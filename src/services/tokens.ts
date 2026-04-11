@@ -59,19 +59,20 @@ export async function fetchTokenChanges24h(): Promise<Map<string, number>> {
       { next: { revalidate: 120 } }
     );
     const data = await res.json();
+    // DefiLlama returns coins[key] as a flat number (the % change), e.g.
+    //   {"coins":{"monad:0x...":1.7559,"coingecko:monad":1.7412}}
     for (const [key, val] of Object.entries(data.coins || {})) {
-      const pct = (val as { percentage?: number }).percentage;
-      if (typeof pct !== "number") continue;
+      if (typeof val !== "number") continue;
       if (key === "coingecko:monad") {
-        changes.set("MON", pct);
-        changes.set("WMON", pct);
+        changes.set("MON", val);
+        changes.set("WMON", val);
         continue;
       }
       const addr = key.replace("monad:", "").toLowerCase();
       const token = Object.values(TOKENS).find(
         (t) => t.address.toLowerCase() === addr
       );
-      if (token) changes.set(token.symbol, pct);
+      if (token) changes.set(token.symbol, val);
     }
   } catch (err) {
     console.error("Failed to fetch 24h price changes:", err);
