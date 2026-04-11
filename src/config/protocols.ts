@@ -180,6 +180,9 @@ export const MORPHO_VAULTS: MorphoVault[] = [
 export const YIELD_VAULTS: YieldVault[] = [];
 
 // ─── DEX / LP ───
-// Uniswap V3 NonfungiblePositionManager on Monad
+// Uniswap V3 deployment on Monad mainnet.
+// Source: github.com/monad-crypto/protocols/mainnet/uniswap.jsonc
 export const UNISWAP_V3_POSITION_MANAGER =
   "0x7197E214c0b767cFB76Fb734ab638E2c192F4E53" as `0x${string}`;
+export const UNISWAP_V3_FACTORY =
+  "0x204faca1764b154221e35c0d20abb3c525710498" as `0x${string}`;
