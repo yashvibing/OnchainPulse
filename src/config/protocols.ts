@@ -93,14 +93,19 @@ export const LENDING_PROTOCOLS: LendingProtocol[] = [];
 export const MORPHO_BLUE_ADDRESS =
   "0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee" as `0x${string}`;
 
-// ─── MetaMorpho vaults on Monad ───
-// Top vaults by TVL as of 2026-04-11. Snapshot from Morpho's GraphQL API:
-// https://blue-api.morpho.org/graphql (chainId: 143, ordered by TotalAssetsUsd).
-// APYs are fetched live from the same API at runtime — only addresses + asset
-// metadata are pinned here. New vaults launched after this date won't appear
-// until added to this list. Update via:
+// ─── MetaMorpho vaults on Monad — STATIC FALLBACK ONLY ───
+// The lending service first attempts dynamic discovery via the Morpho GraphQL
+// API at runtime (see fetchTopMorphoVaults in services/lending.ts). This
+// hardcoded list is used ONLY when that API is unreachable.
+//
+// Top vaults by TVL as of 2026-04-11. Snapshot via:
 //   curl https://blue-api.morpho.org/graphql -H 'content-type: application/json' \
 //     -d '{"query":"{vaults(where:{chainId_in:[143]},first:50,orderBy:TotalAssetsUsd,orderDirection:Desc){items{address symbol name asset{symbol}state{totalAssetsUsd}}}}"}'
+//
+// Refreshing this snapshot is no longer urgent since the live API is the
+// primary source. It only matters when the API is down. Refresh annually,
+// or whenever you notice the static list missing a vault that's been around
+// for a while in the dynamic list.
 export const MORPHO_VAULTS: MorphoVault[] = [
   {
     name: "Steakhouse Prime ETH",

@@ -107,20 +107,63 @@ async function fetchEulerPositions(
 // underlying markets. From the user's perspective: deposit asset → earn yield.
 // This is the dominant Morpho UX for retail.
 //
-// We batch one balanceOf call per vault via multicall, then for any non-zero
-// balance we batch convertToAssets calls. APYs come from Morpho's GraphQL API.
+// Vault discovery is dynamic: we query Morpho's GraphQL API at runtime for the
+// top N vaults by TVL on Monad. If that API is down or returns nothing, we
+// fall back to the static MORPHO_VAULTS snapshot in src/config/protocols.ts.
+// The static list is now a safety net, not the primary source — new vaults
+// will appear automatically as they're indexed by Morpho.
 
-interface MorphoVaultApyMap {
-  // address (lowercase) → netApy as a fraction (0.0626 = 6.26%)
-  [address: string]: number;
+// Stable color assignment by underlying asset, so vaults of the same asset
+// share a color across runs. Falls back to a neutral indigo for unknowns.
+function colorForAsset(symbol: string): string {
+  switch (symbol) {
+    case "WETH":
+      return "#7C3AED";
+    case "cbBTC":
+    case "WBTC":
+      return "#F59E0B";
+    case "USDC":
+      return "#2775CA";
+    case "AUSD":
+      return "#1A73E8";
+    case "USDT0":
+      return "#26A17B";
+    case "USD1":
+      return "#FCD34D";
+    case "WMON":
+    case "MON":
+      return "#6D3BF5";
+    default:
+      return "#94A3B8";
+  }
 }
 
-async function fetchMorphoVaultApys(): Promise<MorphoVaultApyMap> {
+// A vault entry enriched with the live netApy from the API. Same shape as
+// MorphoVault but with the APY baked in to avoid a second round-trip.
+interface VaultWithApy extends MorphoVault {
+  netApy: number; // fraction (0.0626 = 6.26%)
+}
+
+// Hit Morpho's GraphQL API for the top vaults on Monad, ordered by TVL.
+// Returns null on failure so callers can fall back to the static list.
+async function fetchTopMorphoVaults(
+  limit = 20
+): Promise<VaultWithApy[] | null> {
   try {
-    const addresses = MORPHO_VAULTS.map((v) => `"${v.address}"`).join(",");
     const query = `{
-      vaults(where: {chainId_in: [143], address_in: [${addresses}]}, first: 50) {
-        items { address state { netApy } }
+      vaults(
+        where: {chainId_in: [143], totalAssetsUsd_gte: 1000}
+        first: ${limit}
+        orderBy: TotalAssetsUsd
+        orderDirection: Desc
+      ) {
+        items {
+          address
+          symbol
+          name
+          asset { symbol }
+          state { netApy }
+        }
       }
     }`;
     const res = await fetch("https://blue-api.morpho.org/graphql", {
@@ -129,31 +172,55 @@ async function fetchMorphoVaultApys(): Promise<MorphoVaultApyMap> {
       body: JSON.stringify({ query }),
       next: { revalidate: 300 }, // cache 5 min
     });
+    if (!res.ok) {
+      console.warn(`Morpho API returned ${res.status}, using static list`);
+      return null;
+    }
     const data = await res.json();
-    const out: MorphoVaultApyMap = {};
-    for (const item of data?.data?.vaults?.items || []) {
-      const apy = item?.state?.netApy;
-      if (typeof apy === "number") {
-        out[item.address.toLowerCase()] = apy;
+    const items = data?.data?.vaults?.items;
+    if (!Array.isArray(items) || items.length === 0) {
+      console.warn("Morpho API returned no vaults, using static list");
+      return null;
+    }
+    const out: VaultWithApy[] = [];
+    for (const item of items) {
+      const addr = item?.address;
+      const sym = item?.asset?.symbol;
+      if (!addr || !sym) continue;
+      // Skip vaults whose underlying asset we don't have in TOKENS — we'd
+      // have no way to price them. Most top vaults use known assets.
+      if (!Object.values(TOKENS).find((t) => t.symbol === sym)) {
+        console.warn(
+          `Morpho vault ${item.symbol} (${addr}) uses unknown asset ${sym}, skipping`
+        );
+        continue;
       }
+      out.push({
+        name: item.name || item.symbol || "Morpho Vault",
+        symbol: item.symbol || "vault",
+        address: addr as `0x${string}`,
+        underlyingSymbol: sym,
+        color: colorForAsset(sym),
+        netApy: typeof item?.state?.netApy === "number" ? item.state.netApy : 0,
+      });
     }
     return out;
   } catch (err) {
-    console.error("Failed to fetch Morpho vault APYs:", err);
-    return {};
+    console.error("Failed to fetch Morpho vaults dynamically:", err);
+    return null;
   }
 }
 
 async function fetchMorphoVaultPositions(
   walletAddress: `0x${string}`,
   prices: Map<string, number>,
-  apys: MorphoVaultApyMap
+  vaults: VaultWithApy[]
 ): Promise<LendingPosition[]> {
-  if (MORPHO_VAULTS.length === 0) return [];
+  if (vaults.length === 0) return [];
   const normalizedWallet = getAddress(walletAddress);
 
   // Batch 1: balanceOf for every vault.
-  const balanceCalls = MORPHO_VAULTS.map((v) => ({
+  const balanceCalls = vaults.map((v) => ({
     address: getAddress(v.address),
     abi: ERC4626_ABI,
     functionName: "balanceOf" as const,
@@ -164,10 +231,10 @@ async function fetchMorphoVaultPositions(
   });
 
   // Collect vaults with non-zero balances. Only these need a second round-trip.
-  const heldVaults: { vault: MorphoVault; shares: bigint }[] = [];
+  const heldVaults: { vault: VaultWithApy; shares: bigint }[] = [];
   balanceResults.forEach((r, i) => {
     if (r.status === "success" && (r.result as bigint) > 0n) {
-      heldVaults.push({ vault: MORPHO_VAULTS[i], shares: r.result as bigint });
+      heldVaults.push({ vault: vaults[i], shares: r.result as bigint });
     }
   });
   if (heldVaults.length === 0) return [];
@@ -197,8 +264,8 @@ async function fetchMorphoVaultPositions(
     const formatted = formatUnits(assetAmount, decimals);
     const price = prices.get(vault.underlyingSymbol) || 0;
     const valueUsd = parseFloat(formatted) * price;
-    // netApy from Morpho is a fraction (0.0626). We display as %, so × 100.
-    const apy = (apys[vault.address.toLowerCase()] || 0) * 100;
+    // vault.netApy is a fraction (0.0626). We display as %, so × 100.
+    const apy = (vault.netApy || 0) * 100;
 
     positions.push({
       protocol: `Morpho · ${vault.name}`,
@@ -214,15 +281,31 @@ async function fetchMorphoVaultPositions(
   return positions;
 }
 
+// Build a VaultWithApy[] from the static MORPHO_VAULTS snapshot. Used as
+// the safety-net path when the live Morpho API is unreachable. APY is 0 in
+// this path because we have no source of truth offline — better to show
+// "0% APY" than to display a stale hardcoded number that the user might
+// trust as current.
+function staticMorphoVaultsAsFallback(): VaultWithApy[] {
+  return MORPHO_VAULTS.map((v) => ({ ...v, netApy: 0 }));
+}
+
 // ─── Fetch all lending positions ───
 export async function fetchLendingPositions(
   walletAddress: `0x${string}`
 ): Promise<LendingPosition[]> {
-  const [prices, morphoApys, eulerApy] = await Promise.all([
+  const [prices, dynamicVaults, eulerApy] = await Promise.all([
     fetchTokenPrices(),
-    fetchMorphoVaultApys(),
+    fetchTopMorphoVaults(20),
     getProtocolApy("euler").catch(() => 0),
   ]);
+
+  const vaultsToCheck = dynamicVaults ?? staticMorphoVaultsAsFallback();
+  if (dynamicVaults === null) {
+    console.warn(
+      `Using static MORPHO_VAULTS fallback (${vaultsToCheck.length} vaults)`
+    );
+  }
 
   const allPositions: LendingPosition[] = [];
 
@@ -231,7 +314,7 @@ export async function fetchLendingPositions(
   const morphoPositions = await fetchMorphoVaultPositions(
     walletAddress,
     prices,
-    morphoApys
+    vaultsToCheck
   );
   allPositions.push(...morphoPositions);
 
