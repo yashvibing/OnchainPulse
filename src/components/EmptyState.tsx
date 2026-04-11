@@ -6,9 +6,9 @@ export function EmptyState() {
         Enter a wallet address to view your Monad DeFi portfolio
       </div>
       <div className="mx-auto max-w-[420px] text-[12.5px] leading-relaxed text-[var(--color-text-dim)]">
-        Tracks staking (aPriori, FastLane, Kintsu), LP positions (Kuru,
-        Uniswap, Curve), lending (Morpho, Euler), yield vaults (Upshift), and
-        all token holdings.
+        Tracks liquid staking (aPriori, FastLane, Kintsu, Magma), Morpho
+        lending vaults, and all token holdings. Uniswap V3 LP positions and
+        more protocols coming soon.
       </div>
     </div>
   );
@@ -22,7 +22,7 @@ export function LoadingSpinner() {
         Scanning Monad ecosystem…
       </div>
       <div className="mt-1.5 text-[11.5px] text-[var(--color-text-dim)]">
-        aPriori · FastLane · Kuru · Uniswap · Morpho · Upshift
+        aPriori · FastLane · Kintsu · Magma · Morpho
       </div>
     </div>
   );
