@@ -104,10 +104,23 @@ The token list is at:
 ## Commands
 
 ```bash
-npm run dev      # Start dev server on localhost:3000
-npm run build    # Production build
-npm run lint     # Run ESLint
+npm run dev        # Start dev server on localhost:3000
+npm run build      # Production build (also runs type check — must pass before deploy)
+npm run lint       # Run ESLint
+npm test           # Run vitest suite (should always be green on main)
+npm run test:watch # Vitest in watch mode while developing
 ```
+
+## Testing
+
+Tests live in `test/` mirroring the `src/` tree. Stack: vitest + jsdom + @testing-library/react. See [TESTING.md](TESTING.md) for the full guide.
+
+Expectations when changing code:
+- **New function** → add a test.
+- **Bug fix** → add a regression test that fails on the old code and passes on the fix. Verify by temporarily reverting.
+- **New conditional** (if/else, switch) → test BOTH branches.
+- **Never commit code that makes existing tests fail.**
+- **The LST exclusion rule in `usePortfolio.ts` is regression-tested** ([test/hooks/usePortfolio.regression-001.test.tsx](test/hooks/usePortfolio.regression-001.test.tsx)). When wiring new staking protocols (Kintsu, Magma) the new LSTs must follow the same `category: "lst"` rule or the regression test will catch the double-count.
 
 ## TODO (priority order)
 
