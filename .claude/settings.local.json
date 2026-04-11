@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "WebFetch(domain:monadscan.com)",
+      "WebFetch(domain:monad.socialscan.io)",
+      "WebFetch(domain:monadvision.com)",
+      "WebFetch(domain:api.socialscan.io)",
+      "Bash(curl -s -X POST https://rpc.monad.xyz -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7197E214c0b767cFB76Fb734ab638E2c192F4E53\",\"data\":\"0x70a08231000000000000000000000000415ca88b148cd7a3bbad61788a9b90f2a788eec7\"},\"latest\"],\"id\":1}')",
+      "Bash(curl -s -X POST https://rpc.monad.xyz -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7197E214c0b767cFB76Fb734ab638E2c192F4E53\",\"data\":\"0x2f745c59000000000000000000000000415ca88b148cd7a3bbad61788a9b90f2a788eec70000000000000000000000000000000000000000000000000000000000000000\"},\"latest\"],\"id\":1}')"
+    ]
+  }
+}

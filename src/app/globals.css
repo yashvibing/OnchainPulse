@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── MonFolio Design Tokens ─── */
+  /* Deep indigo + teal palette — distinct from Monad's branding */
+  --color-bg-primary: #0D0B1A;
+  --color-bg-card: rgba(255, 255, 255, 0.025);
+  --color-bg-card-hover: rgba(255, 255, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-hover: rgba(255, 255, 255, 0.1);
+
+  --color-text-primary: #E8E8FF;
+  --color-text-secondary: #A0A0B8;
+  --color-text-muted: #5A5A74;
+  --color-text-dim: #3A3A54;
+
+  --color-accent-indigo: #6D3BF5;
+  --color-accent-teal: #0EA5A0;
+  --color-accent-violet: #A78BFA;
+  --color-accent-pink: #E11D89;
+
+  --color-positive: #14B8A6;
+  --color-negative: #F87171;
+  --color-warning: #F59E0B;
+
+  --font-display: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-display);
+  }
+}
+
+/* ─── Utility classes ─── */
+@layer utilities {
+  .bg-radial-glow {
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(70, 30, 160, 0.1) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 100%, rgba(10, 130, 120, 0.06) 0%, transparent 50%),
+      var(--color-bg-primary);
+  }
+
+  .card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+  }
+
+  .card-hover {
+    transition: background 0.2s, border-color 0.2s;
+    &:hover {
+      background: var(--color-bg-card-hover);
+      border-color: var(--color-border-hover);
+    }
+  }
+
+  .gradient-brand {
+    background: linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-teal));
+  }
+}
+
+/* ─── Spinner animation ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 0.8s linear infinite; }
