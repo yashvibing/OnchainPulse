@@ -92,7 +92,24 @@ export const TOKENS: Record<string, TokenInfo> = {
     category: "lst",
     logoColor: "#D97706",
   },
-  // TODO: Add Kintsu (kMON), Magma (gMON) once addresses confirmed
+  // Note: Kintsu's on-chain symbol is sMON, not kMON. The community
+  // historically called it "kMON" but the actual ERC-20 reports "sMON".
+  sMON: {
+    address: "0xA3227C5969757783154C60bF0bC1944180ed81B9",
+    symbol: "sMON",
+    name: "Kintsu Staked Monad",
+    decimals: 18,
+    category: "lst",
+    logoColor: "#EC4899",
+  },
+  gMON: {
+    address: "0x8498312A6B3CbD158bf0c93AbdCF29E6e4F55081",
+    symbol: "gMON",
+    name: "gMON",
+    decimals: 18,
+    category: "lst",
+    logoColor: "#F97316",
+  },
 };
 
 // All ERC-20 addresses for batch balance queries

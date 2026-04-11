@@ -57,6 +57,22 @@ export const ERC4626_ABI = [
   },
 ] as const;
 
+// Kintsu's StakedMonadV2 — same shape as ERC-4626 but uses uint96 instead of
+// uint256 for the share amount, which produces a different function selector.
+// Don't merge this into ERC4626_ABI: viem dispatches by function selector and
+// having two `convertToAssets` entries with different param types in one ABI
+// causes ambiguity errors.
+export const KINTSU_LST_ABI = [
+  ...ERC20_ABI,
+  {
+    inputs: [{ name: "shares", type: "uint96" }],
+    name: "convertToAssets",
+    outputs: [{ name: "", type: "uint96" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 // Euler-style vault with debt tracking
 export const EULER_VAULT_ABI = [
   ...ERC4626_ABI,

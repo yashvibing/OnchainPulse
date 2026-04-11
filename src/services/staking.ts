@@ -1,6 +1,6 @@
 import { formatUnits, getAddress } from "viem";
 import { monadClient } from "@/lib/client";
-import { ERC20_ABI, ERC4626_ABI } from "@/lib/abis";
+import { ERC20_ABI, ERC4626_ABI, KINTSU_LST_ABI } from "@/lib/abis";
 import { STAKING_PROTOCOLS, type StakingProtocol } from "@/config/protocols";
 import { fetchTokenPrices } from "./tokens";
 
@@ -70,17 +70,36 @@ async function fetchStakingPosition(
 
     if (lstBalance === 0n) return null;
 
-    // Get exchange rate: how much MON per 1 LST
+    // Get exchange rate: how much MON per 1 LST. Dispatch on protocol config —
+    // standard ERC-4626 takes uint256, Kintsu takes uint96 (different selector).
     let monEquivalent: bigint;
     try {
-      monEquivalent = await monadClient.readContract({
-        address: normalizedLst,
-        abi: ERC4626_ABI,
-        functionName: "convertToAssets",
-        args: [lstBalance],
-      });
-    } catch {
-      // If convertToAssets fails, assume 1:1 rate
+      if (protocol.exchangeRateMethod === "convertToAssetsUint96") {
+        // Kintsu's StakedMonadV2 caps shares at uint96 (~7.9e28). Sanity-clamp
+        // and call with the uint96-typed ABI so viem picks the right selector.
+        const UINT96_MAX = (1n << 96n) - 1n;
+        const sharesArg = lstBalance > UINT96_MAX ? UINT96_MAX : lstBalance;
+        const result = await monadClient.readContract({
+          address: normalizedLst,
+          abi: KINTSU_LST_ABI,
+          functionName: "convertToAssets",
+          args: [sharesArg],
+        });
+        monEquivalent = BigInt(result);
+      } else {
+        // Default ERC-4626 path (FastLane shMON, aPriori aprMON, Magma gMON)
+        monEquivalent = await monadClient.readContract({
+          address: normalizedLst,
+          abi: ERC4626_ABI,
+          functionName: "convertToAssets",
+          args: [lstBalance],
+        });
+      }
+    } catch (err) {
+      console.error(
+        `convertToAssets failed for ${protocol.name}, falling back to 1:1`,
+        err
+      );
       monEquivalent = lstBalance;
     }
 

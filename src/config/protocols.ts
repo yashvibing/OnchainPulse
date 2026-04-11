@@ -10,8 +10,14 @@ export interface StakingProtocol {
   lstToken: `0x${string}`;
   lstSymbol: string;
   color: string;
-  // Some protocols use ERC-4626, others have custom methods
-  exchangeRateMethod: "convertToAssets" | "getPooledMonByShares";
+  // Some protocols use standard ERC-4626 (uint256), some use a uint96 variant
+  // (Kintsu), and some have entirely custom getter functions. The staking
+  // service dispatches on this field. New protocols default to the standard
+  // path until proven otherwise.
+  exchangeRateMethod:
+    | "convertToAssets" // ERC-4626 standard, uint256
+    | "convertToAssetsUint96" // Kintsu — same name, uint96 param, different selector
+    | "getPooledMonByShares"; // Lido-style, reserved
 }
 
 export interface LendingProtocol {
@@ -44,7 +50,23 @@ export const STAKING_PROTOCOLS: StakingProtocol[] = [
     color: "#D97706",
     exchangeRateMethod: "convertToAssets",
   },
-  // TODO: Add Kintsu, Magma once contract addresses confirmed
+  {
+    name: "Kintsu",
+    lstToken: "0xA3227C5969757783154C60bF0bC1944180ed81B9",
+    lstSymbol: "sMON",
+    color: "#EC4899",
+    // Kintsu's StakedMonadV2 declares convertToAssets(uint96) instead of the
+    // ERC-4626 uint256 form, so the function selector differs. Verified on-chain
+    // 2026-04-11: 1 sMON ≈ 1.0538 MON via selector 0xfb9848e4.
+    exchangeRateMethod: "convertToAssetsUint96",
+  },
+  {
+    name: "Magma",
+    lstToken: "0x8498312A6B3CbD158bf0c93AbdCF29E6e4F55081",
+    lstSymbol: "gMON",
+    color: "#F97316",
+    exchangeRateMethod: "convertToAssets",
+  },
 ];
 
 // ─── Lending ───
