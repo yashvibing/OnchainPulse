@@ -207,7 +207,7 @@ export default function DashboardPage() {
                 Foundation.
               </p>
               <p className="mt-1">
-                Data powered by Monad RPC · DefiLlama · BlockVision
+                Data powered by Monad RPC · DefiLlama
               </p>
             </footer>
           </>
