@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePortfolio } from "@/hooks/usePortfolio";
+import { usePortfolio, useTokenTransferHistory } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
 import { StatCards } from "@/components/StatCards";
@@ -11,6 +11,7 @@ import { StakingCards } from "@/components/StakingCards";
 import { VaultCards } from "@/components/VaultCards";
 import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
+import { TransactionList } from "@/components/TransactionList";
 import { EmptyState, LoadingSpinner } from "@/components/EmptyState";
 
 const TABS = [
@@ -20,6 +21,7 @@ const TABS = [
   { key: "liquidity", label: "Liquidity" },
   { key: "lending", label: "Lending" },
   { key: "yield", label: "Yield Vaults" },
+  { key: "history", label: "History" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   const portfolio = usePortfolio(address);
+  const history = useTokenTransferHistory(address);
 
   function handleSearch(addr: string) {
     setAddress(addr);
@@ -197,6 +200,21 @@ export default function DashboardPage() {
                 ) : (
                   <NoPositions label="yield vault positions" />
                 )}
+              </div>
+            )}
+
+            {/* ── History ── */}
+            {activeTab === "history" && (
+              <div>
+                <SectionTitle
+                  icon="↻"
+                  title="Recent Transfers"
+                  count={history.data?.length}
+                />
+                <TransactionList
+                  events={history.data || []}
+                  isLoading={history.isLoading}
+                />
               </div>
             )}
 
