@@ -20,7 +20,7 @@ MonFolio is a community-made portfolio dashboard for the Monad blockchain ecosys
 ## Monad Network Details
 
 - **Chain ID**: 143 (mainnet), 10143 (testnet)
-- **RPC**: `https://monad-mainnet.drpc.org` (public, rate-limited) or configured via `NEXT_PUBLIC_MONAD_RPC_URL`
+- **RPC**: `https://rpc.monad.xyz` (official Monad public endpoint, default in code) or configured via `NEXT_PUBLIC_MONAD_RPC_URL`. Alternative: `https://monad-mainnet.drpc.org` (third-party aggregator, also works).
 - **Block Explorers**: monadvision.com, monadscan.com, monad.socialscan.io
 - **Multicall3**: `0xcA11bde05977b3631167028862bE2a173976CA11`
 - **WMON** (mainnet): `0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A` (verified on-chain: `symbol()` returns `"WMON"`, `name()` returns `"Wrapped MON"`). The earlier-documented `0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701` is the testnet address.
