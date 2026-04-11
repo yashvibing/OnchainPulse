@@ -39,8 +39,11 @@ src/
 │   ├── client.ts   # viem PublicClient singleton
 │   └── format.ts   # Display formatting helpers
 ├── services/       # Data fetching (pure functions, no React)
-│   ├── tokens.ts   # Token balances + prices via multicall + DefiLlama
-│   ├── staking.ts  # Staking positions via ERC-4626 reads
+│   ├── tokens.ts   # Token balances + prices + 24h change via multicall + DefiLlama
+│   ├── staking.ts  # Liquid staking positions (aPriori, FastLane, Kintsu, Magma)
+│   ├── lending.ts  # MetaMorpho vault positions + APYs from Morpho GraphQL
+│   ├── liquidity.ts # LP positions (Uniswap V3 — scaffolded)
+│   ├── vaults.ts   # Yield vault positions (Upshift — scaffolded)
 │   └── yields.ts   # APY data from DefiLlama
 ├── hooks/          # React Query wrappers
 │   └── usePortfolio.ts
@@ -63,21 +66,27 @@ src/
 
 ## Key DeFi Protocols on Monad (what we track)
 
+All addresses below verified on-chain. Source of truth: github.com/monad-crypto/protocols.
+
 ### Liquid Staking (WORKING)
-- **aPriori** — LST token: aprMON (`0xb2f82D0f38dc453D596Ad40A37799446Fae9b0CF`). Uses ERC-4626 `convertToAssets()`.
-- **FastLane** — LST token: shMON (`0x3a98250F98Dd388C211206F907e4d85439900D7a`). Uses ERC-4626 `convertToAssets()`.
-- **Kintsu** — LST token: kMON. Address TODO — look up in github.com/monad-crypto/protocols
-- **Magma** — LST token: gMON. Address TODO — look up in github.com/monad-crypto/protocols
+- **aPriori** — aprMON (`0x0c65A0BC65a5D819235B71F554D210D3F80E0852`). ERC-4626 `convertToAssets(uint256)`. ~17.2% APY.
+- **FastLane** — shMON (`0x1B68626dCa36c7fE922fD2d55E4f631d962dE19c`). ERC-4626 `convertToAssets(uint256)`. ~15.8% APY.
+- **Kintsu** — sMON (`0xA3227C5969757783154C60bF0bC1944180ed81B9`). Note: on-chain symbol is `sMON`, NOT `kMON` — older docs called it kMON. Uses non-standard `convertToAssets(uint96)` (selector `0xfb9848e4`), see [src/lib/abis.ts](src/lib/abis.ts) `KINTSU_LST_ABI`. ~11.1% APY.
+- **Magma** — gMON (`0x8498312A6B3CbD158bf0c93AbdCF29E6e4F55081`). Standard ERC-4626. ~11.4% APY.
+
+The LST exclusion rule lives in [src/hooks/usePortfolio.ts](src/hooks/usePortfolio.ts) — LST balances appear in the Tokens table for visibility but are NOT counted in `totalValue` (the staking position contributes the value). New LSTs MUST set `category: "lst"` in [src/config/tokens.ts](src/config/tokens.ts) or the regression test will catch the double-count.
+
+### Lending (WORKING — MetaMorpho vaults)
+- **Morpho Blue** core: `0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee`
+- **MetaMorpho vaults** — top ~10 by TVL hardcoded in [src/config/protocols.ts](src/config/protocols.ts) `MORPHO_VAULTS` (steakETH, hyperUSDCa, augustUSDC, bbqUSDT0, etc.). Standard ERC-4626. APYs fetched live from `blue-api.morpho.org/graphql`. Refresh the list periodically by re-querying that endpoint with `chainId_in: [143]`.
+- **Direct Morpho Blue positions** are NOT supported — they need bytes32 market IDs and per-market indexing. Most retail users hold MetaMorpho shares, not direct positions.
+- **Euler** — disabled. The address listed in monad-crypto/protocols is the eVaultFactory, not a real vault.
 
 ### DEXs / LP Positions (SCAFFOLDED — needs wiring)
-- **Uniswap V3** — NFT-based positions. ABI in `abis.ts`. Need PositionManager address.
+- **Uniswap V3** — NFT-based positions. ABI in [src/lib/abis.ts](src/lib/abis.ts). PositionManager address: `0x7197E214c0b767cFB76Fb734ab638E2c192F4E53`. Service is stubbed.
 - **Kuru** — On-chain CLOB DEX. Hybrid CLOB+AMM model.
 - **Curve** — Stableswap pools (AUSD/USDC etc). Standard LP tokens.
 - **Balancer V3** — Weighted pools.
-
-### Lending (SCAFFOLDED — needs wiring)
-- **Morpho** — Market-based lending. ABI in `abis.ts`. Need Morpho Blue address.
-- **Euler** — ERC-4626 vaults with debtOf(). ABI in `abis.ts`. Need vault addresses.
 
 ### Yield Vaults (SCAFFOLDED — needs wiring)
 - **Upshift** — WMON and AUSD yield vaults. ERC-4626 pattern. Need vault addresses.
@@ -124,11 +133,19 @@ Expectations when changing code:
 
 ## TODO (priority order)
 
-1. Look up real contract addresses from monad-crypto/protocols repo and fill in TODOs in `src/config/protocols.ts`
-2. Wire up Uniswap V3 LP position reading (ABI ready in abis.ts)
-3. Add Morpho lending positions (ABI ready)
-4. Add Upshift yield vault positions (ERC-4626 pattern)
-5. Add 30-day portfolio value sparkline chart
-6. Add transaction history via BlockVision API or eth_getLogs
-7. Replace manual address input with wagmi wallet connect
-8. Add Kintsu and Magma staking protocols
+1. Wire up Uniswap V3 LP position reading (ABI + PositionManager address ready, service stubbed)
+2. Add Upshift yield vault positions (ERC-4626 pattern, need vault addresses)
+3. Replace manual address input with wagmi wallet connect
+4. Add 30-day portfolio value sparkline chart
+5. Add transaction history via BlockVision API or eth_getLogs
+6. Add Curve, Balancer V3, Kuru DEX position tracking
+7. Refresh `MORPHO_VAULTS` list periodically (currently a static snapshot from 2026-04-11 — new vaults won't appear until added)
+8. Update the empty-state copy in `src/components/EmptyState.tsx` to mention Magma alongside Kintsu
+
+### Done
+- ✅ Look up real addresses from `monad-crypto/protocols` for staking and Morpho
+- ✅ Add Kintsu and Magma staking (with Kintsu's uint96 quirk)
+- ✅ Add Morpho lending via MetaMorpho vaults (top 10 by TVL)
+- ✅ Wire 24h price change column from DefiLlama
+- ✅ Stop double-counting LSTs in totalValue (regression-tested)
+- ✅ Bootstrap vitest test suite + CI-ready scripts

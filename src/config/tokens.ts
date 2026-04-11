@@ -42,10 +42,13 @@ export const TOKENS: Record<string, TokenInfo> = {
     category: "stablecoin",
     logoColor: "#2775CA",
   },
-  USDT: {
+  // The token at this address is USDT0 (LayerZero Omnichain USDT), not Tether's
+  // native USDT. Verified on-chain 2026-04-11: symbol() returns "USDT0",
+  // name() returns "USDT0". This is the canonical bridged USDT on Monad.
+  USDT0: {
     address: "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
-    symbol: "USDT",
-    name: "Tether USD",
+    symbol: "USDT0",
+    name: "USDT0",
     decimals: 6,
     category: "stablecoin",
     logoColor: "#26A17B",
@@ -65,6 +68,27 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 8,
     category: "wrapped",
     logoColor: "#F7931A",
+  },
+  // Coinbase Wrapped BTC — used as the underlying for several Morpho vaults
+  // on Monad (Hyperithm cbBTC Apex, Steakhouse High Yield cbBTC).
+  // Verified on-chain 2026-04-11.
+  cbBTC: {
+    address: "0xd18B7EC58Cdf4876f6AFebd3Ed1730e4Ce10414b",
+    symbol: "cbBTC",
+    name: "Coinbase Wrapped BTC",
+    decimals: 8,
+    category: "wrapped",
+    logoColor: "#0052FF",
+  },
+  // World Liberty Financial USD — stablecoin used by Morpho's bbqUSD1 vault.
+  // Verified on-chain 2026-04-11: name() = "World Liberty Financial USD".
+  USD1: {
+    address: "0x111111d2bf19e43C34263401e0CAd979eD1cdb61",
+    symbol: "USD1",
+    name: "World Liberty Financial USD",
+    decimals: 6,
+    category: "stablecoin",
+    logoColor: "#FCD34D",
   },
   AUSD: {
     address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",

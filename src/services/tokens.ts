@@ -118,12 +118,15 @@ export async function fetchTokenPrices(): Promise<Map<string, number>> {
 
     // Fallback prices for stablecoins
     if (!prices.has("USDC")) prices.set("USDC", 1.0);
-    if (!prices.has("USDT")) prices.set("USDT", 1.0);
+    if (!prices.has("USDT0")) prices.set("USDT0", 1.0);
     if (!prices.has("AUSD")) prices.set("AUSD", 1.0);
+    if (!prices.has("USD1")) prices.set("USD1", 1.0);
 
     // LST prices ≈ MON price (they accrue value slightly above 1:1)
     if (!prices.has("aprMON")) prices.set("aprMON", monPrice * 1.018);
     if (!prices.has("shMON")) prices.set("shMON", monPrice * 1.012);
+    if (!prices.has("sMON")) prices.set("sMON", monPrice * 1.054);
+    if (!prices.has("gMON")) prices.set("gMON", monPrice * 1.048);
   } catch (err) {
     console.error("Failed to fetch token prices:", err);
   }

@@ -34,6 +34,17 @@ export interface YieldVault {
   color: string;
 }
 
+// MetaMorpho vault — curated ERC-4626 vault on top of Morpho Blue markets.
+// User holds vault shares, vault rebalances across underlying lending markets.
+// This is the default Morpho UX for ~all retail depositors.
+export interface MorphoVault {
+  name: string; // "Steakhouse Prime ETH"
+  symbol: string; // "steakETH"
+  address: `0x${string}`;
+  underlyingSymbol: string; // must match a key in TOKENS for pricing
+  color: string;
+}
+
 // ─── Liquid Staking ───
 export const STAKING_PROTOCOLS: StakingProtocol[] = [
   {
@@ -70,10 +81,98 @@ export const STAKING_PROTOCOLS: StakingProtocol[] = [
 ];
 
 // ─── Lending ───
-// NOTE: Morpho address is the core contract (needs market IDs, not balanceOf).
-// Euler address is the eVaultFactory, not an actual vault — balanceOf reverts.
-// Both are disabled until real user-facing vault addresses are discovered.
+// NOTE: Direct Morpho Blue positions need bytes32 market IDs and per-market
+// indexing — users mostly interact via MetaMorpho vaults instead. See
+// MORPHO_VAULTS below for the curated user-facing vault list.
+// Euler is still disabled — the address listed in monad-crypto/protocols is
+// the eVaultFactory, not a real vault, and balanceOf reverts.
 export const LENDING_PROTOCOLS: LendingProtocol[] = [];
+
+// ─── Morpho Blue core ───
+// Source: github.com/monad-crypto/protocols/mainnet/morpho.jsonc
+export const MORPHO_BLUE_ADDRESS =
+  "0xD5D960E8C380B724a48AC59E2DfF1b2CB4a1eAee" as `0x${string}`;
+
+// ─── MetaMorpho vaults on Monad ───
+// Top vaults by TVL as of 2026-04-11. Snapshot from Morpho's GraphQL API:
+// https://blue-api.morpho.org/graphql (chainId: 143, ordered by TotalAssetsUsd).
+// APYs are fetched live from the same API at runtime — only addresses + asset
+// metadata are pinned here. New vaults launched after this date won't appear
+// until added to this list. Update via:
+//   curl https://blue-api.morpho.org/graphql -H 'content-type: application/json' \
+//     -d '{"query":"{vaults(where:{chainId_in:[143]},first:50,orderBy:TotalAssetsUsd,orderDirection:Desc){items{address symbol name asset{symbol}state{totalAssetsUsd}}}}"}'
+export const MORPHO_VAULTS: MorphoVault[] = [
+  {
+    name: "Steakhouse Prime ETH",
+    symbol: "steakETH",
+    address: "0xba8424EBBEd6C51bEa6d6D903B8815838E6a0322",
+    underlyingSymbol: "WETH",
+    color: "#7C3AED",
+  },
+  {
+    name: "Hyperithm cbBTC Apex",
+    symbol: "hypercbBTCa",
+    address: "0xc402B0cACC0C684427dAA40d964c8AE6fDbb96f7",
+    underlyingSymbol: "cbBTC",
+    color: "#F59E0B",
+  },
+  {
+    name: "Hyperithm USDC Apex",
+    symbol: "hyperUSDCa",
+    address: "0xA8665084D8CD6276c00CA97Cbc0BF4BC9ae94c79",
+    underlyingSymbol: "USDC",
+    color: "#2775CA",
+  },
+  {
+    name: "Grove x Steakhouse High Yield AUSD",
+    symbol: "grove-bbqAUSD",
+    address: "0x32841A8511D5c2c5b253f45668780B99139e476D",
+    underlyingSymbol: "AUSD",
+    color: "#1A73E8",
+  },
+  {
+    name: "Steakhouse High Yield USDT0",
+    symbol: "bbqUSDT0",
+    address: "0x961a59Fe249b9795FAE7fA35f9E89629689D5278",
+    underlyingSymbol: "USDT0",
+    color: "#26A17B",
+  },
+  {
+    name: "August USDC",
+    symbol: "augustUSDC",
+    address: "0x21649703fe63265058e9f22582552561Af4AfA3f",
+    underlyingSymbol: "USDC",
+    color: "#0EA5E9",
+  },
+  {
+    name: "Steakhouse High Yield USD1",
+    symbol: "bbqUSD1",
+    address: "0x8699bfe5c6D74DF561555Bc708dacF165d8E0D73",
+    underlyingSymbol: "USD1",
+    color: "#FCD34D",
+  },
+  {
+    name: "Steakhouse High Yield USDC",
+    symbol: "bbqUSDC",
+    address: "0x802c91d807A8DaCA257c4708ab264B6520964e44",
+    underlyingSymbol: "USDC",
+    color: "#3B82F6",
+  },
+  {
+    name: "Steakhouse High Yield cbBTC",
+    symbol: "bbqCBBTC",
+    address: "0x0f6F5A8272A4Da23e458aABCBCe6382C5cdc6b77",
+    underlyingSymbol: "cbBTC",
+    color: "#FB923C",
+  },
+  {
+    name: "Steakhouse High Yield AUSD",
+    symbol: "bbqAUSD",
+    address: "0xBC03E505EE65f9fAa68a2D7e5A74452858C16D29",
+    underlyingSymbol: "AUSD",
+    color: "#60A5FA",
+  },
+];
 
 // ─── Yield Vaults (Upshift) ───
 // NOTE: These addresses may be proxies that don't directly support ERC-4626.
