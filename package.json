@@ -5,11 +5,13 @@
   "description": "MonFolio — Community Monad Portfolio Dashboard. Not affiliated with Monad Foundation.",
   "scripts": {
     "dev": "next dev",
+    "dev:fresh": "npm run clean && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",

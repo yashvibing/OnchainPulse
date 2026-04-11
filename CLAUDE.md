@@ -114,11 +114,25 @@ The token list is at:
 
 ```bash
 npm run dev        # Start dev server on localhost:3000
+npm run dev:fresh  # Cleans .next first — use after running `next build`
 npm run build      # Production build (also runs type check — must pass before deploy)
+npm run start      # Run the production build (after `build`)
 npm run lint       # Run ESLint
 npm test           # Run vitest suite (should always be green on main)
 npm run test:watch # Vitest in watch mode while developing
+npm run clean      # Wipe .next/ — use when dev mode is acting weird
 ```
+
+### Gotcha: don't run `next build` while `next dev` is running
+
+Both write into `.next/`. The dev server holds dev artifacts (chunks, route
+manifests) and `next build` overwrites them with production artifacts. After
+that, dev's next request crashes with `ENOENT: routes-manifest.json` or
+`Cannot find module './<chunk>.js'`. The fix is `npm run dev:fresh` (which
+wipes `.next/` first).
+
+If you only need to type-check, prefer `npx tsc --noEmit` — it doesn't touch
+`.next/`. If you need a real production build, stop dev first.
 
 ## Testing
 
