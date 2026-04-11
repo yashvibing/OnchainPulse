@@ -23,7 +23,7 @@ export function StatCards({
         accent="var(--color-positive)"
       />
       <StatCard
-        label="POSITIONS"
+        label="DEFI POSITIONS"
         value={String(positionCount)}
         sub={`across ${protocolCount} protocol${protocolCount !== 1 ? "s" : ""}`}
         accent="var(--color-accent-violet)"
