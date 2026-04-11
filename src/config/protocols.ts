@@ -180,9 +180,34 @@ export const MORPHO_VAULTS: MorphoVault[] = [
 ];
 
 // ─── Yield Vaults (Upshift) ───
-// NOTE: These addresses may be proxies that don't directly support ERC-4626.
-// Disabled until correct vault implementation addresses are confirmed.
-export const YIELD_VAULTS: YieldVault[] = [];
+// Source: github.com/monad-crypto/protocols/mainnet/upshift.jsonc
+//
+// earnAUSD is a custom yield aggregator on top of AUSD — it routes deposits
+// across multiple AUSD-denominated DeFi strategies. The token at this address
+// (0x103222...7496) is a UUPS proxy. It does NOT expose the standard ERC-4626
+// `convertToAssets()` or `asset()` functions even when called via the proxy
+// (verified on-chain 2026-04-11). Both the proxy and its current impl
+// (0x2255...dbf3) revert on those selectors.
+//
+// As a result, the vaults service can't compute the exact share→asset rate.
+// We approximate it as 1:1 with AUSD ($1) — the position is shown with the
+// share count valued as if it were the underlying. This under-reports yield
+// that's already accrued (typically <10% of position over the lifetime). Good
+// enough to surface that the position exists and roughly how much it's worth;
+// not good enough for precise accounting. If a future Upshift release exposes
+// a public rate function, swap the fallback in fetchVaultPosition for it.
+//
+// EARNMON ($18K TVL on DefiLlama, project="upshift", symbol="EARNMON") is
+// also live but its address isn't in monad-crypto/protocols yet, so it's not
+// tracked. Add it here when the address surfaces.
+export const YIELD_VAULTS: YieldVault[] = [
+  {
+    name: "Upshift earnAUSD",
+    vaultAddress: "0x103222f020e98Bba0AD9809A011FDF8e6F067496",
+    underlyingSymbol: "AUSD",
+    color: "#1A73E8",
+  },
+];
 
 // ─── DEX / LP ───
 // Uniswap V3 deployment on Monad mainnet.

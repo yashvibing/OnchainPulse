@@ -38,14 +38,24 @@ export async function fetchMonadYields(): Promise<YieldPool[]> {
   }
 }
 
-// Helper: get best yield for a specific protocol
+// Helper: get best yield for a specific protocol. Optional symbolFilter
+// disambiguates when one project has multiple pools (e.g. Upshift has both
+// earnAUSD and earnMON).
 export async function getProtocolApy(
-  protocolName: string
+  protocolName: string,
+  symbolFilter?: string
 ): Promise<number> {
   const pools = await fetchMonadYields();
-  const match = pools.find((p) =>
-    p.project.toLowerCase().includes(protocolName.toLowerCase())
-  );
+  const match = pools.find((p) => {
+    if (!p.project.toLowerCase().includes(protocolName.toLowerCase()))
+      return false;
+    if (
+      symbolFilter &&
+      !(p.symbol || "").toLowerCase().includes(symbolFilter.toLowerCase())
+    )
+      return false;
+    return true;
+  });
   return match?.apy || 0;
 }
 
