@@ -108,8 +108,13 @@ export function usePortfolio(address: string | null) {
 
   const isError = tokens.isError && staking.isError;
 
+  // Exclude LSTs from token total — their value is already counted via the
+  // matching staking position (e.g. shMON token balance == FastLane staking
+  // position). Without this filter, totalValue is roughly 2× the real value.
   const totalTokenValue =
-    tokens.data?.reduce((sum, t) => sum + t.valueUsd, 0) || 0;
+    tokens.data
+      ?.filter((t) => t.token.category !== "lst")
+      .reduce((sum, t) => sum + t.valueUsd, 0) || 0;
   const totalStakingValue =
     staking.data?.reduce((sum, s) => sum + s.stakedValueUsd, 0) || 0;
   const totalVaultValue =
