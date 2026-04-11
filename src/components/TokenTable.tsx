@@ -61,13 +61,16 @@ export function TokenTable({ tokens, compact }: TokenTableProps) {
           </div>
           <div
             className={`text-right text-[12.5px] font-semibold ${
-              t.change24h >= 0
-                ? "text-[var(--color-positive)]"
-                : "text-[var(--color-negative)]"
+              t.change24h === null
+                ? "text-[var(--color-text-dim)]"
+                : t.change24h >= 0
+                  ? "text-[var(--color-positive)]"
+                  : "text-[var(--color-negative)]"
             }`}
           >
-            {t.change24h >= 0 ? "+" : ""}
-            {t.change24h.toFixed(1)}%
+            {t.change24h === null
+              ? "—"
+              : `${t.change24h >= 0 ? "+" : ""}${t.change24h.toFixed(1)}%`}
           </div>
         </div>
       ))}

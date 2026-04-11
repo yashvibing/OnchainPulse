@@ -11,7 +11,7 @@ export interface TokenBalance {
   formatted: string;
   valueUsd: number;
   priceUsd: number;
-  change24h: number;
+  change24h: number | null;
 }
 
 // ─── Fetch native MON balance ───
@@ -44,6 +44,39 @@ async function getErc20Balances(
   });
 
   return balances;
+}
+
+// ─── Fetch 24h price change percentages from DefiLlama ───
+export async function fetchTokenChanges24h(): Promise<Map<string, number>> {
+  const changes = new Map<string, number>();
+  try {
+    const coinKeys = [
+      "coingecko:monad",
+      ...Object.values(TOKENS).map((t) => `monad:${t.address}`),
+    ].join(",");
+    const res = await fetch(
+      `https://coins.llama.fi/percentage/${coinKeys}?lookForward=false&period=1d`,
+      { next: { revalidate: 120 } }
+    );
+    const data = await res.json();
+    for (const [key, val] of Object.entries(data.coins || {})) {
+      const pct = (val as { percentage?: number }).percentage;
+      if (typeof pct !== "number") continue;
+      if (key === "coingecko:monad") {
+        changes.set("MON", pct);
+        changes.set("WMON", pct);
+        continue;
+      }
+      const addr = key.replace("monad:", "").toLowerCase();
+      const token = Object.values(TOKENS).find(
+        (t) => t.address.toLowerCase() === addr
+      );
+      if (token) changes.set(token.symbol, pct);
+    }
+  } catch (err) {
+    console.error("Failed to fetch 24h price changes:", err);
+  }
+  return changes;
 }
 
 // ─── Fetch token prices from DefiLlama ───
@@ -101,10 +134,11 @@ export async function fetchTokenPrices(): Promise<Map<string, number>> {
 export async function fetchTokenBalances(
   walletAddress: `0x${string}`
 ): Promise<TokenBalance[]> {
-  const [nativeBalance, erc20Balances, prices] = await Promise.all([
+  const [nativeBalance, erc20Balances, prices, changes24h] = await Promise.all([
     getNativeBalance(walletAddress).catch(() => 0n),
     getErc20Balances(walletAddress).catch(() => new Map<string, bigint>()),
     fetchTokenPrices(),
+    fetchTokenChanges24h().catch(() => new Map<string, number>()),
   ]);
 
   const balances: TokenBalance[] = [];
@@ -119,7 +153,7 @@ export async function fetchTokenBalances(
       formatted,
       priceUsd: price,
       valueUsd: parseFloat(formatted) * price,
-      change24h: 0, // TODO: fetch from price API
+      change24h: changes24h.has("MON") ? changes24h.get("MON")! : null,
     });
   }
 
@@ -137,7 +171,7 @@ export async function fetchTokenBalances(
       formatted,
       priceUsd: price,
       valueUsd: parseFloat(formatted) * price,
-      change24h: 0, // TODO: fetch from price API
+      change24h: changes24h.has(symbol) ? changes24h.get(symbol)! : null,
     });
   }
 
