@@ -80,6 +80,46 @@ export const STAKING_PROTOCOLS: StakingProtocol[] = [
   },
 ];
 
+// ─── Neverland (Aave V3 fork) ───
+// Source: github.com/monad-crypto/protocols/mainnet/neverland.jsonc
+// Only the initialized reserves are listed. WMON, AUSD, USDC aTokens are
+// deployed but return empty symbol() — proxy not initialized. Skip those.
+export interface NeverlandReserve {
+  asset: string; // must match TOKENS key for pricing
+  aToken: `0x${string}`;
+  variableDebtToken: `0x${string}`;
+  decimals: number;
+}
+
+export const NEVERLAND_POOL = "0x80F00661b13CC5F6ccd3885bE7b4C9c67545D585" as `0x${string}`;
+
+export const NEVERLAND_RESERVES: NeverlandReserve[] = [
+  { asset: "WETH", aToken: "0x31f63Ae5a96566b93477191778606BeBDC4CA66f", variableDebtToken: "0xdE6C157e43c5d9B713C635f439a93CA3BE2156B6", decimals: 18 },
+  { asset: "sMON", aToken: "0xdFC14d336aea9E49113b1356333FD374e646Bf85", variableDebtToken: "0x26A823b286B5dE1185EF0D90F77b7f04e6E24306", decimals: 18 },
+  { asset: "gMON", aToken: "0x7f81779736968836582D31D36274Ed82053aD1AE", variableDebtToken: "0x905999CC7B7e26c1Cb2761F6C00909B65C862b78", decimals: 18 },
+  { asset: "shMON", aToken: "0xC64d73Bb8748C6fA7487ace2D0d945B6fBb2EcDe", variableDebtToken: "0xbb64E46e995bE16eEF3Ec009442ABC0f2c8381B1", decimals: 18 },
+];
+
+// ─── Curvance (ERC-4626 lending) ───
+// Source: github.com/monad-crypto/protocols/mainnet/curvance.jsonc
+// cTokens are ERC-4626 — convertToAssets gives the underlying value.
+export interface CurvanceMarket {
+  cTokenSymbol: string;
+  cToken: `0x${string}`;
+  underlyingSymbol: string; // must match TOKENS key for pricing
+  decimals: number;
+}
+
+export const CURVANCE_MARKETS: CurvanceMarket[] = [
+  { cTokenSymbol: "cWMON", cToken: "0x1e240E30E51491546deC3aF16B0b4EAC8Dd110D4", underlyingSymbol: "WMON", decimals: 18 },
+  { cTokenSymbol: "cshMON", cToken: "0x926C101Cf0a3dE8725Eb24a93E980f9FE34d6230", underlyingSymbol: "shMON", decimals: 18 },
+  { cTokenSymbol: "csMON", cToken: "0x494876051B0E85dCe5ecd5822B1aD39b9660c928", underlyingSymbol: "sMON", decimals: 18 },
+  { cTokenSymbol: "caprMON", cToken: "0xD9E2025b907E95EcC963A5018f56B87575B4aB26", underlyingSymbol: "aprMON", decimals: 18 },
+  { cTokenSymbol: "cUSDC", cToken: "0x21aDBb60a5fB909e7F1fB48aACC4569615CD97b5", underlyingSymbol: "USDC", decimals: 6 },
+  { cTokenSymbol: "cAUSD", cToken: "0x6E182EB501800C555bd5E662E6D350D627F504D8", underlyingSymbol: "AUSD", decimals: 6 },
+  { cTokenSymbol: "cWBTC", cToken: "0x3D2Ff9F862D89Ba526a0fC166bD56ABe04EF28d5", underlyingSymbol: "WBTC", decimals: 8 },
+];
+
 // ─── Lending ───
 // NOTE: Direct Morpho Blue positions need bytes32 market IDs and per-market
 // indexing — users mostly interact via MetaMorpho vaults instead. See

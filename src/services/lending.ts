@@ -1,9 +1,11 @@
 import { formatUnits, getAddress } from "viem";
 import { monadClient } from "@/lib/client";
-import { ERC4626_ABI, EULER_VAULT_ABI } from "@/lib/abis";
+import { ERC20_ABI, ERC4626_ABI, EULER_VAULT_ABI } from "@/lib/abis";
 import {
   LENDING_PROTOCOLS,
   MORPHO_VAULTS,
+  NEVERLAND_RESERVES,
+  CURVANCE_MARKETS,
   type LendingProtocol,
   type MorphoVault,
 } from "@/config/protocols";
@@ -290,14 +292,149 @@ function staticMorphoVaultsAsFallback(): VaultWithApy[] {
   return MORPHO_VAULTS.map((v) => ({ ...v, netApy: 0 }));
 }
 
+// ─── Neverland (Aave V3 fork) ───
+// aTokens are rebasing ERC-20s: balanceOf(user) = supply + accrued interest.
+// variableDebtTokens: balanceOf(user) = borrow amount + accrued interest.
+// No conversion needed — the balance IS the underlying amount.
+
+async function fetchNeverlandPositions(
+  walletAddress: `0x${string}`,
+  prices: Map<string, number>
+): Promise<LendingPosition[]> {
+  if (NEVERLAND_RESERVES.length === 0) return [];
+  const normalizedWallet = getAddress(walletAddress);
+
+  // Batch: balanceOf on every aToken + every debtToken in one multicall.
+  const calls = [
+    ...NEVERLAND_RESERVES.map((r) => ({
+      address: getAddress(r.aToken),
+      abi: ERC20_ABI,
+      functionName: "balanceOf" as const,
+      args: [normalizedWallet] as const,
+    })),
+    ...NEVERLAND_RESERVES.map((r) => ({
+      address: getAddress(r.variableDebtToken),
+      abi: ERC20_ABI,
+      functionName: "balanceOf" as const,
+      args: [normalizedWallet] as const,
+    })),
+  ];
+  const results = await monadClient.multicall({ contracts: calls });
+  const n = NEVERLAND_RESERVES.length;
+
+  const positions: LendingPosition[] = [];
+  for (let i = 0; i < n; i++) {
+    const reserve = NEVERLAND_RESERVES[i];
+    const supplyResult = results[i];
+    const debtResult = results[n + i];
+
+    if (supplyResult.status === "success" && (supplyResult.result as bigint) > 0n) {
+      const formatted = formatUnits(supplyResult.result as bigint, reserve.decimals);
+      const price = prices.get(reserve.asset) || 0;
+      positions.push({
+        protocol: `Neverland · ${reserve.asset}`,
+        type: "supply",
+        asset: reserve.asset,
+        balance: formatted,
+        valueUsd: parseFloat(formatted) * price,
+        apy: 0, // filled below from DefiLlama
+        color: "#8B5CF6",
+      });
+    }
+
+    if (debtResult.status === "success" && (debtResult.result as bigint) > 0n) {
+      const formatted = formatUnits(debtResult.result as bigint, reserve.decimals);
+      const price = prices.get(reserve.asset) || 0;
+      positions.push({
+        protocol: `Neverland · ${reserve.asset}`,
+        type: "borrow",
+        asset: reserve.asset,
+        balance: formatted,
+        valueUsd: parseFloat(formatted) * price,
+        apy: 0,
+        color: "#8B5CF6",
+      });
+    }
+  }
+
+  // Fetch APY from DefiLlama for each asset (best-effort, 0 on failure).
+  for (const pos of positions) {
+    if (pos.type === "supply") {
+      const apy = await getProtocolApy("neverland", pos.asset).catch(() => 0);
+      pos.apy = apy;
+    }
+  }
+
+  return positions;
+}
+
+// ─── Curvance (ERC-4626 lending) ───
+// cTokens are ERC-4626: balanceOf gives shares, convertToAssets gives underlying.
+
+async function fetchCurvancePositions(
+  walletAddress: `0x${string}`,
+  prices: Map<string, number>
+): Promise<LendingPosition[]> {
+  if (CURVANCE_MARKETS.length === 0) return [];
+  const normalizedWallet = getAddress(walletAddress);
+
+  // Batch 1: balanceOf on every cToken.
+  const balanceCalls = CURVANCE_MARKETS.map((m) => ({
+    address: getAddress(m.cToken),
+    abi: ERC20_ABI,
+    functionName: "balanceOf" as const,
+    args: [normalizedWallet] as const,
+  }));
+  const balResults = await monadClient.multicall({ contracts: balanceCalls });
+
+  const held: { market: typeof CURVANCE_MARKETS[number]; shares: bigint }[] = [];
+  balResults.forEach((r, i) => {
+    if (r.status === "success" && (r.result as bigint) > 0n) {
+      held.push({ market: CURVANCE_MARKETS[i], shares: r.result as bigint });
+    }
+  });
+  if (held.length === 0) return [];
+
+  // Batch 2: convertToAssets for non-zero balances.
+  const assetsCalls = held.map(({ market, shares }) => ({
+    address: getAddress(market.cToken),
+    abi: ERC4626_ABI,
+    functionName: "convertToAssets" as const,
+    args: [shares] as const,
+  }));
+  const assetsResults = await monadClient.multicall({ contracts: assetsCalls });
+
+  const positions: LendingPosition[] = [];
+  for (let i = 0; i < held.length; i++) {
+    const { market, shares } = held[i];
+    const assets = assetsResults[i].status === "success"
+      ? (assetsResults[i].result as bigint)
+      : shares;
+    const formatted = formatUnits(assets, market.decimals);
+    const price = prices.get(market.underlyingSymbol) || 0;
+    const apy = await getProtocolApy("curvance", market.underlyingSymbol).catch(() => 0);
+
+    positions.push({
+      protocol: `Curvance · ${market.cTokenSymbol}`,
+      type: "supply",
+      asset: market.underlyingSymbol,
+      balance: formatted,
+      valueUsd: parseFloat(formatted) * price,
+      apy,
+      color: "#F97316",
+    });
+  }
+
+  return positions;
+}
+
 // ─── Fetch all lending positions ───
 export async function fetchLendingPositions(
   walletAddress: `0x${string}`
 ): Promise<LendingPosition[]> {
-  const [prices, dynamicVaults, eulerApy] = await Promise.all([
+  const [prices, dynamicVaults] = await Promise.all([
     fetchTokenPrices(),
     fetchTopMorphoVaults(20),
-    getProtocolApy("euler").catch(() => 0),
   ]);
 
   const vaultsToCheck = dynamicVaults ?? staticMorphoVaultsAsFallback();
@@ -307,28 +444,17 @@ export async function fetchLendingPositions(
     );
   }
 
-  const allPositions: LendingPosition[] = [];
+  // Run all protocol fetchers in parallel.
+  const [morpho, neverland, curvance, euler] = await Promise.all([
+    fetchMorphoVaultPositions(walletAddress, prices, vaultsToCheck),
+    fetchNeverlandPositions(walletAddress, prices),
+    fetchCurvancePositions(walletAddress, prices),
+    Promise.all(
+      LENDING_PROTOCOLS.filter((p) => p.type === "euler").map((p) =>
+        fetchEulerPositions(p, walletAddress, prices, 0)
+      )
+    ).then((arr) => arr.flat()),
+  ]);
 
-  // Morpho MetaMorpho vaults — most users have positions here, not in
-  // raw Morpho Blue markets.
-  const morphoPositions = await fetchMorphoVaultPositions(
-    walletAddress,
-    prices,
-    vaultsToCheck
-  );
-  allPositions.push(...morphoPositions);
-
-  for (const protocol of LENDING_PROTOCOLS) {
-    if (protocol.type === "euler") {
-      const positions = await fetchEulerPositions(
-        protocol,
-        walletAddress,
-        prices,
-        eulerApy
-      );
-      allPositions.push(...positions);
-    }
-  }
-
-  return allPositions;
+  return [...morpho, ...neverland, ...curvance, ...euler];
 }
