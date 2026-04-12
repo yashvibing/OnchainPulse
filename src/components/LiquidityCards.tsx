@@ -11,13 +11,14 @@ interface LiquidityCardsProps {
 
 function UniswapCard({ pos }: { pos: UniswapV3Position }) {
   return (
-    <div
-      className="card card-hover px-5 py-5"
-      style={{ borderLeft: `3px solid ${pos.color}` }}
-    >
+    <div className="card card-hover px-5 py-5">
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <div className="text-[15px] font-bold text-[var(--color-text-primary)]">
+          <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: pos.color }}
+            />
             {pos.token0Symbol} / {pos.token1Symbol}
           </div>
           <div className="text-[11.5px] text-[var(--color-text-muted)]">
@@ -71,13 +72,14 @@ function UniswapCard({ pos }: { pos: UniswapV3Position }) {
 
 function CurveCard({ pos }: { pos: CurvePosition }) {
   return (
-    <div
-      className="card card-hover px-5 py-5"
-      style={{ borderLeft: `3px solid ${pos.color}` }}
-    >
+    <div className="card card-hover px-5 py-5">
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <div className="text-[15px] font-bold text-[var(--color-text-primary)]">
+          <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: pos.color }}
+            />
             {pos.poolLabel}
           </div>
           <div className="text-[11.5px] text-[var(--color-text-muted)]">

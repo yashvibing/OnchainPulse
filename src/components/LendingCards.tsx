@@ -15,11 +15,14 @@ export function LendingCards({ positions }: LendingCardsProps) {
         <div
           key={`supply-${pos.protocol}-${i}`}
           className="card card-hover px-5 py-5"
-          style={{ borderLeft: `3px solid ${pos.color}` }}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>
-              <div className="text-[15px] font-bold text-[var(--color-text-primary)]">
+              <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: pos.color }}
+                />
                 {pos.protocol}
               </div>
               <div className="text-[11.5px] text-[var(--color-text-muted)]">
@@ -63,11 +66,11 @@ export function LendingCards({ positions }: LendingCardsProps) {
         <div
           key={`borrow-${pos.protocol}-${i}`}
           className="card card-hover px-5 py-5"
-          style={{ borderLeft: `3px solid #EF4444` }}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>
-              <div className="text-[15px] font-bold text-[var(--color-text-primary)]">
+              <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-negative)]" />
                 {pos.protocol}
               </div>
               <div className="text-[11.5px] text-[var(--color-text-muted)]">
