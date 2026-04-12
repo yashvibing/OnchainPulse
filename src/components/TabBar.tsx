@@ -11,7 +11,7 @@ export function TabBar({ tabs, active, onChange }: TabBarProps) {
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          className={`rounded-[9px] px-4 py-1.5 text-[12.5px] font-semibold tracking-[0.2px] transition-all ${
+          className={`rounded-[9px] px-4 py-2.5 text-[13px] font-semibold tracking-[0.2px] transition-all ${
             active === tab.key
               ? "border border-[rgba(109,59,245,0.28)] bg-[rgba(109,59,245,0.15)] text-[var(--color-accent-violet)]"
               : "border border-transparent bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
