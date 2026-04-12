@@ -33,6 +33,13 @@
     color: var(--color-text-primary);
     font-family: var(--font-display);
   }
+
+  /* Focus-visible ring for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-indigo);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 /* ─── Utility classes ─── */
