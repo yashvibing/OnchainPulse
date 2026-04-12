@@ -82,14 +82,14 @@ The LST exclusion rule lives in [src/hooks/usePortfolio.ts](src/hooks/usePortfol
 - **Direct Morpho Blue positions** are NOT supported — they need bytes32 market IDs and per-market indexing. Most retail users hold MetaMorpho shares, not direct positions.
 - **Euler** — disabled. The address listed in monad-crypto/protocols is the eVaultFactory, not a real vault.
 
-### DEXs / LP Positions (SCAFFOLDED — needs wiring)
-- **Uniswap V3** — NFT-based positions. ABI in [src/lib/abis.ts](src/lib/abis.ts). PositionManager address: `0x7197E214c0b767cFB76Fb734ab638E2c192F4E53`. Service is stubbed.
-- **Kuru** — On-chain CLOB DEX. Hybrid CLOB+AMM model.
-- **Curve** — Stableswap pools (AUSD/USDC etc). Standard LP tokens.
-- **Balancer V3** — Weighted pools.
+### DEXs / LP Positions
+- **Uniswap V3** (WORKING) — NFT-based positions with proper tick-range amount math (4-round multicall). Verified with real holder `0x9ed4...394c` (WMON/USDC 0.3% fee, $74.50 out-of-range).
+- **Curve** (WORKING) — Factory-enumerated LP positions (StableSwap: 20 pools, Twocrypto: 11 pools). Computes user share of underlying via balanceOf/totalSupply × pool balances. Build-verified and empty-state-verified. Not verified with a real LP holder (Curve LP activity on Monad is very infrequent; holders deposited long ago and don't transfer, so they're outside the RPC log-scan window).
+- **Balancer V3** (BLOCKED) — Contracts deployed (`Vault: 0xbA13...bA9`, factories at `0x7657...3a6` etc.) but all functions revert ("Not implemented" or "execution reverted"). Despite $8.3M TVL on DefiLlama, the deployed factory/vault contracts are non-functional via standard Balancer V3 ABI. Pools may have been deployed via a different mechanism or the interface differs from canonical docs. Needs deeper investigation.
+- **Kuru** (BLOCKED) — CLOB+AMM hybrid with custom MarginAccount (`0x2A68...90c5`) + Vault contracts. No standard LP token pattern. Would need Kuru's SDK/API to read positions. Router at `0xd651...5CC`.
 
-### Yield Vaults (SCAFFOLDED — needs wiring)
-- **Upshift** — WMON and AUSD yield vaults. ERC-4626 pattern. Need vault addresses.
+### Yield Vaults (WORKING)
+- **Upshift earnAUSD** — `0x103222...7496`. Custom vault, NOT standard ERC-4626 (convertToAssets reverts). Valued at 1:1 with AUSD (under-reports accrued yield by ~5-10%). 8.0% APY from DefiLlama. Verified with real holder `0x7362...034f` ($236K position). EARNMON vault also exists on DefiLlama but address not yet published in monad-crypto/protocols.
 
 ## Contract Address Source of Truth
 
@@ -147,19 +147,26 @@ Expectations when changing code:
 
 ## TODO (priority order)
 
-1. Wire up Uniswap V3 LP position reading (ABI + PositionManager address ready, service stubbed)
-2. Add Upshift yield vault positions (ERC-4626 pattern, need vault addresses)
-3. Replace manual address input with wagmi wallet connect
-4. Add 30-day portfolio value sparkline chart
-5. Add transaction history via BlockVision API or eth_getLogs
-6. Add Curve, Balancer V3, Kuru DEX position tracking
-7. Refresh `MORPHO_VAULTS` list periodically (currently a static snapshot from 2026-04-11 — new vaults won't appear until added)
-8. Update the empty-state copy in `src/components/EmptyState.tsx` to mention Magma alongside Kintsu
+1. Replace manual address input with wagmi wallet connect
+2. Add 30-day portfolio value sparkline chart (needs historical price + balance snapshots)
+3. Upgrade transaction history to BlockVision API (add `BLOCKVISION_API_KEY` env var) for full coverage including native MON + unknown tokens
+4. Investigate Balancer V3 — contracts deployed but revert on standard calls. $8.3M TVL exists. May need Balancer team help or a subgraph.
+5. Investigate Kuru — CLOB+AMM hybrid, need their SDK/API. No standard LP token pattern.
+6. Add EARNMON to Upshift vaults when address surfaces in monad-crypto/protocols
+7. Push to GitHub — give the repo a remote
+8. Verify Curve LP end-to-end with a real holder (build-verified but not holder-verified)
 
 ### Done
-- ✅ Look up real addresses from `monad-crypto/protocols` for staking and Morpho
+- ✅ Look up real addresses from `monad-crypto/protocols` for staking, Morpho, Curve, Upshift
 - ✅ Add Kintsu and Magma staking (with Kintsu's uint96 quirk)
-- ✅ Add Morpho lending via MetaMorpho vaults (top 10 by TVL)
+- ✅ Add Morpho lending via MetaMorpho vaults (dynamic discovery from API, static fallback)
 - ✅ Wire 24h price change column from DefiLlama
 - ✅ Stop double-counting LSTs in totalValue (regression-tested)
 - ✅ Bootstrap vitest test suite + CI-ready scripts
+- ✅ Wire Uniswap V3 LP positions with proper tick-range amount math
+- ✅ Wire Curve LP positions via factory enumeration (StableSwap + Twocrypto)
+- ✅ Wire Upshift earnAUSD yield vault (with 1:1 fallback for custom vault)
+- ✅ Add transaction history via eth_getLogs on drpc.org (~70 min lookback, known tokens only)
+- ✅ Add `clean` / `dev:fresh` scripts to fix the dev/build cache collision
+- ✅ Fix USDT → USDT0 mislabeling, add cbBTC + USD1 tokens
+- ✅ Update EmptyState copy to reflect actual protocol coverage
