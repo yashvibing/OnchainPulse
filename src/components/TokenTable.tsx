@@ -43,7 +43,7 @@ export function TokenTable({ tokens, compact }: TokenTableProps) {
                   style={{ backgroundColor: t.token.logoColor }}
                 />
               )}
-              <span className="text-[13.5px] font-semibold text-[var(--color-text-primary)]">
+              <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                 {t.token.symbol}
               </span>
             </div>
@@ -53,14 +53,14 @@ export function TokenTable({ tokens, compact }: TokenTableProps) {
               </div>
             )}
           </div>
-          <div className="text-right font-mono text-[12.5px] text-[var(--color-text-secondary)]">
+          <div className="text-right font-mono text-[12px] text-[var(--color-text-secondary)]">
             {formatNumber(parseFloat(t.formatted), parseFloat(t.formatted) < 1 ? 6 : 2)}
           </div>
-          <div className="text-right text-[13.5px] font-semibold text-[var(--color-text-primary)]">
+          <div className="text-right text-[13px] font-semibold text-[var(--color-text-primary)]">
             {formatUsd(t.valueUsd)}
           </div>
           <div
-            className={`text-right text-[12.5px] font-semibold ${
+            className={`text-right text-[12px] font-semibold ${
               t.change24h === null
                 ? "text-[var(--color-text-dim)]"
                 : t.change24h >= 0

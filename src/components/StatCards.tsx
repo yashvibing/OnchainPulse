@@ -49,13 +49,13 @@ function StatCard({
         {label}
       </div>
       <div
-        className="text-[21px] font-bold"
+        className="text-[20px] font-bold"
         style={{ color: accent || "var(--color-text-primary)" }}
       >
         {value}
       </div>
       {sub && (
-        <div className="mt-0.5 text-[11.5px] text-[var(--color-text-muted)]">
+        <div className="mt-0.5 text-[12px] text-[var(--color-text-muted)]">
           {sub}
         </div>
       )}

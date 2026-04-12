@@ -25,12 +25,12 @@ export function LendingCards({ positions }: LendingCardsProps) {
                 />
                 {pos.protocol}
               </div>
-              <div className="text-[11.5px] text-[var(--color-text-muted)]">
+              <div className="text-[12px] text-[var(--color-text-muted)]">
                 Supply
               </div>
             </div>
             {pos.apy > 0 && (
-              <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12.5px] font-bold text-[var(--color-positive)]">
+              <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
                 {pos.apy.toFixed(1)}% APY
               </span>
             )}
@@ -38,22 +38,22 @@ export function LendingCards({ positions }: LendingCardsProps) {
 
           <div className="flex flex-wrap gap-6">
             <div>
-              <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+              <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
                 Supplied
               </div>
-              <div className="text-[14.5px] font-semibold text-[var(--color-positive)]">
+              <div className="text-[14px] font-semibold text-[var(--color-positive)]">
                 {formatNumber(parseFloat(pos.balance), 2)} {pos.asset}
               </div>
-              <div className="text-[11.5px] text-[var(--color-text-muted)]">
+              <div className="text-[12px] text-[var(--color-text-muted)]">
                 {formatUsd(pos.valueUsd)}
               </div>
             </div>
             {pos.apy > 0 && (
               <div>
-                <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+                <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
                   Daily Earnings
                 </div>
-                <div className="text-[14.5px] font-semibold text-[var(--color-accent-violet)]">
+                <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
                   ≈ {formatUsd((pos.valueUsd * pos.apy) / 36500)}
                 </div>
               </div>
@@ -73,20 +73,20 @@ export function LendingCards({ positions }: LendingCardsProps) {
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-negative)]" />
                 {pos.protocol}
               </div>
-              <div className="text-[11.5px] text-[var(--color-text-muted)]">
+              <div className="text-[12px] text-[var(--color-text-muted)]">
                 Borrow
               </div>
             </div>
           </div>
 
           <div>
-            <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+            <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
               Borrowed
             </div>
-            <div className="text-[14.5px] font-semibold text-[var(--color-negative)]">
+            <div className="text-[14px] font-semibold text-[var(--color-negative)]">
               {formatNumber(parseFloat(pos.balance), 2)} {pos.asset}
             </div>
-            <div className="text-[11.5px] text-[var(--color-text-muted)]">
+            <div className="text-[12px] text-[var(--color-text-muted)]">
               {formatUsd(pos.valueUsd)}
             </div>
           </div>

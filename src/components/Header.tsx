@@ -9,12 +9,12 @@ export function Header() {
           <div className="text-base font-bold tracking-tight text-[var(--color-text-primary)]">
             MonFolio
           </div>
-          <div className="text-[9.5px] uppercase tracking-[1.2px] text-[var(--color-text-dim)]">
+          <div className="text-[10px] uppercase tracking-[1.2px] text-[var(--color-text-dim)]">
             Monad Portfolio Tracker
           </div>
         </div>
       </div>
-      <div className="text-right text-[9.5px] leading-relaxed text-[var(--color-text-dim)]">
+      <div className="text-right text-[10px] leading-relaxed text-[var(--color-text-dim)]">
         Community-made tool
         <br />
         Not affiliated with Monad Foundation

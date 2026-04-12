@@ -22,12 +22,12 @@ export function VaultCards({ positions }: VaultCardsProps) {
                 />
                 {pos.vaultName}
               </div>
-              <div className="text-[11.5px] text-[var(--color-text-muted)]">
+              <div className="text-[12px] text-[var(--color-text-muted)]">
                 Yield Vault
               </div>
             </div>
             {pos.apy > 0 && (
-              <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12.5px] font-bold text-[var(--color-positive)]">
+              <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
                 {pos.apy.toFixed(1)}% APY
               </span>
             )}
@@ -35,31 +35,31 @@ export function VaultCards({ positions }: VaultCardsProps) {
 
           <div className="flex flex-wrap gap-6">
             <div>
-              <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+              <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
                 Deposited
               </div>
-              <div className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+              <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                 {formatNumber(parseFloat(pos.underlyingBalance), 2)}{" "}
                 {pos.underlyingSymbol}
               </div>
-              <div className="text-[11.5px] text-[var(--color-text-muted)]">
+              <div className="text-[12px] text-[var(--color-text-muted)]">
                 {formatUsd(pos.valueUsd)}
               </div>
             </div>
             <div>
-              <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+              <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
                 Vault Shares
               </div>
-              <div className="text-[14.5px] font-semibold text-[var(--color-positive)]">
+              <div className="text-[14px] font-semibold text-[var(--color-positive)]">
                 {formatNumber(parseFloat(pos.sharesBalance), 2)}
               </div>
             </div>
             {pos.apy > 0 && (
               <div>
-                <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+                <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
                   Daily Earnings
                 </div>
-                <div className="text-[14.5px] font-semibold text-[var(--color-accent-violet)]">
+                <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
                   ≈ {formatUsd((pos.valueUsd * pos.apy) / 36500)}
                 </div>
               </div>

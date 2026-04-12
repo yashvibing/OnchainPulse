@@ -21,12 +21,12 @@ function UniswapCard({ pos }: { pos: UniswapV3Position }) {
             />
             {pos.token0Symbol} / {pos.token1Symbol}
           </div>
-          <div className="text-[11.5px] text-[var(--color-text-muted)]">
+          <div className="text-[12px] text-[var(--color-text-muted)]">
             {pos.protocol} · {pos.feeLabel} fee · #{pos.tokenId}
           </div>
         </div>
         <span
-          className={`rounded-full px-3 py-1 text-[12.5px] font-bold ${
+          className={`rounded-full px-3 py-1 text-[12px] font-bold ${
             pos.inRange
               ? "bg-[rgba(20,184,166,0.1)] text-[var(--color-positive)]"
               : "bg-[rgba(255,255,255,0.05)] text-[var(--color-text-muted)]"
@@ -37,30 +37,30 @@ function UniswapCard({ pos }: { pos: UniswapV3Position }) {
       </div>
       <div className="flex flex-wrap gap-6">
         <div>
-          <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+          <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
             Value
           </div>
-          <div className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+          <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
             {formatUsd(pos.valueUsd)}
           </div>
         </div>
         <div>
-          <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+          <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
             Composition
           </div>
-          <div className="text-[12.5px] font-mono text-[var(--color-text-secondary)]">
+          <div className="text-[12px] font-mono text-[var(--color-text-secondary)]">
             {pos.amount0} {pos.token0Symbol}
           </div>
-          <div className="text-[12.5px] font-mono text-[var(--color-text-secondary)]">
+          <div className="text-[12px] font-mono text-[var(--color-text-secondary)]">
             {pos.amount1} {pos.token1Symbol}
           </div>
         </div>
         {pos.feesUsd > 0 && (
           <div>
-            <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+            <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
               Unclaimed Fees
             </div>
-            <div className="text-[14.5px] font-semibold text-[var(--color-positive)]">
+            <div className="text-[14px] font-semibold text-[var(--color-positive)]">
               {formatUsd(pos.feesUsd)}
             </div>
           </div>
@@ -82,28 +82,28 @@ function CurveCard({ pos }: { pos: CurvePosition }) {
             />
             {pos.poolLabel}
           </div>
-          <div className="text-[11.5px] text-[var(--color-text-muted)]">
+          <div className="text-[12px] text-[var(--color-text-muted)]">
             {pos.protocol} · {pos.sharePercent} of pool
           </div>
         </div>
-        <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12.5px] font-bold text-[var(--color-positive)]">
+        <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
           Active
         </span>
       </div>
       <div className="flex flex-wrap gap-6">
         <div>
-          <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+          <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
             Value
           </div>
-          <div className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+          <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
             {formatUsd(pos.valueUsd)}
           </div>
         </div>
         <div>
-          <div className="mb-0.5 text-[10.5px] text-[var(--color-text-dim)]">
+          <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
             LP Tokens
           </div>
-          <div className="text-[12.5px] font-mono text-[var(--color-text-secondary)]">
+          <div className="text-[12px] font-mono text-[var(--color-text-secondary)]">
             {pos.lpBalance}
           </div>
         </div>

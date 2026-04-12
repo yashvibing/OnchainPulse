@@ -52,7 +52,7 @@ export function AddressInput({ onSubmit }: AddressInputProps) {
         )}
         <button
           onClick={handleDemo}
-          className="border-none bg-transparent p-0 text-[11.5px] text-[var(--color-text-muted)] underline hover:text-[var(--color-text-secondary)]"
+          className="border-none bg-transparent p-0 text-[12px] text-[var(--color-text-muted)] underline hover:text-[var(--color-text-secondary)]"
         >
           Load demo wallet
         </button>

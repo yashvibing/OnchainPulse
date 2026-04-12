@@ -31,7 +31,7 @@ export function TransactionList({ events, isLoading }: TransactionListProps) {
         <p className="text-sm text-[var(--color-text-muted)]">
           No token transfers in the last ~70 minutes.
         </p>
-        <p className="mx-auto mt-2 max-w-[460px] text-[11.5px] leading-relaxed text-[var(--color-text-dim)]">
+        <p className="mx-auto mt-2 max-w-[460px] text-[12px] leading-relaxed text-[var(--color-text-dim)]">
           History is scoped to known tokens via on-chain log queries. Native
           MON moves and unknown tokens don&apos;t appear here. For deeper
           history, see the BlockVision upgrade path in CLAUDE.md.
@@ -64,7 +64,7 @@ export function TransactionList({ events, isLoading }: TransactionListProps) {
           }`}
         >
           <span
-            className={`inline-flex h-6 w-12 items-center justify-center rounded-full text-[10.5px] font-bold uppercase tracking-wide ${
+            className={`inline-flex h-6 w-12 items-center justify-center rounded-full text-[11px] font-bold uppercase tracking-wide ${
               e.direction === "in"
                 ? "bg-[rgba(20,184,166,0.1)] text-[var(--color-positive)]"
                 : "bg-[rgba(239,68,68,0.08)] text-[var(--color-negative)]"
@@ -72,17 +72,17 @@ export function TransactionList({ events, isLoading }: TransactionListProps) {
           >
             {e.direction === "in" ? "In" : "Out"}
           </span>
-          <span className="text-[13.5px] font-semibold text-[var(--color-text-primary)]">
+          <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
             {e.tokenSymbol}
           </span>
-          <span className="font-mono text-[11.5px] text-[var(--color-text-secondary)]">
+          <span className="font-mono text-[12px] text-[var(--color-text-secondary)]">
             {shortenAddress(e.counterparty)}
           </span>
-          <span className="text-right font-mono text-[12.5px] text-[var(--color-text-primary)]">
+          <span className="text-right font-mono text-[12px] text-[var(--color-text-primary)]">
             {e.direction === "in" ? "+" : "−"}
             {e.amount}
           </span>
-          <span className="text-right text-[11.5px] text-[var(--color-text-muted)]">
+          <span className="text-right text-[12px] text-[var(--color-text-muted)]">
             {timeAgo(e.timestamp)}
           </span>
         </a>
