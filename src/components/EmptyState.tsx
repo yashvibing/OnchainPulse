@@ -6,9 +6,9 @@ export function EmptyState() {
         Enter a wallet address to view your Monad DeFi portfolio
       </div>
       <div className="mx-auto max-w-[420px] text-[12px] leading-relaxed text-[var(--color-text-dim)]">
-        Tracks liquid staking (aPriori, FastLane, Kintsu, Magma), Morpho
-        lending vaults, and all token holdings. Uniswap V3 LP positions and
-        more protocols coming soon.
+        Tracks liquid staking (aPriori, FastLane, Kintsu, Magma), lending
+        (Morpho, Neverland, Curvance), Uniswap V3 + Curve LP positions,
+        yield vaults, and all token holdings.
       </div>
     </div>
   );
