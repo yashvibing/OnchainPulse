@@ -35,21 +35,24 @@ src/
 │   ├── tokens.ts   # Token addresses + metadata registry
 │   └── protocols.ts # DeFi protocol addresses (staking, lending, vaults)
 ├── lib/            # Shared utilities
-│   ├── abis.ts     # Contract ABIs (ERC20, ERC4626, Morpho, UniV3)
+│   ├── abis.ts     # Contract ABIs (ERC20, ERC4626, Kintsu, Morpho, UniV3, Curve)
 │   ├── client.ts   # viem PublicClient singleton
 │   └── format.ts   # Display formatting helpers
 ├── services/       # Data fetching (pure functions, no React)
 │   ├── tokens.ts   # Token balances + prices + 24h change via multicall + DefiLlama
 │   ├── staking.ts  # Liquid staking positions (aPriori, FastLane, Kintsu, Magma)
 │   ├── lending.ts  # MetaMorpho vault positions + APYs from Morpho GraphQL
-│   ├── liquidity.ts # LP positions (Uniswap V3 — scaffolded)
-│   ├── vaults.ts   # Yield vault positions (Upshift — scaffolded)
+│   ├── liquidity.ts # LP positions (Uniswap V3 + Curve)
+│   ├── vaults.ts   # Yield vault positions (Upshift earnAUSD)
+│   ├── transactions.ts # Transfer history via eth_getLogs on drpc.org
 │   └── yields.ts   # APY data from DefiLlama
 ├── hooks/          # React Query wrappers
 │   └── usePortfolio.ts
 ├── components/     # UI components
 │   ├── Header.tsx, AddressInput.tsx, StatCards.tsx
 │   ├── TabBar.tsx, TokenTable.tsx, StakingCards.tsx
+│   ├── LiquidityCards.tsx, LendingCards.tsx, VaultCards.tsx
+│   ├── TransactionList.tsx
 │   └── EmptyState.tsx
 └── app/            # Next.js app router
     ├── layout.tsx, page.tsx, providers.tsx

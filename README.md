@@ -2,7 +2,7 @@
 
 **Community-made Monad Portfolio Dashboard. Not affiliated with Monad Foundation.**
 
-Track your DeFi positions across the entire Monad ecosystem — staking, LP positions, lending, yield vaults, and token holdings — all in one place.
+Track your DeFi positions across the entire Monad ecosystem in one place: liquid staking, LP positions, lending vaults, yield vaults, token holdings, and recent transfer history.
 
 ---
 
@@ -12,14 +12,61 @@ Track your DeFi positions across the entire Monad ecosystem — staking, LP posi
 # Install dependencies
 npm install
 
-# Copy env and configure RPC
+# Copy env and configure RPC (optional — defaults work for dev)
 cp .env.example .env.local
 
 # Run dev server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. Enter any Monad wallet address or click "Load demo wallet" to explore.
+
+---
+
+## What's Tracked
+
+### Liquid Staking (4 protocols)
+- **aPriori** (aprMON), **FastLane** (shMON), **Magma** (gMON) — standard ERC-4626
+- **Kintsu** (sMON) — non-standard `convertToAssets(uint96)`, handled with a dedicated ABI
+
+### Lending (Morpho, dynamic)
+- **MetaMorpho vaults** — top vaults discovered live from Morpho's GraphQL API at runtime. APYs fetched live. Static fallback list for when the API is down.
+- Covers steakETH, hyperUSDCa, augustUSDC, bbqUSDT0, and more as they launch.
+
+### LP Positions
+- **Uniswap V3** — NFT-based positions with proper tick-range amount math (sqrtPrice calculations, 4-round multicall). Shows In Range / Out of Range badge, composition, and unclaimed fees.
+- **Curve** — Factory-enumerated LP positions across StableSwap (20 pools) and Twocrypto (11 pools). Computes user share of underlying tokens via pool balances.
+
+### Yield Vaults
+- **Upshift earnAUSD** — Custom vault (not standard ERC-4626). Valued at 1:1 with AUSD. 8% APY from DefiLlama.
+
+### Token Holdings
+- 15 known tokens with real-time prices and 24h change from DefiLlama
+- MON, WMON, USDC, USDT0, AUSD, USD1, cbBTC, WBTC, WETH, aprMON, shMON, sMON, gMON
+
+### Transaction History
+- Recent token transfers (in/out) via `eth_getLogs` on drpc.org
+- ~70 minutes of lookback, all tracked tokens, both directions
+- Upgrade path to BlockVision API for full coverage (see `.env.example`)
+
+### LST Double-Count Protection
+LST tokens (shMON, aprMON, sMON, gMON) appear in the Tokens table for visibility but are excluded from the Total Value sum — the staking position already accounts for their value. Regression-tested in `test/hooks/usePortfolio.regression-001.test.tsx`.
+
+---
+
+## Commands
+
+```bash
+npm run dev        # Start dev server
+npm run dev:fresh  # Clean .next/ first — use after running next build
+npm run build      # Production build (includes type check)
+npm run lint       # ESLint
+npm test           # Run vitest suite (20 tests, ~1.5s)
+npm run test:watch # Vitest in watch mode
+npm run clean      # Wipe .next/ cache
+```
+
+**Gotcha:** Don't run `npm run build` while `npm run dev` is running — both write into `.next/` and the dev server will crash. Use `npm run dev:fresh` to recover.
 
 ---
 
@@ -29,75 +76,79 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 monfolio/
 ├── src/
 │   ├── app/
-│   │   ├── globals.css          # Tailwind + design tokens
-│   │   ├── layout.tsx           # Root layout with providers
-│   │   ├── page.tsx             # Main dashboard page
-│   │   └── providers.tsx        # React Query provider
+│   │   ├── globals.css              # Tailwind + design tokens
+│   │   ├── layout.tsx               # Root layout with providers
+│   │   ├── page.tsx                 # Main dashboard (7 tabs)
+│   │   └── providers.tsx            # React Query provider
 │   ├── components/
-│   │   ├── Header.tsx           # App header with branding
-│   │   ├── AddressInput.tsx     # Wallet address search
-│   │   ├── StatCards.tsx        # Total value, daily yield, position count
-│   │   ├── TabBar.tsx           # Navigation tabs
-│   │   ├── TokenTable.tsx       # ERC-20 token holdings table
-│   │   ├── StakingCards.tsx     # Staking position cards
-│   │   └── EmptyState.tsx       # Empty + loading states
+│   │   ├── Header.tsx               # App header
+│   │   ├── AddressInput.tsx         # Wallet address input + demo button
+│   │   ├── StatCards.tsx            # Total value, daily yield, position count
+│   │   ├── TabBar.tsx               # Tab navigation
+│   │   ├── TokenTable.tsx           # Token holdings with 24h change
+│   │   ├── StakingCards.tsx         # Staking position cards
+│   │   ├── LiquidityCards.tsx       # Uniswap V3 + Curve LP cards
+│   │   ├── LendingCards.tsx         # Morpho lending cards
+│   │   ├── VaultCards.tsx           # Yield vault cards
+│   │   ├── TransactionList.tsx      # Transfer history list
+│   │   └── EmptyState.tsx           # Empty + loading states
 │   ├── config/
-│   │   ├── chain.ts             # Monad chain definition (ID 143)
-│   │   ├── tokens.ts            # Known token addresses
-│   │   └── protocols.ts         # DeFi protocol registry
+│   │   ├── chain.ts                 # Monad chain (ID 143)
+│   │   ├── tokens.ts                # Token address registry (15 tokens)
+│   │   └── protocols.ts             # Protocol addresses + vault configs
 │   ├── hooks/
-│   │   └── usePortfolio.ts      # React Query hooks
+│   │   └── usePortfolio.ts          # React Query hooks (8 hooks)
 │   ├── lib/
-│   │   ├── abis.ts              # Contract ABIs (ERC20, ERC4626, Morpho, UniV3)
-│   │   ├── client.ts            # Viem public client singleton
-│   │   └── format.ts            # Display formatting utils
+│   │   ├── abis.ts                  # Contract ABIs
+│   │   ├── client.ts                # viem PublicClient singleton
+│   │   └── format.ts                # Display formatting
 │   └── services/
-│       ├── tokens.ts            # Token balance + price fetching
-│       ├── staking.ts           # Staking position fetching
-│       └── yields.ts            # DefiLlama yields API
-├── .env.example                 # Environment variables template
+│       ├── tokens.ts                # Token balances + prices + 24h change
+│       ├── staking.ts               # 4 LST protocols
+│       ├── lending.ts               # Morpho dynamic vault discovery
+│       ├── liquidity.ts             # Uniswap V3 + Curve LP
+│       ├── vaults.ts                # Upshift yield vaults
+│       ├── transactions.ts          # Transfer history via eth_getLogs
+│       └── yields.ts                # DefiLlama yields API
+├── test/
+│   ├── setup.ts
+│   ├── lib/format.test.ts           # 16 unit tests
+│   └── hooks/usePortfolio.regression-001.test.tsx  # LST double-count regression
+├── vitest.config.ts
+├── CLAUDE.md                        # Project context for Claude Code
+├── TESTING.md                       # Test conventions and workflow
+├── .env.example
 ├── package.json
-├── tsconfig.json
 └── next.config.mjs
 ```
 
 ---
 
-## What's Working
+## Tech Stack
 
-- **Token balances**: Native MON + all ERC-20s via Multicall3
-- **Token prices**: DefiLlama API (free, no key)
-- **Staking positions**: aPriori (aprMON) and FastLane (shMON) via ERC-4626 reads
-- **Staking APYs**: DefiLlama Yields API with fallback values
-- **UI**: Full dashboard with tabs, stat cards, token table, staking cards
-
-## What Needs Wiring Up
-
-These are scaffolded and ready — you just need the real contract addresses from
-[monad-crypto/protocols](https://github.com/monad-crypto/protocols):
-
-1. **LP Positions** — `src/lib/abis.ts` has `UNI_V3_NFT_ABI`. Add the Uniswap V3
-   PositionManager address to `src/config/protocols.ts`
-2. **Lending** — `src/lib/abis.ts` has `MORPHO_ABI` and `EULER_VAULT_ABI`. Add
-   contract addresses to `src/config/protocols.ts`
-3. **Yield Vaults** — Uses standard ERC-4626 pattern. Add Upshift vault addresses
-4. **Transaction History** — Add BlockVision API integration
-5. **Portfolio Chart** — Add 30-day value history (requires historical price data)
+| Layer | Tool |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript (strict, ES2020 target) |
+| Styling | Tailwind CSS v4 |
+| Chain SDK | viem |
+| Data fetching | @tanstack/react-query |
+| Prices + 24h | DefiLlama (coins + percentage endpoints) |
+| APYs | DefiLlama Yields + Morpho GraphQL API |
+| RPC | rpc.monad.xyz (default) + monad-mainnet.drpc.org (tx history) |
+| Testing | vitest + @testing-library/react + jsdom |
 
 ---
 
-## Tech Stack
+## Still TODO
 
-| Layer          | Tool                         |
-|----------------|------------------------------|
-| Framework      | Next.js 15 (App Router)      |
-| Language       | TypeScript                   |
-| Styling        | Tailwind CSS v4              |
-| Chain SDK      | viem                         |
-| Data fetching  | @tanstack/react-query        |
-| Price data     | DefiLlama (free, no key)     |
-| APY data       | DefiLlama Yields (free)      |
-| RPC            | Monad public endpoints       |
+1. Replace manual address input with wagmi wallet connect
+2. 30-day portfolio value sparkline chart
+3. Upgrade transaction history to BlockVision (full coverage, requires API key)
+4. Balancer V3 LP positions (contracts deployed but non-functional, needs investigation)
+5. Kuru DEX positions (CLOB+AMM hybrid, needs their SDK)
+
+See [CLAUDE.md](CLAUDE.md) for the full prioritized TODO list with investigation notes.
 
 ---
 
@@ -105,55 +156,15 @@ These are scaffolded and ready — you just need the real contract addresses fro
 
 ### RPC Endpoint
 
-The default uses a public endpoint (rate-limited). For production:
-
-1. Get a paid key from [Alchemy](https://www.alchemy.com/), [QuickNode](https://www.quicknode.com/), or [Chainstack](https://chainstack.com/)
-2. Set `NEXT_PUBLIC_MONAD_RPC_URL` in `.env.local`
+Default uses `rpc.monad.xyz` (public, rate-limited). For production, get a paid key from Alchemy, QuickNode, or Chainstack and set `NEXT_PUBLIC_MONAD_RPC_URL` in `.env.local`.
 
 ### Adding New Tokens
 
-Edit `src/config/tokens.ts` — add the contract address, symbol, decimals, and category.
+Edit `src/config/tokens.ts`. Add address, symbol, decimals, and category. Tokens with `category: "lst"` are automatically excluded from the Total Value sum (the staking position handles their value).
 
 ### Adding New Protocols
 
-Edit `src/config/protocols.ts` — add staking protocols, lending markets, or yield vaults.
-Then create a corresponding service in `src/services/`.
-
----
-
-## Deployment
-
-```bash
-# Build for production
-npm run build
-
-# Deploy to Vercel (recommended)
-npx vercel
-
-# Or deploy to any Node.js host
-npm start
-```
-
----
-
-## Claude Code Tips
-
-When working on this in Claude Code, useful commands:
-
-```
-# "Add Kintsu staking to the protocol registry and staking service"
-# "Wire up Uniswap V3 LP position reading using the UNI_V3_NFT_ABI"
-# "Add a portfolio value chart component using the history data"
-# "Fetch transaction history from BlockVision API"
-# "Add wallet connect via wagmi instead of manual address input"
-```
-
-The codebase is structured so each feature is self-contained:
-- **Config** → addresses and protocol metadata
-- **ABIs** → contract interfaces
-- **Services** → data fetching logic
-- **Hooks** → React Query wrappers
-- **Components** → UI rendering
+Edit `src/config/protocols.ts`. For staking: add to `STAKING_PROTOCOLS`. For Morpho vaults: they're discovered automatically from the API. For Curve: pools are discovered via factory enumeration. For custom protocols: create a service in `src/services/` and wire it into `usePortfolio`.
 
 ---
 
