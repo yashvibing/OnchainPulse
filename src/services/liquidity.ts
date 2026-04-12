@@ -1,33 +1,51 @@
-import { getAddress } from "viem";
+import { formatUnits, getAddress } from "viem";
 import { monadClient } from "@/lib/client";
 import {
+  ERC20_ABI,
   UNI_V3_NFT_ABI,
   UNI_V3_FACTORY_ABI,
   UNI_V3_POOL_ABI,
+  CURVE_FACTORY_ABI,
+  CURVE_POOL_ABI,
 } from "@/lib/abis";
 import {
   UNISWAP_V3_POSITION_MANAGER,
   UNISWAP_V3_FACTORY,
+  CURVE_FACTORIES,
 } from "@/config/protocols";
 import { getTokenByAddress } from "@/config/tokens";
 import { fetchTokenPrices } from "./tokens";
 
 // ─── Types ───
 
-export interface LiquidityPosition {
+export interface UniswapV3Position {
+  kind: "uniswap-v3";
   tokenId: number;
   protocol: string;
   token0Symbol: string;
   token1Symbol: string;
   fee: number;
   feeLabel: string;
-  amount0: string; // formatted token amount
+  amount0: string;
   amount1: string;
   inRange: boolean;
   valueUsd: number;
-  feesUsd: number; // unclaimed fees in USD
+  feesUsd: number;
   color: string;
 }
+
+export interface CurvePosition {
+  kind: "curve";
+  protocol: string;
+  poolAddress: string;
+  poolLabel: string; // e.g. "USDC/AUSD"
+  lpBalance: string; // formatted LP amount
+  sharePercent: string; // e.g. "0.42%"
+  valueUsd: number;
+  color: string;
+}
+
+export type LiquidityPosition = UniswapV3Position | CurvePosition;
 
 // ─── Fee tier display ───
 export function formatFee(fee: number): string {
@@ -80,10 +98,10 @@ function computeAmountsFromLiquidity(
   return { rawAmount0: amount0, rawAmount1: amount1 };
 }
 
-// ─── Fetch all UniV3 LP positions ───
-export async function fetchLiquidityPositions(
+// ─── Fetch UniV3 LP positions ───
+async function fetchUniswapV3Positions(
   walletAddress: `0x${string}`
-): Promise<LiquidityPosition[]> {
+): Promise<UniswapV3Position[]> {
   const positionManager = getAddress(UNISWAP_V3_POSITION_MANAGER);
   const factory = getAddress(UNISWAP_V3_FACTORY);
   const normalizedWallet = getAddress(walletAddress);
@@ -215,7 +233,7 @@ export async function fetchLiquidityPositions(
     });
 
     // Now build the final positions with proper amount math + USD value.
-    const positions: LiquidityPosition[] = [];
+    const positions: UniswapV3Position[] = [];
     live.forEach((p, i) => {
       const poolAddr = poolAddrs[i];
       const currentTick = poolAddr
@@ -265,6 +283,7 @@ export async function fetchLiquidityPositions(
         currentTick < p.tickUpper;
 
       positions.push({
+        kind: "uniswap-v3",
         tokenId: Number(p.tokenId),
         protocol: "Uniswap V3",
         token0Symbol: sym0,
@@ -285,7 +304,158 @@ export async function fetchLiquidityPositions(
 
     return positions;
   } catch (err) {
-    console.error("[liquidity] fetch failed:", err);
+    console.error("[liquidity/uniswap] fetch failed:", err);
     return [];
   }
+}
+
+// ─── Curve LP positions ───
+//
+// Curve pools are ERC-20 LP tokens. The factories enumerate all deployed pools.
+// For each pool where the user has a non-zero LP balance, we compute their
+// share of the underlying tokens by: user_balance / totalSupply × pool_balances[i].
+//
+// We cache the pool address list at module level (pools don't change after
+// deployment) so only the first user load per session pays the discovery cost.
+
+let cachedCurvePoolAddrs: `0x${string}`[] | null = null;
+
+async function discoverCurvePools(): Promise<`0x${string}`[]> {
+  if (cachedCurvePoolAddrs) return cachedCurvePoolAddrs;
+
+  const allPools: `0x${string}`[] = [];
+  for (const factory of CURVE_FACTORIES) {
+    try {
+      const count = await monadClient.readContract({
+        address: getAddress(factory),
+        abi: CURVE_FACTORY_ABI,
+        functionName: "pool_count",
+        args: [],
+      });
+      const n = Number(count);
+      if (n === 0) continue;
+      const calls = Array.from({ length: n }, (_, i) => ({
+        address: getAddress(factory),
+        abi: CURVE_FACTORY_ABI,
+        functionName: "pool_list" as const,
+        args: [BigInt(i)] as const,
+      }));
+      const results = await monadClient.multicall({ contracts: calls });
+      for (const r of results) {
+        if (r.status === "success") allPools.push(r.result as `0x${string}`);
+      }
+    } catch (err) {
+      console.error("[liquidity/curve] factory enumeration failed:", err);
+    }
+  }
+  cachedCurvePoolAddrs = allPools;
+  return allPools;
+}
+
+async function fetchCurvePositions(
+  walletAddress: `0x${string}`
+): Promise<CurvePosition[]> {
+  const pools = await discoverCurvePools();
+  if (pools.length === 0) return [];
+  const normalizedWallet = getAddress(walletAddress);
+
+  // Round 1: balanceOf on every pool (pools are ERC-20 LP tokens).
+  const balanceCalls = pools.map((p) => ({
+    address: getAddress(p),
+    abi: ERC20_ABI,
+    functionName: "balanceOf" as const,
+    args: [normalizedWallet] as const,
+  }));
+  const balResults = await monadClient.multicall({ contracts: balanceCalls });
+
+  const held: { pool: `0x${string}`; lpBalance: bigint }[] = [];
+  balResults.forEach((r, i) => {
+    if (r.status === "success" && (r.result as bigint) > 0n) {
+      held.push({ pool: pools[i], lpBalance: r.result as bigint });
+    }
+  });
+  if (held.length === 0) return [];
+
+  // Round 2: for each held pool, fetch totalSupply + coins[0..3] + balances[0..3].
+  // Most Curve pools have 2-3 coins. We probe up to 4 and handle reverts.
+  const prices = await fetchTokenPrices();
+  const positions: CurvePosition[] = [];
+
+  for (const { pool, lpBalance } of held) {
+    try {
+      const poolAddr = getAddress(pool);
+      // Batch: totalSupply + coins(0..3) + balances(0..3)
+      const calls = [
+        { address: poolAddr, abi: ERC20_ABI, functionName: "totalSupply" as const, args: [] as const },
+        ...Array.from({ length: 4 }, (_, i) => ({
+          address: poolAddr, abi: CURVE_POOL_ABI, functionName: "coins" as const, args: [BigInt(i)] as const,
+        })),
+        ...Array.from({ length: 4 }, (_, i) => ({
+          address: poolAddr, abi: CURVE_POOL_ABI, functionName: "balances" as const, args: [BigInt(i)] as const,
+        })),
+      ];
+      const results = await monadClient.multicall({ contracts: calls });
+
+      const totalSupply = results[0].status === "success" ? (results[0].result as bigint) : 0n;
+      if (totalSupply === 0n) continue;
+
+      const share = Number(lpBalance) / Number(totalSupply);
+
+      // Parse coins + balances (skip index where coins reverts = no more coins)
+      const coins: { symbol: string; decimals: number; addr: `0x${string}` }[] = [];
+      for (let i = 0; i < 4; i++) {
+        if (results[1 + i].status !== "success") break;
+        const addr = results[1 + i].result as `0x${string}`;
+        if (addr === "0x0000000000000000000000000000000000000000") break;
+        const info = getTokenByAddress(addr);
+        coins.push({
+          addr,
+          symbol: info?.symbol ?? addr.slice(0, 8),
+          decimals: info?.decimals ?? 18,
+        });
+      }
+
+      let valueUsd = 0;
+      for (let i = 0; i < coins.length; i++) {
+        if (results[5 + i].status !== "success") continue;
+        const poolBal = results[5 + i].result as bigint;
+        const formatted = Number(formatUnits(poolBal, coins[i].decimals));
+        const price = prices.get(coins[i].symbol) || 0;
+        valueUsd += share * formatted * price;
+      }
+
+      const poolLabel = coins.map((c) => c.symbol).join("/");
+      const lpFormatted = formatUnits(lpBalance, 18);
+
+      positions.push({
+        kind: "curve",
+        protocol: "Curve",
+        poolAddress: pool,
+        poolLabel,
+        lpBalance: parseFloat(lpFormatted).toFixed(4),
+        sharePercent: (share * 100).toFixed(share < 0.001 ? 4 : 2) + "%",
+        valueUsd,
+        color: "#FACC15",
+      });
+    } catch (err) {
+      console.error(`[liquidity/curve] pool ${pool} failed:`, err);
+    }
+  }
+
+  positions.sort((a, b) => b.valueUsd - a.valueUsd);
+  return positions;
+}
+
+// ─── Combined: all liquidity positions ───
+export async function fetchLiquidityPositions(
+  walletAddress: `0x${string}`
+): Promise<LiquidityPosition[]> {
+  const [uniV3, curve] = await Promise.all([
+    fetchUniswapV3Positions(walletAddress),
+    fetchCurvePositions(walletAddress),
+  ]);
+  // Merge and sort by USD value descending
+  const all: LiquidityPosition[] = [...uniV3, ...curve];
+  all.sort((a, b) => b.valueUsd - a.valueUsd);
+  return all;
 }

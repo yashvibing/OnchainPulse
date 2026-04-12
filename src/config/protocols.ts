@@ -210,9 +210,19 @@ export const YIELD_VAULTS: YieldVault[] = [
 ];
 
 // ─── DEX / LP ───
+
 // Uniswap V3 deployment on Monad mainnet.
 // Source: github.com/monad-crypto/protocols/mainnet/uniswap.jsonc
 export const UNISWAP_V3_POSITION_MANAGER =
   "0x7197E214c0b767cFB76Fb734ab638E2c192F4E53" as `0x${string}`;
 export const UNISWAP_V3_FACTORY =
   "0x204faca1764b154221e35c0d20abb3c525710498" as `0x${string}`;
+
+// Curve Finance factory contracts on Monad mainnet.
+// Source: github.com/monad-crypto/protocols/mainnet/curve.jsonc
+// StableSwap: 20 pools, Twocrypto: 11 pools, Tricrypto: 0 pools (as of 2026-04-12)
+export const CURVE_FACTORIES: `0x${string}`[] = [
+  "0x8271e06E5887FE5ba05234f5315c19f3Ec90E8aD", // StableSwapFactory
+  "0xe7FBd704B938cB8fe26313C3464D4b7B7348c88C", // TwocryptoFactory
+  // TricryptoFactory omitted — 0 pools deployed
+];

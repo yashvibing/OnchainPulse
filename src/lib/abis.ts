@@ -85,6 +85,53 @@ export const EULER_VAULT_ABI = [
   },
 ] as const;
 
+// Curve Factory — pool_count + pool_list for enumeration. Both StableSwap
+// and Twocrypto/Tricrypto factories share the same factory ABI for these.
+export const CURVE_FACTORY_ABI = [
+  {
+    inputs: [],
+    name: "pool_count",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "i", type: "uint256" }],
+    name: "pool_list",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+// Curve Pool — minimal LP / coin / balance interface. Curve pools are also
+// ERC-20 LP tokens, so balanceOf/totalSupply come from ERC20_ABI.
+// We use coins(uint256) and balances(uint256) to enumerate underlying tokens.
+export const CURVE_POOL_ABI = [
+  ...ERC20_ABI,
+  {
+    inputs: [{ name: "i", type: "uint256" }],
+    name: "coins",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "i", type: "uint256" }],
+    name: "balances",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "N_COINS",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 // Uniswap V3 Factory — only the getPool method we need
 export const UNI_V3_FACTORY_ABI = [
   {
