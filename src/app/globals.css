@@ -40,6 +40,11 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
+
+  /* Tabular figures for financial data — prevents digit-width wobble */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ─── Utility classes ─── */

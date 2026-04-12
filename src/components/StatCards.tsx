@@ -49,7 +49,7 @@ function StatCard({
         {label}
       </div>
       <div
-        className="text-[20px] font-bold"
+        className="text-[20px] font-bold tabular-nums"
         style={{ color: accent || "var(--color-text-primary)" }}
       >
         {value}
