@@ -21,10 +21,11 @@ const DEMO_WALLETS: { address: string; label: string }[] = [
 
 interface AddressInputProps {
   onSubmit: (address: string) => void;
+  initialAddress?: string | null;
 }
 
-export function AddressInput({ onSubmit }: AddressInputProps) {
-  const [input, setInput] = useState("");
+export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
+  const [input, setInput] = useState(initialAddress || "");
   const [error, setError] = useState("");
   const demoIndex = useRef(0);
 

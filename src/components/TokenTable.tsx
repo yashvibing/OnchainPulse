@@ -6,9 +6,34 @@ interface TokenTableProps {
   compact?: boolean;
 }
 
-// Token icon URL from Monad token list or a fallback colored circle
-function TokenIcon({ symbol, logoColor }: { symbol: string; logoColor?: string }) {
+// Token icon: real logo from CDN when available, gradient circle fallback
+function TokenIcon({
+  symbol,
+  logoColor,
+  logoURI,
+}: {
+  symbol: string;
+  logoColor?: string;
+  logoURI?: string;
+}) {
   const color = logoColor || "#5A5A74";
+
+  if (logoURI) {
+    return (
+      <img
+        src={logoURI}
+        alt={symbol}
+        className="h-7 w-7 rounded-full"
+        onError={(e) => {
+          // Fall back to gradient circle if image fails
+          const el = e.currentTarget;
+          el.style.display = "none";
+          el.nextElementSibling?.classList.remove("hidden");
+        }}
+      />
+    );
+  }
+
   return (
     <div
       className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white"
@@ -50,7 +75,7 @@ export function TokenTable({ tokens, compact }: TokenTableProps) {
           style={{ animationDelay: `${i * 30}ms` }}
         >
           <div className="flex items-center gap-2.5">
-            <TokenIcon symbol={t.token.symbol} logoColor={t.token.logoColor} />
+            <TokenIcon symbol={t.token.symbol} logoColor={t.token.logoColor} logoURI={t.token.logoURI} />
             <div>
               <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                 {t.token.symbol}

@@ -12,6 +12,7 @@ export interface TokenInfo {
   decimals: number;
   category: "native" | "stablecoin" | "lst" | "wrapped" | "defi";
   logoColor?: string;
+  logoURI?: string;
 }
 
 // Native MON doesn't have a contract address — it's the gas token

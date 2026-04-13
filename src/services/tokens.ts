@@ -3,6 +3,9 @@ import { monadClient } from "@/lib/client";
 import { ERC20_ABI } from "@/lib/abis";
 import { TOKENS, NATIVE_MON, type TokenInfo } from "@/config/tokens";
 
+const TOKEN_LIST_URL =
+  "https://raw.githubusercontent.com/monad-crypto/token-list/main/tokenlist-mainnet.json";
+
 // ─── Token Balance Types ───
 
 export interface TokenBalance {
@@ -14,6 +17,61 @@ export interface TokenBalance {
   change24h: number | null;
 }
 
+// ─── Dynamic token list (fetched once, cached in memory) ───
+
+let cachedExtendedTokens: TokenInfo[] | null = null;
+
+// LST symbols that must keep category:"lst" for double-count protection
+const LST_SYMBOLS = new Set(["aprMON", "shMON", "sMON", "gMON"]);
+
+async function getExtendedTokenList(): Promise<TokenInfo[]> {
+  if (cachedExtendedTokens) return cachedExtendedTokens;
+
+  try {
+    const res = await fetch(TOKEN_LIST_URL, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const tokens: TokenInfo[] = [];
+
+    for (const t of data.tokens || []) {
+      if (t.chainId !== 143) continue;
+      // Skip tokens we already have in our curated list
+      const existing = Object.values(TOKENS).find(
+        (k) => k.address.toLowerCase() === t.address.toLowerCase()
+      );
+      if (existing) {
+        // Enrich existing with logoURI if we don't have one
+        if (!existing.logoURI && t.logoURI) existing.logoURI = t.logoURI;
+        continue;
+      }
+
+      tokens.push({
+        address: t.address as `0x${string}`,
+        symbol: t.symbol,
+        name: t.name,
+        decimals: t.decimals,
+        category: LST_SYMBOLS.has(t.symbol) ? "lst" : "defi",
+        logoURI: t.logoURI,
+      });
+    }
+
+    cachedExtendedTokens = tokens;
+    return tokens;
+  } catch {
+    return [];
+  }
+}
+
+// Build a combined token list: curated + dynamic
+async function getAllTokens(): Promise<Record<string, TokenInfo>> {
+  const extended = await getExtendedTokenList();
+  const all: Record<string, TokenInfo> = { ...TOKENS };
+  for (const t of extended) {
+    if (!all[t.symbol]) all[t.symbol] = t;
+  }
+  return all;
+}
+
 // ─── Fetch native MON balance ───
 async function getNativeBalance(address: `0x${string}`): Promise<bigint> {
   return monadClient.getBalance({ address: getAddress(address) });
@@ -21,9 +79,10 @@ async function getNativeBalance(address: `0x${string}`): Promise<bigint> {
 
 // ─── Batch-fetch all ERC-20 balances via multicall ───
 async function getErc20Balances(
-  walletAddress: `0x${string}`
+  walletAddress: `0x${string}`,
+  tokens?: Record<string, TokenInfo>
 ): Promise<Map<string, bigint>> {
-  const tokenEntries = Object.entries(TOKENS);
+  const tokenEntries = Object.entries(tokens || TOKENS);
 
   const normalizedWallet = getAddress(walletAddress);
   const contracts = tokenEntries.map(([, token]) => ({
@@ -138,12 +197,16 @@ export async function fetchTokenPrices(): Promise<Map<string, number>> {
 export async function fetchTokenBalances(
   walletAddress: `0x${string}`
 ): Promise<TokenBalance[]> {
-  const [nativeBalance, erc20Balances, prices, changes24h] = await Promise.all([
+  const [nativeBalance, allTokens, prices, changes24h] = await Promise.all([
     getNativeBalance(walletAddress).catch(() => 0n),
-    getErc20Balances(walletAddress).catch(() => new Map<string, bigint>()),
+    getAllTokens(),
     fetchTokenPrices(),
     fetchTokenChanges24h().catch(() => new Map<string, number>()),
   ]);
+
+  const erc20Balances = await getErc20Balances(walletAddress, allTokens).catch(
+    () => new Map<string, bigint>()
+  );
 
   const balances: TokenBalance[] = [];
 
@@ -163,7 +226,7 @@ export async function fetchTokenBalances(
 
   // Add ERC-20 tokens
   for (const [symbol, balance] of erc20Balances) {
-    const token = TOKENS[symbol];
+    const token = allTokens[symbol];
     if (!token) continue;
 
     const formatted = formatUnits(balance, token.decimals);

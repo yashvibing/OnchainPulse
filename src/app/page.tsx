@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -16,9 +17,9 @@ import {
   LoadingSpinner,
   SkeletonStatCards,
   SkeletonCards,
-  SkeletonTable,
 } from "@/components/EmptyState";
-import { shortenAddress } from "@/lib/format";
+import { PortfolioSparkline } from "@/components/Sparkline";
+import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: "◎" },
@@ -31,16 +32,36 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export default function DashboardPage() {
+export default function Page() {
+  return (
+    <Suspense>
+      <DashboardPage />
+    </Suspense>
+  );
+}
+
+function DashboardPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [address, setAddress] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [tabFade, setTabFade] = useState(false);
+
+  // Read address from URL on first load
+  useEffect(() => {
+    const urlAddr = searchParams.get("address");
+    if (urlAddr && isValidEvmAddress(urlAddr) && !address) {
+      setAddress(urlAddr);
+    }
+  }, [searchParams, address]);
 
   const portfolio = usePortfolio(address);
 
   function handleSearch(addr: string) {
     setAddress(addr);
     setActiveTab("overview");
+    // Update URL without full page reload
+    router.replace(`?address=${addr}`, { scroll: false });
   }
 
   const handleTabChange = useCallback((key: string) => {
@@ -56,7 +77,7 @@ export default function DashboardPage() {
       <Header />
 
       <main className="mx-auto max-w-[920px] px-5 pb-16 pt-6">
-        <AddressInput onSubmit={handleSearch} />
+        <AddressInput onSubmit={handleSearch} initialAddress={address} />
 
         {/* Wallet address badge */}
         {address && (
@@ -68,12 +89,19 @@ export default function DashboardPage() {
               </span>
             </div>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(address);
-              }}
+              onClick={() => navigator.clipboard.writeText(address)}
               className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
             >
               Copy
+            </button>
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}?address=${address}`;
+                navigator.clipboard.writeText(url);
+              }}
+              className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
+            >
+              Share
             </button>
           </div>
         )}
@@ -111,6 +139,14 @@ export default function DashboardPage() {
               positionCount={portfolio.positionCount}
               protocolCount={portfolio.protocolCount}
             />
+
+            <PortfolioSparkline
+              holdings={new Map(
+                portfolio.tokens.map((t) => [t.token.symbol, t.valueUsd])
+              )}
+            />
+
+            <RefreshBar onRefresh={portfolio.refetch} />
 
             {/* Desktop tab bar — hidden on mobile */}
             <div className="hidden md:block">
@@ -316,5 +352,47 @@ function NoPositions({ label }: { label: string }) {
     <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">
       No {label} found for this wallet.
     </p>
+  );
+}
+
+function RefreshBar({ onRefresh }: { onRefresh: () => void }) {
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const [ago, setAgo] = useState("just now");
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Update the "ago" text every 10s
+  useEffect(() => {
+    function tick() {
+      const diff = Math.floor((Date.now() - lastUpdated) / 1000);
+      if (diff < 10) setAgo("just now");
+      else if (diff < 60) setAgo(`${diff}s ago`);
+      else setAgo(`${Math.floor(diff / 60)}m ago`);
+    }
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
+
+  function handleRefresh() {
+    setRefreshing(true);
+    onRefresh();
+    setLastUpdated(Date.now());
+    setTimeout(() => setRefreshing(false), 1500);
+  }
+
+  return (
+    <div className="mb-4 flex items-center gap-2 text-[11px] text-[var(--color-text-dim)]">
+      <span>Updated {ago}</span>
+      <span>·</span>
+      <button
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors disabled:opacity-50"
+      >
+        {refreshing ? "Refreshing…" : "Refresh"}
+      </button>
+      <span>·</span>
+      <span>Auto-refreshes every 60s</span>
+    </div>
   );
 }
