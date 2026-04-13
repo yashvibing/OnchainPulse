@@ -55,6 +55,20 @@ function DashboardPage() {
     }
   }, [searchParams, address]);
 
+  // Update og:image meta tag dynamically for sharing
+  useEffect(() => {
+    const ogUrl = address
+      ? `${window.location.origin}/api/og?address=${address}`
+      : `${window.location.origin}/api/og`;
+    let tag = document.querySelector('meta[property="og:image"]');
+    if (!tag) {
+      tag = document.createElement("meta");
+      tag.setAttribute("property", "og:image");
+      document.head.appendChild(tag);
+    }
+    tag.setAttribute("content", ogUrl);
+  }, [address]);
+
   const portfolio = usePortfolio(address);
 
   function handleSearch(addr: string) {
