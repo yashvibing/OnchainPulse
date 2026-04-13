@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -11,15 +11,22 @@ import { StakingCards } from "@/components/StakingCards";
 import { VaultCards } from "@/components/VaultCards";
 import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
-import { EmptyState, LoadingSpinner } from "@/components/EmptyState";
+import {
+  EmptyState,
+  LoadingSpinner,
+  SkeletonStatCards,
+  SkeletonCards,
+  SkeletonTable,
+} from "@/components/EmptyState";
+import { shortenAddress } from "@/lib/format";
 
 const TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "tokens", label: "Tokens" },
-  { key: "staking", label: "Staking" },
-  { key: "liquidity", label: "Liquidity" },
-  { key: "lending", label: "Lending" },
-  { key: "yield", label: "Yield Vaults" },
+  { key: "overview", label: "Overview", icon: "◎" },
+  { key: "tokens", label: "Tokens", icon: "◈" },
+  { key: "staking", label: "Staking", icon: "⬡" },
+  { key: "liquidity", label: "Liquidity", icon: "◇" },
+  { key: "lending", label: "Lending", icon: "⊞" },
+  { key: "yield", label: "Yield", icon: "⬢" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -27,6 +34,7 @@ type TabKey = (typeof TABS)[number]["key"];
 export default function DashboardPage() {
   const [address, setAddress] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [tabFade, setTabFade] = useState(false);
 
   const portfolio = usePortfolio(address);
 
@@ -35,15 +43,51 @@ export default function DashboardPage() {
     setActiveTab("overview");
   }
 
+  const handleTabChange = useCallback((key: string) => {
+    setTabFade(true);
+    setTimeout(() => {
+      setActiveTab(key as TabKey);
+      setTabFade(false);
+    }, 120);
+  }, []);
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-20 md:pb-0">
       <Header />
 
       <main className="mx-auto max-w-[920px] px-5 pb-16 pt-6">
         <AddressInput onSubmit={handleSearch} />
 
-        {/* Loading */}
-        {portfolio.isLoading && <LoadingSpinner />}
+        {/* Wallet address badge */}
+        {address && (
+          <div className="mb-4 flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-1.5">
+              <div className="h-2 w-2 rounded-full bg-[var(--color-positive)] animate-pulse" />
+              <span className="font-mono text-[12px] text-[var(--color-text-secondary)]">
+                {shortenAddress(address)}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(address);
+              }}
+              className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+        )}
+
+        {/* Skeleton loading */}
+        {portfolio.isLoading && address && (
+          <div className="animate-fade-up">
+            <SkeletonStatCards />
+            <SkeletonCards count={3} />
+          </div>
+        )}
+
+        {/* Spinner fallback for initial load */}
+        {portfolio.isLoading && !address && <LoadingSpinner />}
 
         {/* Empty — no address entered yet */}
         {!address && !portfolio.isLoading && <EmptyState />}
@@ -68,137 +112,139 @@ export default function DashboardPage() {
               protocolCount={portfolio.protocolCount}
             />
 
-            <TabBar
-              tabs={TABS}
-              active={activeTab}
-              onChange={(key) => setActiveTab(key as TabKey)}
-            />
+            {/* Desktop tab bar — hidden on mobile */}
+            <div className="hidden md:block">
+              <TabBar
+                tabs={TABS}
+                active={activeTab}
+                onChange={handleTabChange}
+              />
+            </div>
 
-            {/* ── Overview ── */}
-            {activeTab === "overview" && (
-              <div className="space-y-6">
-                {/* Top tokens */}
-                {portfolio.tokens.length > 0 && (
-                  <section>
-                    <SectionTitle icon="◈" title="Top Holdings" />
-                    <TokenTable
-                      tokens={portfolio.tokens.slice(0, 5)}
-                      compact
-                    />
-                  </section>
-                )}
+            {/* Tab content with fade transition */}
+            <div
+              className="transition-opacity duration-150"
+              style={{ opacity: tabFade ? 0 : 1 }}
+            >
+              {/* ── Overview ── */}
+              {activeTab === "overview" && (
+                <div className="space-y-6">
+                  {portfolio.tokens.length > 0 && (
+                    <section className="animate-fade-up" style={{ animationDelay: "0ms" }}>
+                      <SectionTitle icon="◈" title="Top Holdings" />
+                      <TokenTable
+                        tokens={portfolio.tokens.slice(0, 5)}
+                        compact
+                      />
+                    </section>
+                  )}
 
-                {/* Staking summary */}
-                {portfolio.staking.length > 0 && (
-                  <section>
-                    <SectionTitle icon="⬡" title="Active Staking" />
+                  {portfolio.staking.length > 0 && (
+                    <section className="animate-fade-up" style={{ animationDelay: "60ms" }}>
+                      <SectionTitle icon="⬡" title="Active Staking" />
+                      <StakingCards positions={portfolio.staking} />
+                    </section>
+                  )}
+
+                  {portfolio.liquidity.length > 0 && (
+                    <section className="animate-fade-up" style={{ animationDelay: "120ms" }}>
+                      <SectionTitle icon="◇" title="Liquidity Positions" />
+                      <LiquidityCards positions={portfolio.liquidity} />
+                    </section>
+                  )}
+
+                  {portfolio.lending.length > 0 && (
+                    <section className="animate-fade-up" style={{ animationDelay: "180ms" }}>
+                      <SectionTitle icon="⊞" title="Lending & Borrowing" />
+                      <LendingCards positions={portfolio.lending} />
+                    </section>
+                  )}
+
+                  {portfolio.vaults.length > 0 && (
+                    <section className="animate-fade-up" style={{ animationDelay: "240ms" }}>
+                      <SectionTitle icon="⬢" title="Yield Vaults" />
+                      <VaultCards positions={portfolio.vaults} />
+                    </section>
+                  )}
+                </div>
+              )}
+
+              {/* ── Tokens ── */}
+              {activeTab === "tokens" && (
+                <div className="animate-fade-up">
+                  <SectionTitle
+                    icon="◈"
+                    title="Token Holdings"
+                    count={portfolio.tokens.length}
+                  />
+                  <TokenTable tokens={portfolio.tokens} />
+                </div>
+              )}
+
+              {/* ── Staking ── */}
+              {activeTab === "staking" && (
+                <div className="animate-fade-up">
+                  <SectionTitle
+                    icon="⬡"
+                    title="Staking Positions"
+                    count={portfolio.staking.length}
+                  />
+                  {portfolio.staking.length > 0 ? (
                     <StakingCards positions={portfolio.staking} />
-                  </section>
-                )}
+                  ) : (
+                    <NoPositions label="staking positions" />
+                  )}
+                </div>
+              )}
 
-                {/* Liquidity summary */}
-                {portfolio.liquidity.length > 0 && (
-                  <section>
-                    <SectionTitle icon="◇" title="Liquidity Positions" />
+              {/* ── Liquidity ── */}
+              {activeTab === "liquidity" && (
+                <div className="animate-fade-up">
+                  <SectionTitle
+                    icon="◇"
+                    title="Liquidity Positions"
+                    count={portfolio.liquidity.length}
+                  />
+                  {portfolio.liquidity.length > 0 ? (
                     <LiquidityCards positions={portfolio.liquidity} />
-                  </section>
-                )}
+                  ) : (
+                    <NoPositions label="liquidity positions" />
+                  )}
+                </div>
+              )}
 
-                {/* Lending summary */}
-                {portfolio.lending.length > 0 && (
-                  <section>
-                    <SectionTitle icon="⊞" title="Lending & Borrowing" />
+              {/* ── Lending ── */}
+              {activeTab === "lending" && (
+                <div className="animate-fade-up">
+                  <SectionTitle
+                    icon="⊞"
+                    title="Lending & Borrowing"
+                    count={portfolio.lending.length}
+                  />
+                  {portfolio.lending.length > 0 ? (
                     <LendingCards positions={portfolio.lending} />
-                  </section>
-                )}
+                  ) : (
+                    <NoPositions label="lending positions" />
+                  )}
+                </div>
+              )}
 
-                {/* Vault summary */}
-                {portfolio.vaults.length > 0 && (
-                  <section>
-                    <SectionTitle icon="⬢" title="Yield Vaults" />
+              {/* ── Yield ── */}
+              {activeTab === "yield" && (
+                <div className="animate-fade-up">
+                  <SectionTitle
+                    icon="⬢"
+                    title="Yield Vaults"
+                    count={portfolio.vaults.length}
+                  />
+                  {portfolio.vaults.length > 0 ? (
                     <VaultCards positions={portfolio.vaults} />
-                  </section>
-                )}
-              </div>
-            )}
-
-            {/* ── Tokens ── */}
-            {activeTab === "tokens" && (
-              <div>
-                <SectionTitle
-                  icon="◈"
-                  title="Token Holdings"
-                  count={portfolio.tokens.length}
-                />
-                <TokenTable tokens={portfolio.tokens} />
-              </div>
-            )}
-
-            {/* ── Staking ── */}
-            {activeTab === "staking" && (
-              <div>
-                <SectionTitle
-                  icon="⬡"
-                  title="Staking Positions"
-                  count={portfolio.staking.length}
-                />
-                {portfolio.staking.length > 0 ? (
-                  <StakingCards positions={portfolio.staking} />
-                ) : (
-                  <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">
-                    No staking positions found for this wallet.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ── Liquidity ── */}
-            {activeTab === "liquidity" && (
-              <div>
-                <SectionTitle
-                  icon="◇"
-                  title="Liquidity Positions"
-                  count={portfolio.liquidity.length}
-                />
-                {portfolio.liquidity.length > 0 ? (
-                  <LiquidityCards positions={portfolio.liquidity} />
-                ) : (
-                  <NoPositions label="liquidity positions" />
-                )}
-              </div>
-            )}
-
-            {/* ── Lending ── */}
-            {activeTab === "lending" && (
-              <div>
-                <SectionTitle
-                  icon="⊞"
-                  title="Lending & Borrowing"
-                  count={portfolio.lending.length}
-                />
-                {portfolio.lending.length > 0 ? (
-                  <LendingCards positions={portfolio.lending} />
-                ) : (
-                  <NoPositions label="lending positions" />
-                )}
-              </div>
-            )}
-
-            {/* ── Yield ── */}
-            {activeTab === "yield" && (
-              <div>
-                <SectionTitle
-                  icon="⬢"
-                  title="Yield Vaults"
-                  count={portfolio.vaults.length}
-                />
-                {portfolio.vaults.length > 0 ? (
-                  <VaultCards positions={portfolio.vaults} />
-                ) : (
-                  <NoPositions label="yield vault positions" />
-                )}
-              </div>
-            )}
+                  ) : (
+                    <NoPositions label="yield vault positions" />
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Footer */}
             <footer className="mt-12 text-center text-[11px] leading-relaxed text-[var(--color-text-dim)]">
@@ -213,6 +259,28 @@ export default function DashboardPage() {
           </>
         )}
       </main>
+
+      {/* ── Mobile bottom navigation ── */}
+      {address && !portfolio.isLoading && !portfolio.isError && (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-bg-primary)] backdrop-blur-lg md:hidden">
+          <div className="mx-auto flex max-w-[920px] items-center justify-around px-2 py-1.5">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={`flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 transition-colors ${
+                  activeTab === tab.key
+                    ? "text-[var(--color-accent-violet)]"
+                    : "text-[var(--color-text-dim)]"
+                }`}
+              >
+                <span className="text-[16px]">{tab.icon}</span>
+                <span className="text-[9px] font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

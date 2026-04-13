@@ -8,10 +8,11 @@ interface StakingCardsProps {
 export function StakingCards({ positions }: StakingCardsProps) {
   return (
     <div className="grid gap-3">
-      {positions.map((pos) => (
+      {positions.map((pos, i) => (
         <div
           key={pos.protocol}
-          className="card card-hover px-5 py-5"
+          className="card card-hover px-5 py-5 animate-fade-up"
+          style={{ animationDelay: `${i * 50}ms` }}
         >
           {/* Header */}
           <div className="mb-3 flex items-start justify-between">
@@ -30,6 +31,23 @@ export function StakingCards({ positions }: StakingCardsProps) {
             <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
               {pos.apy.toFixed(1)}% APY
             </span>
+          </div>
+
+          {/* Yield progress bar — shows APY as a visual bar */}
+          <div className="mb-4">
+            <div className="mb-1 flex items-center justify-between text-[11px]">
+              <span className="text-[var(--color-text-dim)]">Yield rate</span>
+              <span className="font-semibold text-[var(--color-positive)]">{pos.apy.toFixed(1)}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.04)]">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(pos.apy / 25 * 100, 100)}%`,
+                  background: `linear-gradient(90deg, ${pos.color}, var(--color-positive))`,
+                }}
+              />
+            </div>
           </div>
 
           {/* Stats */}

@@ -115,13 +115,15 @@ function CurveCard({ pos }: { pos: CurvePosition }) {
 export function LiquidityCards({ positions }: LiquidityCardsProps) {
   return (
     <div className="grid gap-3">
-      {positions.map((pos, i) =>
-        pos.kind === "uniswap-v3" ? (
-          <UniswapCard key={`uni-${pos.tokenId}`} pos={pos} />
-        ) : (
-          <CurveCard key={`crv-${pos.poolAddress}-${i}`} pos={pos} />
-        )
-      )}
+      {positions.map((pos, i) => (
+        <div key={pos.kind === "uniswap-v3" ? `uni-${pos.tokenId}` : `crv-${pos.kind === "curve" ? pos.poolAddress : ""}-${i}`} className="animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
+          {pos.kind === "uniswap-v3" ? (
+            <UniswapCard pos={pos} />
+          ) : (
+            <CurveCard pos={pos} />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

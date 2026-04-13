@@ -1,5 +1,5 @@
 interface TabBarProps {
-  tabs: readonly { key: string; label: string }[];
+  tabs: readonly { key: string; label: string; icon?: string }[];
   active: string;
   onChange: (key: string) => void;
 }

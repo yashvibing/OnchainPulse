@@ -6,6 +6,19 @@ interface TokenTableProps {
   compact?: boolean;
 }
 
+// Token icon URL from Monad token list or a fallback colored circle
+function TokenIcon({ symbol, logoColor }: { symbol: string; logoColor?: string }) {
+  const color = logoColor || "#5A5A74";
+  return (
+    <div
+      className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white"
+      style={{ background: `linear-gradient(135deg, ${color}, ${color}88)` }}
+    >
+      {symbol.slice(0, 2)}
+    </div>
+  );
+}
+
 export function TokenTable({ tokens, compact }: TokenTableProps) {
   if (tokens.length === 0) {
     return (
@@ -29,29 +42,25 @@ export function TokenTable({ tokens, compact }: TokenTableProps) {
       {tokens.map((t, i) => (
         <div
           key={t.token.symbol + i}
-          className={`grid grid-cols-[2fr_1.2fr_1fr_80px] items-center px-5 py-3 ${
+          className={`animate-fade-up grid grid-cols-[2fr_1.2fr_1fr_80px] items-center px-5 py-3 ${
             i < tokens.length - 1
               ? "border-b border-[rgba(255,255,255,0.025)]"
               : ""
           }`}
+          style={{ animationDelay: `${i * 30}ms` }}
         >
-          <div>
-            <div className="flex items-center gap-2">
-              {t.token.logoColor && (
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: t.token.logoColor }}
-                />
-              )}
+          <div className="flex items-center gap-2.5">
+            <TokenIcon symbol={t.token.symbol} logoColor={t.token.logoColor} />
+            <div>
               <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                 {t.token.symbol}
               </span>
+              {!compact && (
+                <div className="text-[11px] text-[var(--color-text-dim)]">
+                  {t.token.name}
+                </div>
+              )}
             </div>
-            {!compact && (
-              <div className="mt-0.5 text-[11px] text-[var(--color-text-dim)]">
-                {t.token.name}
-              </div>
-            )}
           </div>
           <div className="text-right font-mono text-[12px] text-[var(--color-text-secondary)]">
             {formatNumber(parseFloat(t.formatted), parseFloat(t.formatted) < 1 ? 6 : 2)}

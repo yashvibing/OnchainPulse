@@ -8,10 +8,11 @@ interface VaultCardsProps {
 export function VaultCards({ positions }: VaultCardsProps) {
   return (
     <div className="grid gap-3">
-      {positions.map((pos) => (
+      {positions.map((pos, i) => (
         <div
           key={pos.vaultName}
-          className="card card-hover px-5 py-5"
+          className="card card-hover px-5 py-5 animate-fade-up"
+          style={{ animationDelay: `${i * 50}ms` }}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>

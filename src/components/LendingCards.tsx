@@ -14,7 +14,8 @@ export function LendingCards({ positions }: LendingCardsProps) {
       {supplies.map((pos, i) => (
         <div
           key={`supply-${pos.protocol}-${i}`}
-          className="card card-hover px-5 py-5"
+          className="card card-hover px-5 py-5 animate-fade-up"
+          style={{ animationDelay: `${i * 50}ms` }}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>
@@ -65,7 +66,8 @@ export function LendingCards({ positions }: LendingCardsProps) {
       {borrows.map((pos, i) => (
         <div
           key={`borrow-${pos.protocol}-${i}`}
-          className="card card-hover px-5 py-5"
+          className="card card-hover px-5 py-5 animate-fade-up"
+          style={{ animationDelay: `${(supplies.length + i) * 50}ms` }}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>
