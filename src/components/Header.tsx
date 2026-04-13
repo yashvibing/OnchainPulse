@@ -1,3 +1,7 @@
+"use client";
+
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+
 export function Header() {
   return (
     <header className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
@@ -11,6 +15,11 @@ export function Header() {
           </div>
         </div>
       </div>
+      <ConnectButton
+        chainStatus="none"
+        showBalance={false}
+        accountStatus="avatar"
+      />
     </header>
   );
 }

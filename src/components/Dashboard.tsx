@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useAccount } from "wagmi";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -43,6 +44,7 @@ export function Dashboard() {
 function DashboardInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { address: connectedAddress, isConnected } = useAccount();
   const [address, setAddress] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [tabFade, setTabFade] = useState(false);
@@ -55,6 +57,14 @@ function DashboardInner() {
       setAddress(urlAddr);
     }
   }, [searchParams, address]);
+
+  // Auto-load connected wallet address
+  useEffect(() => {
+    if (isConnected && connectedAddress && !address) {
+      setAddress(connectedAddress);
+      router.replace(`?address=${connectedAddress}`, { scroll: false });
+    }
+  }, [isConnected, connectedAddress, address, router]);
 
   const portfolio = usePortfolio(address);
 
