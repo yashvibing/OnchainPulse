@@ -57,18 +57,11 @@ function DashboardPage() {
 
   const portfolio = usePortfolio(address);
 
-  // Build OG image URL with portfolio stats in a single "s" param
-  // Format: s=value-dailyYield-positions-protocols (dash-separated)
+  // OG image URL — server fetches the data directly
   function buildOgUrl() {
     const base = typeof window !== "undefined" ? window.location.origin : "";
     if (!address) return `${base}/api/og`;
-    const s = [
-      Math.round(portfolio.totalValue),
-      Math.round(portfolio.dailyYield * 100) / 100,
-      portfolio.positionCount,
-      portfolio.protocolCount,
-    ].join("-");
-    return `${base}/api/og?address=${address}&s=${s}`;
+    return `${base}/api/og?address=${address}`;
   }
 
   // Update og:image meta tag when portfolio data loads
