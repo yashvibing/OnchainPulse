@@ -15,10 +15,10 @@ function fmtUsd(v: number): string {
   return "$0";
 }
 
-// v param format: "totalValue.positions.protocols.dailyYield"
+// v param format: "totalValue_positions_protocols_dailyYield"
 function parseStats(v: string | null) {
   if (!v) return { value: 0, positions: 0, protocols: 0, dailyYield: 0 };
-  const parts = v.split(".");
+  const parts = v.split("_");
   return {
     value: parseFloat(parts[0]) || 0,
     positions: parseInt(parts[1]) || 0,

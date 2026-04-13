@@ -107,7 +107,7 @@ function DashboardInner() {
                   portfolio.positionCount,
                   portfolio.protocolCount,
                   Math.round(portfolio.dailyYield * 100) / 100,
-                ].join(".");
+                ].join("_");
                 const url = `${window.location.origin}?address=${address}&v=${v}`;
                 navigator.clipboard.writeText(url).then(() => {
                   setCopyFeedback("Link copied!");
