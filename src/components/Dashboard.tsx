@@ -102,13 +102,13 @@ function DashboardInner() {
             <button
               onClick={() => {
                 // Encode stats as: totalValue.positions.protocols.dailyYield
-                const v = [
+                const stats = [
                   Math.round(portfolio.totalValue),
                   portfolio.positionCount,
                   portfolio.protocolCount,
                   Math.round(portfolio.dailyYield * 100) / 100,
                 ].join("_");
-                const url = `${window.location.origin}?address=${address}&v=${v}`;
+                const url = `${window.location.origin}?address=${address}&d=${address}~${stats}`;
                 navigator.clipboard.writeText(url).then(() => {
                   setCopyFeedback("Link copied!");
                   setTimeout(() => setCopyFeedback(null), 2000);
