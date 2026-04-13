@@ -46,6 +46,7 @@ function DashboardPage() {
   const [address, setAddress] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [tabFade, setTabFade] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   // Read address from URL on first load
   useEffect(() => {
@@ -108,23 +109,34 @@ function DashboardPage() {
                 {shortenAddress(address)}
               </span>
             </div>
-            <button
-              onClick={() => navigator.clipboard.writeText(address)}
-              className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
-            >
-              Copy
-            </button>
-            <button
-              onClick={() => {
-                // Share URL includes address only (clean link), OG image
-                // will be fetched by crawlers with stats baked in via meta tag
-                const url = `${window.location.origin}?address=${address}`;
-                navigator.clipboard.writeText(url);
+            <CopyButton
+              text={address}
+              label="Copy"
+              feedback={copyFeedback}
+              onCopy={() => {
+                navigator.clipboard.writeText(address).then(() => {
+                  setCopyFeedback("Copied address!");
+                  setTimeout(() => setCopyFeedback(null), 2000);
+                });
               }}
-              className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
-            >
-              Share
-            </button>
+            />
+            <CopyButton
+              text={`${window.location.origin}?address=${address}`}
+              label="Share"
+              feedback={copyFeedback}
+              onCopy={() => {
+                const url = `${window.location.origin}?address=${address}`;
+                navigator.clipboard.writeText(url).then(() => {
+                  setCopyFeedback("Link copied!");
+                  setTimeout(() => setCopyFeedback(null), 2000);
+                });
+              }}
+            />
+            {copyFeedback && (
+              <span className="animate-fade-up text-[11px] font-medium text-[var(--color-positive)]">
+                {copyFeedback}
+              </span>
+            )}
           </div>
         )}
 
@@ -344,6 +356,25 @@ function DashboardPage() {
 }
 
 // ─── Small sub-components ───
+
+function CopyButton({
+  label,
+  onCopy,
+}: {
+  text: string;
+  label: string;
+  feedback: string | null;
+  onCopy: () => void;
+}) {
+  return (
+    <button
+      onClick={onCopy}
+      className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
+    >
+      {label}
+    </button>
+  );
+}
 
 function SectionTitle({
   icon,
