@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
-import { usePortfolio } from "@/hooks/usePortfolio";
+import { usePortfolio, useTokenApprovals } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
 import { StatCards } from "@/components/StatCards";
@@ -20,6 +20,7 @@ import {
   SkeletonCards,
 } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
+import { ApprovalManager } from "@/components/ApprovalManager";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 
 const TABS = [
@@ -29,6 +30,7 @@ const TABS = [
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
   { key: "yield", label: "Yield", icon: "⬢" },
+  { key: "security", label: "Security", icon: "⛨" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -67,6 +69,7 @@ function DashboardInner() {
   }, [isConnected, connectedAddress, address, router]);
 
   const portfolio = usePortfolio(address);
+  const approvals = useTokenApprovals(address);
 
   function handleSearch(addr: string) {
     setAddress(addr);
@@ -255,6 +258,18 @@ function DashboardInner() {
                 <div className="animate-fade-up">
                   <SectionTitle icon="⬢" title="Yield Vaults" count={portfolio.vaults.length} />
                   {portfolio.vaults.length > 0 ? <VaultCards positions={portfolio.vaults} /> : <NoPositions label="yield vault positions" />}
+                </div>
+              )}
+
+              {activeTab === "security" && (
+                <div className="animate-fade-up">
+                  <SectionTitle icon="⛨" title="Token Approvals" count={approvals.data?.length} />
+                  <ApprovalManager
+                    approvals={approvals.data || []}
+                    isLoading={approvals.isLoading}
+                    isConnected={isConnected}
+                    onRevoked={() => approvals.refetch()}
+                  />
                 </div>
               )}
             </div>

@@ -23,6 +23,10 @@ import {
   fetchTokenTransferHistory,
   type TransferEvent,
 } from "@/services/transactions";
+import {
+  fetchTokenApprovals,
+  type TokenApproval,
+} from "@/services/approvals";
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -106,6 +110,17 @@ export function useTokenTransferHistory(address: string | null) {
     enabled: !!address && ADDRESS_RE.test(address),
     staleTime: 60_000,
     refetchInterval: 120_000,
+    retry: 1,
+  });
+}
+
+// ─── Token Approvals Hook ───
+export function useTokenApprovals(address: string | null) {
+  return useQuery<TokenApproval[]>({
+    queryKey: ["tokenApprovals", address],
+    queryFn: () => fetchTokenApprovals(address as `0x${string}`),
+    enabled: !!address && ADDRESS_RE.test(address),
+    staleTime: 120_000,
     retry: 1,
   });
 }
