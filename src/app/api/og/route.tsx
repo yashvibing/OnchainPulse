@@ -15,12 +15,13 @@ function fmtUsd(v: number): string {
   return "$0";
 }
 
-// Single "d" param encodes everything: "address~value_positions_protocols_yield"
-// If no ~, it's just the address with no stats.
+// Single "d" param: first 42 chars = address, rest = stats after a separator
+// Format: "0x1234...abcd" or "0x1234...abcdS15420_12_5_2" (S = stats separator)
 function parseData(d: string | null) {
-  if (!d) return null;
-  const [addr, statsStr] = d.split("~");
-  if (!addr || !/^0x[a-fA-F0-9]{40}$/.test(addr)) return null;
+  if (!d || d.length < 42) return null;
+  const addr = d.slice(0, 42);
+  const statsStr = d.length > 43 && d[42] === "S" ? d.slice(43) : null;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return null;
 
   let value = 0, positions = 0, protocols = 0, dailyYield = 0;
   if (statsStr) {
