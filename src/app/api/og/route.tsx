@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 
 // Node runtime — more reliable for external fetches than edge
 export const runtime = "nodejs";
@@ -20,30 +20,41 @@ async function getPortfolioSummary(address: string) {
   let monBalance = 0;
   let monPrice = 0;
 
+  // Fetch balance — independent try/catch so one failure doesn't kill both
   try {
-    const [balRes, priceRes] = await Promise.all([
-      fetch("https://rpc.monad.xyz", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "eth_getBalance",
-          params: [address, "latest"],
-        }),
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 4000);
+    const res = await fetch("https://rpc.monad.xyz", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: 1,
+        method: "eth_getBalance",
+        params: [address, "latest"],
       }),
-      fetch("https://coins.llama.fi/prices/current/coingecko:monad"),
-    ]);
-
-    if (balRes.ok) {
-      const d = await balRes.json();
+      signal: controller.signal,
+    });
+    if (res.ok) {
+      const d = await res.json();
       monBalance = parseInt(d.result || "0", 16) / 1e18;
     }
-    if (priceRes.ok) {
-      const d = await priceRes.json();
+  } catch {
+    // timeout or network error — use 0
+  }
+
+  // Fetch price
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 4000);
+    const res = await fetch("https://coins.llama.fi/prices/current/coingecko:monad", {
+      signal: controller.signal,
+    });
+    if (res.ok) {
+      const d = await res.json();
       monPrice = d.coins?.["coingecko:monad"]?.price || 0;
     }
   } catch {
-    // Continue with zeros
+    // timeout or network error — use 0
   }
 
   return { monBalance, monPrice, totalValue: monBalance * monPrice };
@@ -102,7 +113,18 @@ export async function GET(req: NextRequest) {
       ),
       { width: 1200, height: 630 }
     );
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch {
+    // Fallback: minimal branded image if anything fails
+    return new ImageResponse(
+      (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#0D0B1A", fontFamily: "system-ui" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
+            <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
+          </div>
+        </div>
+      ),
+      { width: 1200, height: 630 }
+    );
   }
 }
