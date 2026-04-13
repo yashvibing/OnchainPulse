@@ -58,11 +58,11 @@ function DashboardPage() {
 
   const portfolio = usePortfolio(address);
 
-  // OG image URL — server fetches the data directly
   function buildOgUrl() {
     const base = typeof window !== "undefined" ? window.location.origin : "";
     if (!address) return `${base}/api/og`;
-    return `${base}/api/og?address=${address}`;
+    const v = Math.round(portfolio.totalValue);
+    return `${base}/api/og?address=${address}${v > 0 ? `&v=${v}` : ""}`;
   }
 
   // Update og:image meta tag when portfolio data loads

@@ -1,8 +1,7 @@
 import { ImageResponse } from "next/og";
 import { type NextRequest } from "next/server";
 
-// Node runtime — more reliable for external fetches than edge
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 function short(a: string) {
   return a.slice(0, 6) + "..." + a.slice(-4);
@@ -12,119 +11,69 @@ function fmtUsd(v: number): string {
   if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
   if (v >= 1e3) return "$" + (v / 1e3).toFixed(2) + "K";
   if (v >= 1) return "$" + v.toFixed(2);
-  if (v > 0) return "$" + v.toFixed(4);
-  return "$0.00";
+  return "$0";
 }
 
-async function getPortfolioSummary(address: string) {
-  let monBalance = 0;
-  let monPrice = 0;
+export function GET(req: NextRequest) {
+  const address = req.nextUrl.searchParams.get("address");
+  const hasAddr = address && /^0x[a-fA-F0-9]{40}$/.test(address);
+  const value = parseInt(req.nextUrl.searchParams.get("v") || "0");
 
-  // Fetch balance — independent try/catch so one failure doesn't kill both
-  try {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 4000);
-    const res = await fetch("https://rpc.monad.xyz", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0", id: 1,
-        method: "eth_getBalance",
-        params: [address, "latest"],
-      }),
-      signal: controller.signal,
-    });
-    if (res.ok) {
-      const d = await res.json();
-      monBalance = parseInt(d.result || "0", 16) / 1e18;
-    }
-  } catch {
-    // timeout or network error — use 0
-  }
-
-  // Fetch price
-  try {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 4000);
-    const res = await fetch("https://coins.llama.fi/prices/current/coingecko:monad", {
-      signal: controller.signal,
-    });
-    if (res.ok) {
-      const d = await res.json();
-      monPrice = d.coins?.["coingecko:monad"]?.price || 0;
-    }
-  } catch {
-    // timeout or network error — use 0
-  }
-
-  return { monBalance, monPrice, totalValue: monBalance * monPrice };
-}
-
-export async function GET(req: NextRequest) {
-  try {
-    const address = req.nextUrl.searchParams.get("address");
-    const hasAddr = address && /^0x[a-fA-F0-9]{40}$/.test(address);
-
-    if (!hasAddr) {
-      return new ImageResponse(
-        (
-          <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
-              <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
-              <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
-            </div>
-            <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens.</div>
-            <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
-          </div>
-        ),
-        { width: 1200, height: 630 }
-      );
-    }
-
-    const data = await getPortfolioSummary(address);
-
+  if (!hasAddr) {
     return new ImageResponse(
       (
         <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "48px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "white" }}>OP</div>
-              <div style={{ fontSize: "24px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
-            </div>
-            <div style={{ fontSize: "18px", color: "#A0A0B8", fontFamily: "monospace" }}>{short(address)}</div>
-          </div>
-
-          <div style={{ fontSize: "14px", color: "#5A5A74", letterSpacing: "1.5px", marginBottom: "12px" }}>PORTFOLIO VALUE</div>
-          <div style={{ fontSize: "72px", fontWeight: 700, color: "#E8E8FF", marginBottom: "24px", lineHeight: 1 }}>{fmtUsd(data.totalValue)}</div>
-
-          <div style={{ display: "flex", gap: "40px", flex: 1 }}>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "13px", color: "#5A5A74", marginBottom: "4px" }}>MON BALANCE</div>
-              <div style={{ fontSize: "28px", fontWeight: 600, color: "#A78BFA" }}>{data.monBalance >= 1000 ? (data.monBalance / 1000).toFixed(1) + "K" : data.monBalance.toFixed(2)} MON</div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "13px", color: "#5A5A74", marginBottom: "4px" }}>MON PRICE</div>
-              <div style={{ fontSize: "28px", fontWeight: 600, color: "#14B8A6" }}>${data.monPrice.toFixed(2)}</div>
-            </div>
-          </div>
-
-          <div style={{ fontSize: "16px", color: "#3A3A54", textAlign: "right" }}>onchain-pulse.vercel.app</div>
-        </div>
-      ),
-      { width: 1200, height: 630 }
-    );
-  } catch {
-    // Fallback: minimal branded image if anything fails
-    return new ImageResponse(
-      (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#0D0B1A", fontFamily: "system-ui" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
+          <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens.</div>
+          <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
         </div>
       ),
       { width: 1200, height: 630 }
     );
   }
+
+  return new ImageResponse(
+    (
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "48px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "white" }}>OP</div>
+            <div style={{ fontSize: "24px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
+          </div>
+          <div style={{ fontSize: "18px", color: "#A0A0B8", fontFamily: "monospace" }}>{short(address)}</div>
+        </div>
+
+        <div style={{ fontSize: "14px", color: "#5A5A74", letterSpacing: "1.5px", marginBottom: "12px" }}>PORTFOLIO VALUE</div>
+        <div style={{ fontSize: "72px", fontWeight: 700, color: "#E8E8FF", marginBottom: "24px", lineHeight: 1 }}>{value > 0 ? fmtUsd(value) : "View Portfolio"}</div>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", gap: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#6D28D9" }} />
+              <span style={{ fontSize: "14px", color: "#5A5A74" }}>Staking</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#14B8A6" }} />
+              <span style={{ fontSize: "14px", color: "#5A5A74" }}>Lending</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#FF007A" }} />
+              <span style={{ fontSize: "14px", color: "#5A5A74" }}>LP</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#F59E0B" }} />
+              <span style={{ fontSize: "14px", color: "#5A5A74" }}>Vaults</span>
+            </div>
+          </div>
+          <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630 }
+  );
 }
