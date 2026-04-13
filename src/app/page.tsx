@@ -121,11 +121,12 @@ function DashboardPage() {
               }}
             />
             <CopyButton
-              text={`${window.location.origin}?address=${address}`}
+              text=""
               label="Share"
               feedback={copyFeedback}
               onCopy={() => {
-                const url = `${window.location.origin}?address=${address}`;
+                const v = Math.round(portfolio.totalValue);
+                const url = `${window.location.origin}?address=${address}${v > 0 ? `&v=${v}` : ""}`;
                 navigator.clipboard.writeText(url).then(() => {
                   setCopyFeedback("Link copied!");
                   setTimeout(() => setCopyFeedback(null), 2000);
