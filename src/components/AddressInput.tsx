@@ -3,13 +3,20 @@
 import { useState, useRef } from "react";
 import { isValidEvmAddress } from "@/lib/format";
 
+// Curated wallets that light up multiple tabs. Ranked by feature coverage.
 const DEMO_WALLETS: { address: string; label: string }[] = [
-  { address: "0x5e073494678fb7fa4a05bb17d45941dd9dc469c1", label: "Staking + Neverland" },
-  { address: "0x9a4Ff17Da01f5821b54c3cfeB54211846Cf703ff", label: "Uniswap V3 LP" },
-  { address: "0x33a7f808a362d2c780d1c6eea9b52179a441fdf9", label: "Neverland (4 reserves)" },
-  { address: "0xEc8A675289BEb9cbEDBE5E8c91059668E2192Df8", label: "Curvance" },
-  { address: "0x7362a34eae117b8c88b1edf6afcb94d4a9e7034f", label: "Morpho + Upshift" },
-  { address: "0x1722445FA07a56dbae3bAd63DEb6C1d30983cbf4", label: "shMON/WMON LP" },
+  // 5 features: 3 LSTs + Neverland (2) + Curvance (2) + UniV3 (8 positions)
+  { address: "0x44aa9f1c5d23971210ee16e96ffd95a06c295987", label: "All features" },
+  // 5 features: shMON staking + Neverland + Morpho + UniV3 (10 positions)
+  { address: "0xb90c0e83f27d34fd838682da1fe7ea0c00bfa251", label: "Morpho + Staking + LP" },
+  // 4 features: all 4 LSTs + Neverland + Curvance (4 markets) + 71K MON
+  { address: "0xcd6b980029e6e6e0733ac8ec3e02be9410d09799", label: "All 4 staking protocols" },
+  // 5 features: all 4 LSTs + Neverland + Curvance + UniV3
+  { address: "0xdc2d04e580f5edbf15bf8129384f8a5b2259089c", label: "All 4 LSTs + lending" },
+  // 3 features: 20 UniV3 positions + large aprMON staking
+  { address: "0x85dc137379f537346607f78842ac11f632cd1a32", label: "20 Uniswap V3 positions" },
+  // 2 features: Morpho vaults + Upshift earnAUSD ($236K)
+  { address: "0x7362a34eae117b8c88b1edf6afcb94d4a9e7034f", label: "Morpho + Upshift vault" },
 ];
 
 interface AddressInputProps {
