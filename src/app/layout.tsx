@@ -3,7 +3,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MonFolio — Monad Portfolio Tracker",
+  title: "Onchain Pulse — Monad Portfolio Tracker",
   description:
     "Track your DeFi positions across the Monad ecosystem. Community-made, not affiliated with Monad Foundation.",
   icons: { icon: "/favicon.ico" },

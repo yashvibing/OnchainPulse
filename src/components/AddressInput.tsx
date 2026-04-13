@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { isValidEvmAddress } from "@/lib/format";
 
-const DEMO_ADDRESS = "0x02964135319494d129F62e319Af7dE923Cb45B6F";
+const DEMO_WALLETS: { address: string; label: string }[] = [
+  { address: "0x5e073494678fb7fa4a05bb17d45941dd9dc469c1", label: "Staking + Neverland" },
+  { address: "0x9a4Ff17Da01f5821b54c3cfeB54211846Cf703ff", label: "Uniswap V3 LP" },
+  { address: "0x33a7f808a362d2c780d1c6eea9b52179a441fdf9", label: "Neverland (4 reserves)" },
+  { address: "0xEc8A675289BEb9cbEDBE5E8c91059668E2192Df8", label: "Curvance" },
+  { address: "0x7362a34eae117b8c88b1edf6afcb94d4a9e7034f", label: "Morpho + Upshift" },
+  { address: "0x1722445FA07a56dbae3bAd63DEb6C1d30983cbf4", label: "shMON/WMON LP" },
+];
 
 interface AddressInputProps {
   onSubmit: (address: string) => void;
@@ -12,6 +19,7 @@ interface AddressInputProps {
 export function AddressInput({ onSubmit }: AddressInputProps) {
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const demoIndex = useRef(0);
 
   function handleSubmit() {
     const addr = input.trim();
@@ -24,9 +32,11 @@ export function AddressInput({ onSubmit }: AddressInputProps) {
   }
 
   function handleDemo() {
-    setInput(DEMO_ADDRESS);
+    const demo = DEMO_WALLETS[demoIndex.current % DEMO_WALLETS.length];
+    demoIndex.current += 1;
+    setInput(demo.address);
     setError("");
-    onSubmit(DEMO_ADDRESS);
+    onSubmit(demo.address);
   }
 
   return (

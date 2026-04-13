@@ -22,7 +22,7 @@ export function LoadingSpinner() {
         Scanning Monad ecosystem…
       </div>
       <div className="mt-1.5 text-[12px] text-[var(--color-text-dim)]">
-        aPriori · FastLane · Kintsu · Magma · Morpho
+        aPriori · FastLane · Kintsu · Magma · Morpho · Neverland · Curvance
       </div>
     </div>
   );
