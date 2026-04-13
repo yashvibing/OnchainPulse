@@ -55,11 +55,25 @@ function DashboardPage() {
     }
   }, [searchParams, address]);
 
-  // Update og:image meta tag dynamically for sharing
+  const portfolio = usePortfolio(address);
+
+  // Build OG image URL with portfolio stats in a single "s" param
+  // Format: s=value-dailyYield-positions-protocols (dash-separated)
+  function buildOgUrl() {
+    const base = typeof window !== "undefined" ? window.location.origin : "";
+    if (!address) return `${base}/api/og`;
+    const s = [
+      Math.round(portfolio.totalValue),
+      Math.round(portfolio.dailyYield * 100) / 100,
+      portfolio.positionCount,
+      portfolio.protocolCount,
+    ].join("-");
+    return `${base}/api/og?address=${address}&s=${s}`;
+  }
+
+  // Update og:image meta tag when portfolio data loads
   useEffect(() => {
-    const ogUrl = address
-      ? `${window.location.origin}/api/og?address=${address}`
-      : `${window.location.origin}/api/og`;
+    const ogUrl = buildOgUrl();
     let tag = document.querySelector('meta[property="og:image"]');
     if (!tag) {
       tag = document.createElement("meta");
@@ -67,9 +81,8 @@ function DashboardPage() {
       document.head.appendChild(tag);
     }
     tag.setAttribute("content", ogUrl);
-  }, [address]);
-
-  const portfolio = usePortfolio(address);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, portfolio.totalValue, portfolio.positionCount]);
 
   function handleSearch(addr: string) {
     setAddress(addr);
@@ -110,6 +123,8 @@ function DashboardPage() {
             </button>
             <button
               onClick={() => {
+                // Share URL includes address only (clean link), OG image
+                // will be fetched by crawlers with stats baked in via meta tag
                 const url = `${window.location.origin}?address=${address}`;
                 navigator.clipboard.writeText(url);
               }}

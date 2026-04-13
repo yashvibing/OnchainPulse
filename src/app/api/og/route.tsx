@@ -7,63 +7,60 @@ function short(a: string) {
   return a.slice(0, 6) + "..." + a.slice(-4);
 }
 
-const BG = "linear-gradient(135deg, #0D0B1A 0%, #1a1535 50%, #0D0B1A 100%)";
-const LOGO_BG = "linear-gradient(135deg, #6D3BF5, #0EA5A0)";
+function fmtUsd(v: number): string {
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return "$" + (v / 1e3).toFixed(2) + "K";
+  if (v >= 1) return "$" + v.toFixed(2);
+  if (v > 0) return "$" + v.toFixed(4);
+  return "$0.00";
+}
 
 export function GET(req: NextRequest) {
-  const address = req.nextUrl.searchParams.get("address");
-  const hasAddress = address && /^0x[a-fA-F0-9]{40}$/.test(address);
+  const p = req.nextUrl.searchParams;
+  const address = p.get("address");
+  const hasAddr = address && /^0x[a-fA-F0-9]{40}$/.test(address);
+
+  // Stats encoded as single param: "value-yield-positions-protocols"
+  const stats = p.get("s")?.split("-").map(Number) || [];
+  const value = stats[0] || 0;
+  const dailyYield = stats[1] || 0;
+  const positions = stats[2] || 0;
+  const protocols = stats[3] || 0;
+
+  if (!hasAddr) {
+    return new ImageResponse(
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
+          <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
+        </div>
+        <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens.</div>
+        <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
+      </div>,
+      { width: 1200, height: 630 }
+    );
+  }
+
+  const hasStats = value > 0;
 
   return new ImageResponse(
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: BG, fontFamily: "system-ui", padding: "60px" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "48px" }}>
-        <div style={{ width: "56px", height: "56px", borderRadius: "14px", background: LOGO_BG, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800, color: "white" }}>OP</div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: "36px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
-          <div style={{ fontSize: "16px", color: "#5A5A74" }}>Monad Portfolio Tracker</div>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "white" }}>OP</div>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
         </div>
+        <div style={{ fontSize: "18px", color: "#A0A0B8", fontFamily: "monospace" }}>{short(address)}</div>
       </div>
 
-      {/* Content */}
-      {hasAddress ? (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ fontSize: "14px", color: "#5A5A74", letterSpacing: "1px", marginBottom: "12px" }}>PORTFOLIO FOR</div>
-          <div style={{ fontSize: "32px", fontWeight: 600, color: "#A78BFA", fontFamily: "monospace", marginBottom: "32px" }}>{short(address)}</div>
-          <div style={{ fontSize: "20px", color: "#A0A0B8", lineHeight: 1.6 }}>
-            View staking, lending, LP positions, yield vaults, and token holdings on the Monad ecosystem.
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ fontSize: "24px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6 }}>
-            Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens — all in one view.
-          </div>
-        </div>
-      )}
+      <div style={{ fontSize: "64px", fontWeight: 700, color: "#E8E8FF", marginBottom: "12px" }}>{hasStats ? fmtUsd(value) : "View Portfolio"}</div>
 
-      {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div style={{ display: "flex", gap: "24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#6D28D9" }} />
-            <span style={{ fontSize: "14px", color: "#5A5A74" }}>Staking</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#14B8A6" }} />
-            <span style={{ fontSize: "14px", color: "#5A5A74" }}>Lending</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#FF007A" }} />
-            <span style={{ fontSize: "14px", color: "#5A5A74" }}>LP</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "4px", background: "#F59E0B" }} />
-            <span style={{ fontSize: "14px", color: "#5A5A74" }}>Vaults</span>
-          </div>
-        </div>
-        <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
+      <div style={{ display: "flex", gap: "20px", fontSize: "18px", flex: 1 }}>
+        {dailyYield > 0 && <div style={{ color: "#14B8A6" }}>+{fmtUsd(dailyYield)}/day</div>}
+        {positions > 0 && <div style={{ color: "#A78BFA" }}>{positions} positions across {protocols} protocols</div>}
       </div>
+
+      <div style={{ fontSize: "16px", color: "#3A3A54", textAlign: "right" }}>onchain-pulse.vercel.app</div>
     </div>,
     { width: 1200, height: 630 }
   );
