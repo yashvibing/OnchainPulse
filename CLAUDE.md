@@ -150,14 +150,12 @@ Expectations when changing code:
 
 ## TODO (priority order)
 
-1. Replace manual address input with wagmi wallet connect
-2. Add 30-day portfolio value sparkline chart (needs historical price + balance snapshots)
-3. Upgrade transaction history to BlockVision API (add `BLOCKVISION_API_KEY` env var) for full coverage including native MON + unknown tokens
-4. Investigate Balancer V3 — contracts deployed but revert on standard calls. $8.3M TVL exists. May need Balancer team help or a subgraph.
-5. Investigate Kuru — CLOB+AMM hybrid, need their SDK/API. No standard LP token pattern.
-6. Add EARNMON to Upshift vaults when address surfaces in monad-crypto/protocols
-7. Push to GitHub — give the repo a remote
-8. Verify Curve LP end-to-end with a real holder (build-verified but not holder-verified)
+1. Investigate Balancer V3 — contracts deployed but revert on standard calls. $8.3M TVL exists. May need Balancer team help or a subgraph.
+2. Investigate Kuru — CLOB+AMM hybrid, need their SDK/API. No standard LP token pattern.
+3. Add EARNMON to Upshift vaults when address surfaces in monad-crypto/protocols
+4. Verify Curve LP end-to-end with a real holder (build-verified but not holder-verified)
+5. One-click staking/unstaking actions via connected wallet
+6. Wrap/unwrap MON via WMON contract
 
 ### Done
 - ✅ Look up real addresses from `monad-crypto/protocols` for staking, Morpho, Curve, Upshift
@@ -169,7 +167,14 @@ Expectations when changing code:
 - ✅ Wire Uniswap V3 LP positions with proper tick-range amount math
 - ✅ Wire Curve LP positions via factory enumeration (StableSwap + Twocrypto)
 - ✅ Wire Upshift earnAUSD yield vault (with 1:1 fallback for custom vault)
-- ✅ Add transaction history via eth_getLogs on drpc.org (~70 min lookback, known tokens only)
 - ✅ Add `clean` / `dev:fresh` scripts to fix the dev/build cache collision
 - ✅ Fix USDT → USDT0 mislabeling, add cbBTC + USD1 tokens
 - ✅ Update EmptyState copy to reflect actual protocol coverage
+- ✅ Add Neverland (Aave V3 fork) + Curvance (ERC-4626) lending
+- ✅ Replace manual address input with wagmi wallet connect (RainbowKit)
+- ✅ Add 7-day portfolio sparkline chart
+- ✅ Dynamic token list from monad-crypto/token-list (72 tokens)
+- ✅ Shareable portfolio URLs with OG image generation
+- ✅ Token approval manager with revoke support
+- ✅ 13 design polish improvements + premium design upgrade (Satoshi font)
+- ✅ Push to GitHub (yashcrypto21/OnchainPulse)
