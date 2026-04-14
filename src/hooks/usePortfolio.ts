@@ -20,10 +20,6 @@ import {
 } from "@/services/liquidity";
 import { fetchMonadYields, type YieldPool } from "@/services/yields";
 import {
-  fetchTokenTransferHistory,
-  type TransferEvent,
-} from "@/services/transactions";
-import {
   fetchTokenApprovals,
   type TokenApproval,
 } from "@/services/approvals";
@@ -96,21 +92,6 @@ export function useMonadYields() {
     queryKey: ["monadYields"],
     queryFn: fetchMonadYields,
     staleTime: 300_000,
-  });
-}
-
-// ─── Token Transfer History Hook ───
-// Backed by drpc.org's eth_getLogs in the transactions service. ~70 minutes
-// of lookback covering all tracked tokens, both directions. Slower than the
-// other queries (~10-20 multicall round trips) so we cache more aggressively.
-export function useTokenTransferHistory(address: string | null) {
-  return useQuery<TransferEvent[]>({
-    queryKey: ["tokenTransferHistory", address],
-    queryFn: () => fetchTokenTransferHistory(address as `0x${string}`),
-    enabled: !!address && ADDRESS_RE.test(address),
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    retry: 1,
   });
 }
 
