@@ -82,7 +82,7 @@ function StatCard({
 
   return (
     <div
-      className="card card-hover flex-1 min-w-[155px] px-5 py-4 transition-shadow duration-300"
+      className="card-elevated card-hover flex-1 min-w-[155px] px-5 py-4 transition-shadow duration-300"
       style={{
         ["--glow-color" as string]: accent || "var(--color-accent-indigo)",
       }}
