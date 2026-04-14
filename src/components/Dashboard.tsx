@@ -21,6 +21,7 @@ import {
 } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
 import { ApprovalManager } from "@/components/ApprovalManager";
+import { SwapPanel } from "@/components/SwapPanel";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 
 const TABS = [
@@ -30,6 +31,7 @@ const TABS = [
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
   { key: "yield", label: "Yield", icon: "⬢" },
+  { key: "swap", label: "Swap", icon: "⇄" },
   { key: "security", label: "Security", icon: "⛨" },
 ] as const;
 
@@ -258,6 +260,13 @@ function DashboardInner() {
                 <div className="animate-fade-up">
                   <SectionTitle icon="⬢" title="Yield Vaults" count={portfolio.vaults.length} />
                   {portfolio.vaults.length > 0 ? <VaultCards positions={portfolio.vaults} /> : <NoPositions label="yield vault positions" />}
+                </div>
+              )}
+
+              {activeTab === "swap" && (
+                <div className="animate-fade-up">
+                  <SectionTitle icon="⇄" title="Swap" />
+                  <SwapPanel />
                 </div>
               )}
 
