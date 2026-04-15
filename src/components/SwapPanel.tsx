@@ -8,7 +8,6 @@ import { formatNumber } from "@/lib/format";
 
 const NATIVE_ADDR = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
-// Swappable tokens: native MON + all ERC-20s
 const SWAP_TOKENS: TokenInfo[] = [
   { ...NATIVE_MON, address: NATIVE_ADDR as `0x${string}` },
   ...Object.values(TOKENS),
@@ -42,7 +41,7 @@ function TokenSelector({
         <span className="text-[var(--color-text-dim)]">▾</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-xl">
           {filtered.map((t) => (
             <button
               key={t.address}
@@ -65,104 +64,36 @@ function TokenSelector({
   );
 }
 
-function QuoteCard({
-  quote,
-  isBest,
-  onSwap,
-  isSwapping,
-}: {
-  quote: SwapQuote;
-  isBest: boolean;
-  onSwap: () => void;
-  isSwapping: boolean;
-}) {
-  return (
-    <div
-      className={`animate-fade-up flex items-center justify-between rounded-[var(--radius-lg)] border px-4 py-3 ${
-        isBest
-          ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.06)]"
-          : "border-[var(--color-border)] bg-[var(--color-bg-card)]"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ background: quote.aggregatorColor }}
-        />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
-              {quote.aggregator}
-            </span>
-            {isBest && (
-              <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-positive)]">
-                Best
-              </span>
-            )}
-          </div>
-          <div className="text-[11px] text-[var(--color-text-dim)]">
-            Gas: ~{parseInt(quote.gasEstimate).toLocaleString()}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <div className="font-mono text-[15px] font-semibold text-[var(--color-text-primary)]">
-            {parseFloat(quote.amountOutFormatted) >= 1000
-              ? formatNumber(parseFloat(quote.amountOutFormatted), 2)
-              : parseFloat(quote.amountOutFormatted).toFixed(6)}
-          </div>
-        </div>
-        <button
-          onClick={onSwap}
-          disabled={isSwapping}
-          className={`rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-50 ${
-            isBest ? "btn-primary" : "bg-[var(--color-bg-card-elevated)]"
-          }`}
-        >
-          {isSwapping ? "Swapping..." : "Swap"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function SwapPanel() {
   const { address: walletAddress, isConnected } = useAccount();
   const { sendTransaction, data: txHash, isPending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-  const [tokenIn, setTokenIn] = useState<TokenInfo>(SWAP_TOKENS[0]); // MON
+  const [tokenIn, setTokenIn] = useState<TokenInfo>(SWAP_TOKENS[0]);
   const [tokenOut, setTokenOut] = useState<TokenInfo>(SWAP_TOKENS.find((t) => t.symbol === "USDC")!);
   const [amountIn, setAmountIn] = useState("");
   const [quotes, setQuotes] = useState<SwapQuote[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0); // which aggregator is selected
   const [loading, setLoading] = useState(false);
-  const [swappingIdx, setSwappingIdx] = useState<number | null>(null);
-  const [slippage, setSlippage] = useState(1); // 1%
+  const [swapping, setSwapping] = useState(false);
+  const [slippage, setSlippage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [txSuccess, setTxSuccess] = useState(false);
 
-  // Fetch quotes when input changes (debounced)
   const fetchQuotes = useCallback(async () => {
     if (!amountIn || parseFloat(amountIn) <= 0) {
       setQuotes([]);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
       const results = await fetchSwapQuotes(
-        tokenIn.address,
-        tokenOut.address,
-        amountIn,
-        tokenIn.decimals,
-        tokenOut.decimals
+        tokenIn.address, tokenOut.address, amountIn, tokenIn.decimals, tokenOut.decimals
       );
       setQuotes(results);
-      if (results.length === 0) {
-        setError("No routes found. Try a different pair or amount.");
-      }
+      setSelectedIdx(0); // auto-select best
+      if (results.length === 0) setError("No routes found. Try a different pair or amount.");
     } catch {
       setError("Failed to fetch quotes.");
       setQuotes([]);
@@ -175,49 +106,37 @@ export function SwapPanel() {
     return () => clearTimeout(timer);
   }, [fetchQuotes]);
 
-  // Handle tx success
   useEffect(() => {
     if (isSuccess) {
       setTxSuccess(true);
-      setSwappingIdx(null);
+      setSwapping(false);
       setTimeout(() => setTxSuccess(false), 5000);
     }
   }, [isSuccess]);
 
-  async function handleSwap(quote: SwapQuote, idx: number) {
-    if (!isConnected || !walletAddress) {
-      setError("Connect your wallet first.");
-      return;
-    }
+  async function handleSwap() {
+    if (!isConnected || !walletAddress) { setError("Connect your wallet first."); return; }
+    if (quotes.length === 0) return;
 
-    setSwappingIdx(idx);
+    const quote = quotes[selectedIdx];
+    setSwapping(true);
     setError(null);
 
     const txData = await buildSwapTx(
-      quote,
-      walletAddress,
-      slippage,
-      tokenIn.address,
-      tokenOut.address,
-      amountIn,
-      tokenIn.decimals
+      quote, walletAddress, slippage, tokenIn.address, tokenOut.address, amountIn, tokenIn.decimals
     );
 
     if (!txData) {
-      setError(`Failed to build ${quote.aggregator} transaction. Try another aggregator.`);
-      setSwappingIdx(null);
+      setError(`Failed to build ${quote.aggregator} transaction. Try another route.`);
+      setSwapping(false);
       return;
     }
 
     try {
-      sendTransaction({
-        to: txData.to,
-        data: txData.data,
-        value: txData.value,
-      });
+      sendTransaction({ to: txData.to, data: txData.data, value: txData.value });
     } catch {
       setError("Transaction rejected.");
-      setSwappingIdx(null);
+      setSwapping(false);
     }
   }
 
@@ -227,6 +146,13 @@ export function SwapPanel() {
     setTokenOut(tmp);
     setQuotes([]);
   }
+
+  const selectedQuote = quotes[selectedIdx];
+  const selectedOutFormatted = selectedQuote
+    ? parseFloat(selectedQuote.amountOutFormatted) >= 1000
+      ? formatNumber(parseFloat(selectedQuote.amountOutFormatted), 2)
+      : parseFloat(selectedQuote.amountOutFormatted).toFixed(6)
+    : "0.0";
 
   return (
     <div className="mx-auto max-w-[520px]">
@@ -242,19 +168,12 @@ export function SwapPanel() {
             placeholder="0.0"
             className="flex-1 bg-transparent text-[24px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)]"
           />
-          <TokenSelector
-            selected={tokenIn}
-            onChange={(t) => { setTokenIn(t); setQuotes([]); }}
-            exclude={tokenOut.address}
-          />
+          <TokenSelector selected={tokenIn} onChange={(t) => { setTokenIn(t); setQuotes([]); }} exclude={tokenOut.address} />
         </div>
 
-        {/* Flip button */}
+        {/* Flip */}
         <div className="flex justify-center py-1">
-          <button
-            onClick={handleFlip}
-            className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-2 text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-secondary)]"
-          >
+          <button onClick={handleFlip} className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-2 text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-secondary)]">
             ↕
           </button>
         </div>
@@ -263,19 +182,9 @@ export function SwapPanel() {
         <div className="mb-1 text-[11px] text-[var(--color-text-dim)]">You receive</div>
         <div className="flex items-center gap-3">
           <div className="flex-1 text-[24px] font-semibold text-[var(--color-text-muted)]">
-            {loading
-              ? "..."
-              : quotes[0]
-                ? parseFloat(quotes[0].amountOutFormatted) >= 1000
-                  ? formatNumber(parseFloat(quotes[0].amountOutFormatted), 2)
-                  : parseFloat(quotes[0].amountOutFormatted).toFixed(6)
-                : "0.0"}
+            {loading ? "..." : selectedOutFormatted}
           </div>
-          <TokenSelector
-            selected={tokenOut}
-            onChange={(t) => { setTokenOut(t); setQuotes([]); }}
-            exclude={tokenIn.address}
-          />
+          <TokenSelector selected={tokenOut} onChange={(t) => { setTokenOut(t); setQuotes([]); }} exclude={tokenIn.address} />
         </div>
 
         {/* Slippage */}
@@ -287,7 +196,7 @@ export function SwapPanel() {
               onClick={() => setSlippage(s)}
               className={`rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 slippage === s
-                  ? "bg-[var(--color-accent-primary)] text-white"
+                  ? "bg-[var(--color-accent-primary)] text-[#0A0E17]"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
@@ -297,47 +206,56 @@ export function SwapPanel() {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(239,68,68,0.08)] px-4 py-2 text-[12px] text-[var(--color-negative)]">
-          {error}
-        </div>
-      )}
-
-      {/* Success */}
-      {txSuccess && txHash && (
-        <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(20,184,166,0.08)] px-4 py-2 text-[12px] text-[var(--color-positive)]">
-          Swap successful!{" "}
-          <a
-            href={`https://monadvision.com/tx/${txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            View transaction
-          </a>
-        </div>
-      )}
-
-      {/* Quotes */}
+      {/* Routes — selectable, no individual swap buttons */}
       {quotes.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] text-[var(--color-text-dim)]">
-              {quotes.length} route{quotes.length !== 1 ? "s" : ""} found
-            </span>
-            <span className="text-[11px] text-[var(--color-text-dim)]">
-              Best: {quotes[0].aggregator}
-            </span>
+        <div className="mt-3 space-y-1.5">
+          <div className="px-1 text-[11px] text-[var(--color-text-dim)]">
+            {quotes.length} route{quotes.length !== 1 ? "s" : ""} found — select one
           </div>
           {quotes.map((q, i) => (
-            <QuoteCard
+            <button
               key={q.aggregator}
-              quote={q}
-              isBest={i === 0}
-              onSwap={() => handleSwap(q, i)}
-              isSwapping={(swappingIdx === i && isPending) || (swappingIdx === i && isConfirming)}
-            />
+              onClick={() => setSelectedIdx(i)}
+              className={`animate-fade-up flex w-full items-center justify-between rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-all ${
+                selectedIdx === i
+                  ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.06)]"
+                  : "border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-border-hover)]"
+              }`}
+              style={{ animationDelay: `${i * 40}ms` }}
+            >
+              <div className="flex items-center gap-3">
+                {/* Radio dot */}
+                <div className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                  selectedIdx === i ? "border-[var(--color-accent-primary)]" : "border-[var(--color-text-dim)]"
+                }`}>
+                  {selectedIdx === i && <div className="h-2 w-2 rounded-full bg-[var(--color-accent-primary)]" />}
+                </div>
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: q.aggregatorColor }}
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                      {q.aggregator}
+                    </span>
+                    {i === 0 && (
+                      <span className="rounded-full bg-[rgba(0,232,123,0.1)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-positive)]">
+                        Best
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-[var(--color-text-dim)]">
+                    Gas: ~{parseInt(q.gasEstimate).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="font-mono text-[15px] font-semibold text-[var(--color-text-primary)]">
+                {parseFloat(q.amountOutFormatted) >= 1000
+                  ? formatNumber(parseFloat(q.amountOutFormatted), 2)
+                  : parseFloat(q.amountOutFormatted).toFixed(6)}
+              </div>
+            </button>
           ))}
         </div>
       )}
@@ -349,11 +267,38 @@ export function SwapPanel() {
         </div>
       )}
 
-      {/* Not connected */}
-      {!isConnected && amountIn && parseFloat(amountIn) > 0 && quotes.length > 0 && (
-        <div className="mt-3 text-center text-[12px] text-[var(--color-warning)]">
-          Connect wallet to swap
+      {/* Error */}
+      {error && (
+        <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(255,71,87,0.08)] px-4 py-2 text-[12px] text-[var(--color-negative)]">
+          {error}
         </div>
+      )}
+
+      {/* Success */}
+      {txSuccess && txHash && (
+        <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(0,232,123,0.08)] px-4 py-2 text-[12px] text-[var(--color-positive)]">
+          Swap successful!{" "}
+          <a href={`https://monadvision.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">
+            View transaction
+          </a>
+        </div>
+      )}
+
+      {/* SINGLE SWAP BUTTON */}
+      {quotes.length > 0 && (
+        <button
+          onClick={handleSwap}
+          disabled={swapping || isPending || isConfirming || !isConnected}
+          className="btn-primary mt-4 w-full py-4 text-[16px] disabled:opacity-50"
+        >
+          {!isConnected
+            ? "Connect wallet to swap"
+            : isPending
+              ? "Confirm in wallet..."
+              : isConfirming
+                ? "Swapping..."
+                : `Swap via ${selectedQuote?.aggregator || "best route"}`}
+        </button>
       )}
     </div>
   );
