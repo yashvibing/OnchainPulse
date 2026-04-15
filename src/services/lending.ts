@@ -6,6 +6,8 @@ import {
   MORPHO_VAULTS,
   NEVERLAND_RESERVES,
   CURVANCE_MARKETS,
+  EULER_VAULTS,
+  GEARBOX_VAULTS,
   type LendingProtocol,
   type MorphoVault,
 } from "@/config/protocols";
@@ -428,6 +430,76 @@ async function fetchCurvancePositions(
   return positions;
 }
 
+// ─── Euler V2 Earn + Gearbox Edge vaults (ERC-4626) ───
+// Both use standard ERC-4626: balanceOf → convertToAssets for underlying value.
+async function fetchErc4626VaultPositions(
+  walletAddress: `0x${string}`,
+  prices: Map<string, number>,
+  vaults: { name: string; address: `0x${string}`; underlyingSymbol: string; color: string }[],
+  protocolPrefix: string
+): Promise<LendingPosition[]> {
+  if (vaults.length === 0) return [];
+  const normalizedWallet = getAddress(walletAddress);
+
+  const balanceCalls = vaults.map((v) => ({
+    address: getAddress(v.address),
+    abi: ERC4626_ABI,
+    functionName: "balanceOf" as const,
+    args: [normalizedWallet] as const,
+  }));
+
+  let balResults;
+  try {
+    balResults = await monadClient.multicall({ contracts: balanceCalls });
+  } catch {
+    return [];
+  }
+
+  const held: { vault: typeof vaults[number]; shares: bigint }[] = [];
+  balResults.forEach((r, i) => {
+    if (r.status === "success" && (r.result as bigint) > 0n) {
+      held.push({ vault: vaults[i], shares: r.result as bigint });
+    }
+  });
+  if (held.length === 0) return [];
+
+  const assetsCalls = held.map(({ vault, shares }) => ({
+    address: getAddress(vault.address),
+    abi: ERC4626_ABI,
+    functionName: "convertToAssets" as const,
+    args: [shares] as const,
+  }));
+
+  let assetsResults;
+  try {
+    assetsResults = await monadClient.multicall({ contracts: assetsCalls });
+  } catch {
+    return [];
+  }
+
+  const positions: LendingPosition[] = [];
+  held.forEach(({ vault, shares }, i) => {
+    const r = assetsResults[i];
+    const assetAmount = r.status === "success" ? (r.result as bigint) : shares;
+    const tokenInfo = Object.values(TOKENS).find((t) => t.symbol === vault.underlyingSymbol);
+    const decimals = tokenInfo?.decimals ?? 18;
+    const formatted = formatUnits(assetAmount, decimals);
+    const price = prices.get(vault.underlyingSymbol) || 0;
+
+    positions.push({
+      protocol: `${protocolPrefix} · ${vault.name}`,
+      type: "supply",
+      asset: vault.underlyingSymbol,
+      balance: formatted,
+      valueUsd: parseFloat(formatted) * price,
+      apy: 0, // APY from Merkl yield aggregator
+      color: vault.color,
+    });
+  });
+
+  return positions;
+}
+
 // ─── Fetch all lending positions ───
 export async function fetchLendingPositions(
   walletAddress: `0x${string}`
@@ -445,7 +517,7 @@ export async function fetchLendingPositions(
   }
 
   // Run all protocol fetchers in parallel.
-  const [morpho, neverland, curvance, euler] = await Promise.all([
+  const [morpho, neverland, curvance, euler, eulerV2, gearbox] = await Promise.all([
     fetchMorphoVaultPositions(walletAddress, prices, vaultsToCheck),
     fetchNeverlandPositions(walletAddress, prices),
     fetchCurvancePositions(walletAddress, prices),
@@ -454,7 +526,9 @@ export async function fetchLendingPositions(
         fetchEulerPositions(p, walletAddress, prices, 0)
       )
     ).then((arr) => arr.flat()),
+    fetchErc4626VaultPositions(walletAddress, prices, EULER_VAULTS, "Euler V2"),
+    fetchErc4626VaultPositions(walletAddress, prices, GEARBOX_VAULTS, "Gearbox"),
   ]);
 
-  return [...morpho, ...neverland, ...curvance, ...euler];
+  return [...morpho, ...neverland, ...curvance, ...euler, ...eulerV2, ...gearbox];
 }

@@ -17,6 +17,7 @@ import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
 import { ApprovalManager } from "@/components/ApprovalManager";
 import { SwapPanel } from "@/components/SwapPanel";
+import { YieldAggregator } from "@/components/YieldAggregator";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 
 const PORTFOLIO_TABS = [
@@ -99,6 +100,19 @@ function DashboardInner() {
             </p>
           </div>
           <SwapPanel />
+        </section>
+
+        {/* ══════ YIELD AGGREGATOR ══════ */}
+        <section className="mb-8 border-t border-[var(--color-border)] pt-8">
+          <div className="mb-4 text-center">
+            <h2 className="text-[24px] font-bold text-[var(--color-text-primary)]">
+              Yield Aggregator
+            </h2>
+            <p className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+              Compare lending & borrowing rates across all Monad protocols. Select tokens to find the best yield.
+            </p>
+          </div>
+          <YieldAggregator />
         </section>
 
         {/* ══════ PORTFOLIO SECTION ══════ */}

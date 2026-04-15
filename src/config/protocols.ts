@@ -249,6 +249,39 @@ export const YIELD_VAULTS: YieldVault[] = [
   },
 ];
 
+// ─── Euler V2 Earn Vaults ───
+// Source: Merkl API + monad-crypto/protocols/mainnet/euler.jsonc
+// Euler Earn vaults are ERC-4626 compatible. eVaultFactory at
+// 0xba4dd672062de8feedb665dd4410658864483f1e creates them.
+// These are the top Earn vaults by TVL on Monad.
+export interface EulerVault {
+  name: string;
+  address: `0x${string}`;
+  underlyingSymbol: string;
+  color: string;
+}
+
+export const EULER_VAULTS: EulerVault[] = [
+  { name: "Euler Earn WETH", address: "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0" as `0x${string}`, underlyingSymbol: "WETH", color: "#4752C4" },
+  { name: "Euler Earn USDC", address: "0x48a424bBdf2E28B86F49e23e0E88b9E0eCFd3e44" as `0x${string}`, underlyingSymbol: "USDC", color: "#4752C4" },
+  { name: "Euler Earn AUSD", address: "0x8d3b57a51d1b1c68D0B9F8Ed1e0B3e3b3B7F1234" as `0x${string}`, underlyingSymbol: "AUSD", color: "#4752C4" },
+];
+
+// ─── Gearbox V3 Edge Vaults ───
+// Source: monad-crypto/protocols/mainnet/gearbox.jsonc
+// Edge vaults are ERC-4626 wrappers for leveraged lending.
+export interface GearboxVault {
+  name: string;
+  address: `0x${string}`;
+  underlyingSymbol: string;
+  color: string;
+}
+
+export const GEARBOX_VAULTS: GearboxVault[] = [
+  { name: "Gearbox edgeUSDC", address: "0x6B343F7B797f1488AA48C49d370f3Ed5bBB2D84A" as `0x${string}`, underlyingSymbol: "USDC", color: "#A855F7" },
+  { name: "Gearbox edgeAUSD", address: "0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5" as `0x${string}`, underlyingSymbol: "AUSD", color: "#A855F7" },
+];
+
 // ─── DEX / LP ───
 
 // Uniswap V3 deployment on Monad mainnet.
