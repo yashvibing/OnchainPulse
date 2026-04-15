@@ -3,9 +3,9 @@ export function EmptyState() {
     <div className="py-14 text-center">
       {/* Pulse animation matching "Onchain Pulse" brand */}
       <div className="relative mx-auto mb-6 h-16 w-16">
-        <div className="absolute inset-0 rounded-full bg-[var(--color-accent-indigo)] opacity-20" style={{ animation: "pulse-ring 2s ease-in-out infinite" }} />
-        <div className="absolute inset-2 rounded-full bg-[var(--color-accent-indigo)] opacity-30" style={{ animation: "pulse-ring 2s ease-in-out infinite 0.3s" }} />
-        <div className="absolute inset-4 rounded-full bg-[var(--color-accent-indigo)] opacity-40" style={{ animation: "pulse-ring 2s ease-in-out infinite 0.6s" }} />
+        <div className="absolute inset-0 rounded-full bg-[var(--color-accent-primary)] opacity-20" style={{ animation: "pulse-ring 2s ease-in-out infinite" }} />
+        <div className="absolute inset-2 rounded-full bg-[var(--color-accent-primary)] opacity-30" style={{ animation: "pulse-ring 2s ease-in-out infinite 0.3s" }} />
+        <div className="absolute inset-4 rounded-full bg-[var(--color-accent-primary)] opacity-40" style={{ animation: "pulse-ring 2s ease-in-out infinite 0.6s" }} />
         <div className="gradient-brand-animated absolute inset-5 rounded-full" />
       </div>
       <div className="mb-2 text-[15px] text-[var(--color-text-muted)]">
@@ -23,7 +23,7 @@ export function EmptyState() {
 export function LoadingSpinner() {
   return (
     <div className="py-16 text-center">
-      <div className="mx-auto mb-5 h-11 w-11 animate-spin rounded-full border-[3px] border-[rgba(109,59,245,0.18)] border-t-[var(--color-accent-indigo)]" />
+      <div className="mx-auto mb-5 h-11 w-11 animate-spin rounded-full border-[3px] border-[rgba(0,232,123,0.18)] border-t-[var(--color-accent-primary)]" />
       <div className="text-[13px] text-[var(--color-text-muted)]">
         Scanning Monad ecosystem…
       </div>

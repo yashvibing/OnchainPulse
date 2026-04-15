@@ -80,7 +80,7 @@ function QuoteCard({
     <div
       className={`animate-fade-up flex items-center justify-between rounded-[var(--radius-lg)] border px-4 py-3 ${
         isBest
-          ? "border-[var(--color-accent-indigo)] bg-[rgba(109,59,245,0.06)]"
+          ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.06)]"
           : "border-[var(--color-border)] bg-[var(--color-bg-card)]"
       }`}
     >
@@ -117,7 +117,7 @@ function QuoteCard({
           onClick={onSwap}
           disabled={isSwapping}
           className={`rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-50 ${
-            isBest ? "gradient-brand" : "bg-[var(--color-bg-card-elevated)]"
+            isBest ? "btn-primary" : "bg-[var(--color-bg-card-elevated)]"
           }`}
         >
           {isSwapping ? "Swapping..." : "Swap"}
@@ -287,7 +287,7 @@ export function SwapPanel() {
               onClick={() => setSlippage(s)}
               className={`rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-medium transition-colors ${
                 slippage === s
-                  ? "bg-[var(--color-accent-indigo)] text-white"
+                  ? "bg-[var(--color-accent-primary)] text-white"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >

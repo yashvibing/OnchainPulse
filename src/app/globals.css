@@ -2,51 +2,52 @@
 
 @theme {
   /* ─── Onchain Pulse Design Tokens ─── */
-  /* Industrial-premium: dark, data-dense, intentional */
+  /* Swap-first, action-oriented, high-energy dark theme */
 
-  /* Backgrounds — 3-level elevation system */
-  --color-bg-primary: #0D0B1A;
-  --color-bg-surface: rgba(255, 255, 255, 0.02);
+  /* Backgrounds */
+  --color-bg-primary: #0A0E17;
+  --color-bg-surface: #0F1420;
   --color-bg-card: rgba(255, 255, 255, 0.03);
   --color-bg-card-elevated: rgba(255, 255, 255, 0.05);
-  --color-bg-card-hover: rgba(255, 255, 255, 0.055);
+  --color-bg-card-hover: rgba(255, 255, 255, 0.07);
 
   /* Borders */
   --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-hover: rgba(255, 255, 255, 0.12);
-  --color-border-elevated: rgba(255, 255, 255, 0.09);
+  --color-border-hover: rgba(255, 255, 255, 0.14);
+  --color-border-elevated: rgba(255, 255, 255, 0.1);
 
-  /* Text — 4-level hierarchy */
-  --color-text-primary: #EEEEF2;
-  --color-text-secondary: #A0A0B8;
-  --color-text-muted: #5A5A74;
-  --color-text-dim: #3A3A54;
+  /* Text */
+  --color-text-primary: #F0F0F5;
+  --color-text-secondary: #9CA3B0;
+  --color-text-muted: #5C6370;
+  --color-text-dim: #363C48;
 
-  /* Accents */
-  --color-accent-indigo: #6D3BF5;
-  --color-accent-gold: #D4C5A0;
+  /* Accents — neon green primary, electric blue secondary */
+  --color-accent-primary: #00E87B;
+  --color-accent-secondary: #3B82F6;
   --color-accent-violet: #A78BFA;
 
   /* Semantic */
-  --color-positive: #14B8A6;
-  --color-negative: #F87171;
-  --color-warning: #F59E0B;
+  --color-positive: #00E87B;
+  --color-negative: #FF4757;
+  --color-warning: #FFB800;
 
-  /* Typography — Satoshi for display, JetBrains Mono for data */
+  /* Typography */
   --font-display: "Satoshi", "DM Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Type scale — 5 intentional sizes */
+  /* Type scale */
   --text-xs: 11px;
   --text-sm: 13px;
   --text-base: 15px;
   --text-lg: 20px;
   --text-xl: 28px;
 
-  /* Border radius hierarchy */
+  /* Border radius */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 @layer base {
@@ -59,7 +60,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent-indigo);
+    outline: 2px solid var(--color-accent-primary);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
@@ -72,12 +73,11 @@
 @layer utilities {
   .bg-radial-glow {
     background:
-      radial-gradient(ellipse at 20% 0%, rgba(70, 30, 160, 0.08) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 100%, rgba(212, 197, 160, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% -20%, rgba(0, 232, 123, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
       var(--color-bg-primary);
   }
 
-  /* Level 1 card — default container */
   .card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
@@ -86,7 +86,6 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   }
 
-  /* Level 2 card — stat cards, elevated elements */
   .card-elevated {
     background: var(--color-bg-card-elevated);
     border: 1px solid var(--color-border-elevated);
@@ -94,7 +93,7 @@
     backdrop-filter: blur(16px);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 4px 24px rgba(0, 0, 0, 0.2);
+      0 4px 24px rgba(0, 0, 0, 0.3);
   }
 
   .card-hover {
@@ -106,7 +105,19 @@
   }
 
   .gradient-brand {
-    background: linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-gold));
+    background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
+  }
+
+  .btn-primary {
+    background: var(--color-accent-primary);
+    color: #0A0E17;
+    font-weight: 700;
+    border-radius: var(--radius-md);
+    transition: opacity 0.15s, box-shadow 0.15s;
+    &:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 20px rgba(0, 232, 123, 0.25);
+    }
   }
 }
 
@@ -121,7 +132,7 @@
   50% { background-position: 100% 50%; }
 }
 .gradient-brand-animated {
-  background: linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-gold), var(--color-accent-violet), var(--color-accent-indigo));
+  background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary), var(--color-accent-violet), var(--color-accent-primary));
   background-size: 300% 300%;
   animation: gradient-shift 4s ease infinite;
 }
@@ -146,6 +157,11 @@
   0% { transform: scale(0.8); opacity: 0.5; }
   50% { transform: scale(1.2); opacity: 0; }
   100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(0, 232, 123, 0.1); }
+  50% { box-shadow: 0 0 25px rgba(0, 232, 123, 0.2); }
 }
 
 /* ─── Dark scrollbar ─── */

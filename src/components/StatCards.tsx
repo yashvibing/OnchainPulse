@@ -84,11 +84,11 @@ function StatCard({
     <div
       className="card-elevated card-hover flex-1 min-w-[155px] px-5 py-4 transition-shadow duration-300"
       style={{
-        ["--glow-color" as string]: accent || "var(--color-accent-indigo)",
+        ["--glow-color" as string]: accent || "var(--color-accent-primary)",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.boxShadow =
-          `0 0 20px ${accent || "var(--color-accent-indigo)"}15, inset 0 1px 0 rgba(255,255,255,0.05)`;
+          `0 0 20px ${accent || "var(--color-accent-primary)"}15, inset 0 1px 0 rgba(255,255,255,0.05)`;
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.boxShadow =

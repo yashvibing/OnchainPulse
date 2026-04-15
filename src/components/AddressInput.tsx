@@ -55,11 +55,11 @@ export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="Enter wallet address (0x...)"
-          className="min-w-[220px] flex-1 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-indigo)]"
+          className="min-w-[220px] flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
         />
         <button
           onClick={handleSubmit}
-          className="gradient-brand whitespace-nowrap rounded-xl px-7 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+          className="btn-primary whitespace-nowrap rounded-[var(--radius-md)] px-7 py-3 text-sm"
         >
           Track
         </button>
