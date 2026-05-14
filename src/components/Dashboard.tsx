@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useAccount } from "wagmi";
 import { usePortfolio, useTokenApprovals } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -16,8 +15,6 @@ import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
 import { ApprovalManager } from "@/components/ApprovalManager";
-import { SwapPanel } from "@/components/SwapPanel";
-import { YieldAggregator } from "@/components/YieldAggregator";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 
 const PORTFOLIO_TABS = [
@@ -43,7 +40,6 @@ export function Dashboard() {
 function DashboardInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { address: connectedAddress, isConnected } = useAccount();
   const [address, setAddress] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PortfolioTabKey>("overview");
   const [tabFade, setTabFade] = useState(false);
@@ -57,13 +53,6 @@ function DashboardInner() {
       setShowPortfolio(true);
     }
   }, [searchParams, address]);
-
-  useEffect(() => {
-    if (isConnected && connectedAddress && !address) {
-      setAddress(connectedAddress);
-      router.replace(`?address=${connectedAddress}`, { scroll: false });
-    }
-  }, [isConnected, connectedAddress, address, router]);
 
   const portfolio = usePortfolio(address);
   const approvals = useTokenApprovals(address);
@@ -89,31 +78,6 @@ function DashboardInner() {
 
       <main className="mx-auto max-w-[1000px] px-5 pb-16 pt-6">
 
-        {/* ══════ SWAP HERO ══════ */}
-        <section className="mb-8">
-          <div className="mb-4 text-center">
-            <h1 className="text-[28px] font-bold text-[var(--color-text-primary)]">
-              Swap at the best rate
-            </h1>
-            <p className="mt-1 text-[13px] text-[var(--color-text-muted)]">
-              Comparing KyberSwap · Monorail · OpenOcean · Fibrous in real time
-            </p>
-          </div>
-          <SwapPanel />
-        </section>
-
-        {/* ══════ YIELD AGGREGATOR ══════ */}
-        <section className="mb-8 border-t border-[var(--color-border)] pt-8">
-          <div className="mb-4 text-center">
-            <h2 className="text-[24px] font-bold text-[var(--color-text-primary)]">
-              Yield Aggregator
-            </h2>
-            <p className="mt-1 text-[13px] text-[var(--color-text-muted)]">
-              Compare lending & borrowing rates across all Monad protocols. Select tokens to find the best yield.
-            </p>
-          </div>
-          <YieldAggregator />
-        </section>
 
         {/* ══════ PORTFOLIO SECTION ══════ */}
         {!showPortfolio && address && (
@@ -128,11 +92,15 @@ function DashboardInner() {
         )}
 
         {!address && (
-          <div className="mt-6">
+          <div className="mt-10">
             <div className="mx-auto max-w-[520px]">
-              <div className="mb-3 text-center text-[13px] text-[var(--color-text-muted)]">
-                Or enter any address to view their portfolio
-              </div>
+              <h1 className="text-center text-[28px] font-bold text-[var(--color-text-primary)]">
+                Track a Monad wallet
+              </h1>
+              <p className="mb-5 mt-2 text-center text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+                Enter any address to view token holdings, staking, lending,
+                liquidity, vaults, and approvals.
+              </p>
               <AddressInput onSubmit={handleSearch} initialAddress={address} />
             </div>
           </div>
@@ -178,11 +146,9 @@ function DashboardInner() {
                   {copyFeedback}
                 </span>
               )}
-              {!isConnected && (
-                <div className="ml-auto">
-                  <AddressInput onSubmit={handleSearch} initialAddress={address} />
-                </div>
-              )}
+              <div className="ml-auto">
+                <AddressInput onSubmit={handleSearch} initialAddress={address} />
+              </div>
             </div>
 
             {/* Skeleton loading */}
@@ -303,7 +269,7 @@ function DashboardInner() {
                       <ApprovalManager
                         approvals={approvals.data || []}
                         isLoading={approvals.isLoading}
-                        isConnected={isConnected}
+                        isConnected={false}
                         onRevoked={() => approvals.refetch()}
                       />
                     </div>

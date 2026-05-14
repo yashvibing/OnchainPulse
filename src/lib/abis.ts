@@ -52,6 +52,24 @@ export const ERC20_ABI = [
   },
 ] as const;
 
+export const WMON_ABI = [
+  ...ERC20_ABI,
+  {
+    inputs: [],
+    name: "deposit",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "wad", type: "uint256" }],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
 export const ERC4626_ABI = [
   ...ERC20_ABI,
   {

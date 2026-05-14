@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import {
   fetchYieldOpportunities,
+  filterBorrowOpportunities,
   filterByTokens,
+  getBorrowCollateralSymbols,
+  getOpportunityAssetSymbols,
   sortOpportunities,
   calculateLoopStrategies,
   type YieldOpportunity,
@@ -63,6 +66,12 @@ function SortButton({
 }
 
 function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
+  const assetSymbols = getOpportunityAssetSymbols(opp);
+  const collateralSymbols = getBorrowCollateralSymbols(opp);
+  const tokenLabel = assetSymbols.length > 0
+    ? assetSymbols.join(" / ")
+    : opp.tokens.map((t) => t.symbol).join(" / ");
+
   return (
     <a
       href={opp.depositUrl}
@@ -72,20 +81,20 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex -space-x-1.5">
-          {opp.tokens.slice(0, 2).map((t, i) => (
+          {assetSymbols.slice(0, 2).map((symbol, i) => (
             <div
               key={i}
               className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--color-bg-primary)] text-[8px] font-bold text-white"
               style={{ background: "#5A5A74", zIndex: 2 - i }}
             >
-              {t.symbol.slice(0, 2)}
+              {symbol.slice(0, 2)}
             </div>
           ))}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
-              {opp.tokens.map((t) => t.symbol).join(" / ")}
+              {tokenLabel}
             </span>
             <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
               opp.action === "LEND"
@@ -96,8 +105,13 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
             </span>
           </div>
           <div className="text-[11px] text-[var(--color-text-dim)] truncate">
-            {opp.protocol}
+            {opp.protocol}{opp.name ? ` - ${opp.name}` : ""}
           </div>
+          {opp.action === "BORROW" && (
+            <div className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+              Lend/collateral: {collateralSymbols.join(", ")}
+            </div>
+          )}
         </div>
       </div>
 
@@ -179,9 +193,40 @@ function LoopStrategyRow({ s }: { s: LoopStrategy }) {
   );
 }
 
+function OpportunitySection({
+  title,
+  emptyLabel,
+  opportunities,
+}: {
+  title: string;
+  emptyLabel: string;
+  opportunities: YieldOpportunity[];
+}) {
+  return (
+    <div className="flex-1">
+      <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
+        {title}
+      </div>
+      <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
+        {opportunities.slice(0, 25).map((opp, i) => (
+          <div key={`${opp.id}-${i}`} style={{ animationDelay: `${i * 30}ms` }}>
+            <OpportunityRow opp={opp} />
+          </div>
+        ))}
+        {opportunities.length === 0 && (
+          <div className="py-6 text-center text-[12px] text-[var(--color-text-dim)]">
+            {emptyLabel}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function YieldAggregator() {
   const [allOpps, setAllOpps] = useState<YieldOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lendTokens, setLendTokens] = useState<string[]>([]);
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
@@ -189,24 +234,47 @@ export function YieldAggregator() {
   useEffect(() => {
     fetchYieldOpportunities().then((data) => {
       setAllOpps(data);
+      setError(null);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {
+      setError("Yield data is temporarily unavailable.");
+      setLoading(false);
+    });
   }, []);
 
-  function toggleToken(list: string[], setList: (v: string[]) => void, symbol: string) {
-    if (list.includes(symbol)) setList(list.filter((s) => s !== symbol));
-    else setList([...list, symbol]);
+  function selectToken(list: string[], setList: (v: string[]) => void, symbol: string) {
+    setList(list.includes(symbol) ? [] : [symbol]);
   }
 
+  const hasLendSelection = lendTokens.length > 0;
+  const hasBorrowSelection = borrowTokens.length > 0;
+  const showSupplyOnly = hasLendSelection && !hasBorrowSelection;
+  const showBorrowOnly = hasBorrowSelection && !hasLendSelection;
+  const showLooping = hasLendSelection && hasBorrowSelection;
   const lendOpps = sortOpportunities(filterByTokens(allOpps, lendTokens, "LEND"), sortField);
-  const borrowOpps = sortOpportunities(filterByTokens(allOpps, borrowTokens, "BORROW"), sortField);
-  const showLooping = lendTokens.length > 0 && borrowTokens.length > 0;
+  const borrowOpps = sortOpportunities(
+    filterBorrowOpportunities(allOpps, borrowTokens, showLooping ? lendTokens : []),
+    sortField
+  );
   const loopStrategies = showLooping ? calculateLoopStrategies(allOpps, lendTokens, borrowTokens) : [];
 
   if (loading) {
     return (
       <div className="py-10 text-center text-[13px] text-[var(--color-text-muted)]">
         Loading yield data from Merkl...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8 text-center">
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+          {error}
+        </p>
+        <p className="mt-1 text-[12px] text-[var(--color-text-muted)]">
+          Please try again in a moment.
+        </p>
       </div>
     );
   }
@@ -218,7 +286,7 @@ export function YieldAggregator() {
         {/* Lend tokens */}
         <div className="flex-1">
           <div className="mb-2 text-[12px] font-semibold text-[var(--color-positive)]">
-            LEND — Select tokens to supply
+            LEND — Select one token to supply
           </div>
           <div className="flex flex-wrap gap-1.5">
             {POPULAR_TOKENS.map((s) => (
@@ -226,7 +294,7 @@ export function YieldAggregator() {
                 key={s}
                 symbol={s}
                 selected={lendTokens.includes(s)}
-                onClick={() => toggleToken(lendTokens, setLendTokens, s)}
+                onClick={() => selectToken(lendTokens, setLendTokens, s)}
               />
             ))}
           </div>
@@ -235,7 +303,7 @@ export function YieldAggregator() {
         {/* Borrow tokens */}
         <div className="flex-1">
           <div className="mb-2 text-[12px] font-semibold text-[var(--color-accent-secondary)]">
-            BORROW — Select tokens to borrow
+            BORROW — Select one token to borrow
           </div>
           <div className="flex flex-wrap gap-1.5">
             {POPULAR_TOKENS.map((s) => (
@@ -243,7 +311,7 @@ export function YieldAggregator() {
                 key={s}
                 symbol={s}
                 selected={borrowTokens.includes(s)}
-                onClick={() => toggleToken(borrowTokens, setBorrowTokens, s)}
+                onClick={() => selectToken(borrowTokens, setBorrowTokens, s)}
               />
             ))}
           </div>
@@ -259,46 +327,36 @@ export function YieldAggregator() {
         <SortButton label="Protocol" field="protocol" current={sortField} onClick={setSortField} />
       </div>
 
-      {/* Results */}
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Lend results */}
-        <div className="flex-1">
-          <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
-            {lendOpps.length} lending opportunities {lendTokens.length > 0 ? `for ${lendTokens.join(", ")}` : "(all tokens)"}
-          </div>
-          <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
-            {lendOpps.slice(0, 25).map((o, i) => (
-              <div key={`${o.id}-${i}`} style={{ animationDelay: `${i * 30}ms` }}>
-                <OpportunityRow opp={o} />
-              </div>
-            ))}
-            {lendOpps.length === 0 && (
-              <div className="py-6 text-center text-[12px] text-[var(--color-text-dim)]">
-                No lending opportunities found
-              </div>
-            )}
-          </div>
+      {!hasLendSelection && !hasBorrowSelection && (
+        <div className="flex flex-col gap-6 md:flex-row">
+          <OpportunitySection
+            title={`${lendOpps.length} lending opportunities (all supported tokens)`}
+            emptyLabel="No lending opportunities found"
+            opportunities={lendOpps}
+          />
+          <OpportunitySection
+            title={`${borrowOpps.length} borrowing opportunities (all supported tokens)`}
+            emptyLabel="No borrowing opportunities found"
+            opportunities={borrowOpps}
+          />
         </div>
+      )}
 
-        {/* Borrow results */}
-        <div className="flex-1">
-          <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
-            {borrowOpps.length} borrowing opportunities {borrowTokens.length > 0 ? `for ${borrowTokens.join(", ")}` : "(all tokens)"}
-          </div>
-          <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
-            {borrowOpps.slice(0, 25).map((o, i) => (
-              <div key={`${o.id}-${i}`} style={{ animationDelay: `${i * 30}ms` }}>
-                <OpportunityRow opp={o} />
-              </div>
-            ))}
-            {borrowOpps.length === 0 && (
-              <div className="py-6 text-center text-[12px] text-[var(--color-text-dim)]">
-                {borrowTokens.length > 0 ? "No borrowing opportunities found" : "Select borrow tokens to see rates"}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {showSupplyOnly && (
+        <OpportunitySection
+          title={`${lendOpps.length} lending APRs for ${lendTokens.join(", ")}`}
+          emptyLabel="No lending opportunities found for this token selection"
+          opportunities={lendOpps}
+        />
+      )}
+
+      {showBorrowOnly && (
+        <OpportunitySection
+          title={`${borrowOpps.length} borrowing opportunities for ${borrowTokens.join(", ")}`}
+          emptyLabel="No borrowing opportunities found for this token selection"
+          opportunities={borrowOpps}
+        />
+      )}
 
       {/* Looping strategies — shown when both lend + borrow tokens selected */}
       {showLooping && (
@@ -310,7 +368,7 @@ export function YieldAggregator() {
             </span>
           </div>
           <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
-            Supply → borrow → re-supply loop. APR shown at 1x, 2x, 3x leverage. Does not include base borrow cost.
+            Showing matches for lending {lendTokens.join(", ")} and borrowing {borrowTokens.join(", ")}. APR shown at 1x, 2x, 3x leverage. Does not include base borrow cost.
           </div>
           <div className="space-y-1.5">
             {loopStrategies.map((s, i) => (

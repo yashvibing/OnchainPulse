@@ -114,7 +114,7 @@ export function ApprovalManager({ approvals, isLoading, isConnected, onRevoked }
         </div>
         {!isConnected && (
           <span className="text-[11px] text-[var(--color-warning)]">
-            Connect wallet to revoke
+            Revoke actions paused
           </span>
         )}
       </div>

@@ -39,6 +39,21 @@ export interface LoopStrategy {
 
 const MERKL_API = "https://api.merkl.xyz/v4";
 const MONAD_CHAIN_ID = "143";
+const YIELD_ASSET_SYMBOLS = new Set([
+  "WMON",
+  "MON",
+  "USDC",
+  "USDT0",
+  "WETH",
+  "AUSD",
+  "SHMON",
+  "APRMON",
+  "SMON",
+  "GMON",
+  "WBTC",
+  "CBBTC",
+  "USD1",
+]);
 
 // Cache Merkl data for 5 minutes
 let cache: { data: YieldOpportunity[]; ts: number } | null = null;
@@ -100,7 +115,7 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
   });
 }
 
-export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
+export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]> {
   // Return cache if fresh
   if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
 
@@ -131,18 +146,110 @@ export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
   return deduped;
 }
 
+export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
+  if (typeof window === "undefined") {
+    return fetchMerklYieldOpportunities();
+  }
+
+  const res = await fetch("/api/yield-opportunities");
+  if (!res.ok) throw new Error("Failed to fetch yield opportunities");
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+function normalizeYieldSymbol(symbol: string): string {
+  const cleaned = symbol.replace(/-\d+$/u, "").toUpperCase();
+  return cleaned === "MON" ? "WMON" : cleaned;
+}
+
+export function getKnownOpportunityAssetSymbols(opp: YieldOpportunity): string[] {
+  return opp.tokens
+    .map((token) => normalizeYieldSymbol(token.symbol))
+    .filter((symbol) => YIELD_ASSET_SYMBOLS.has(symbol));
+}
+
+export function getOpportunityAssetSymbols(opp: YieldOpportunity): string[] {
+  const uniqueAssets = [...new Set(getKnownOpportunityAssetSymbols(opp))];
+  if (uniqueAssets.length > 0) return uniqueAssets;
+
+  return [...new Set(opp.tokens.map((token) => token.symbol.toUpperCase()))];
+}
+
+function getSelectedOpportunitySymbol(
+  opp: YieldOpportunity,
+  selectedSymbols: string[]
+): string {
+  const assets = getOpportunityAssetSymbols(opp);
+  const selected = new Set(selectedSymbols.map(normalizeYieldSymbol));
+  return assets.find((symbol) => selected.has(symbol)) || assets[0] || "???";
+}
+
+function getNameSymbol(value: string): string {
+  return normalizeYieldSymbol(value.replace(/^(e|c)(?=[A-Z])/u, ""));
+}
+
+export function getBorrowCollateralSymbols(opp: YieldOpportunity): string[] {
+  if (opp.action !== "BORROW") return [];
+
+  const usingMatch = opp.name.match(/\busing\s+([A-Za-z0-9-]+)/iu);
+  if (usingMatch?.[1]) return [getNameSymbol(usingMatch[1])];
+
+  const curvancePair = opp.name.match(/from\s+Curvance\s+([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\s+market/iu);
+  if (curvancePair?.[1]) return [getNameSymbol(curvancePair[1])];
+
+  const isolatedVault = opp.name.match(/Isolated\s+([A-Za-z0-9-]+)\s+([A-Za-z0-9-]+)\s+vault/iu);
+  if (isolatedVault?.[1] && isolatedVault?.[2]) {
+    const borrowAsset = getNameSymbol(isolatedVault[2]);
+    const collateralAssets = isolatedVault[1]
+      .split("-")
+      .map(getNameSymbol)
+      .filter((symbol) => symbol && symbol !== borrowAsset);
+    if (collateralAssets.length > 0) return [...new Set(collateralAssets)];
+  }
+
+  if (opp.name.toLowerCase().includes("any morpho market")) {
+    return ["Any listed collateral"];
+  }
+
+  return ["Protocol collateral"];
+}
+
 // Filter opportunities by token symbols
 export function filterByTokens(
   opps: YieldOpportunity[],
   tokenSymbols: string[],
   action: "LEND" | "BORROW"
 ): YieldOpportunity[] {
-  if (tokenSymbols.length === 0) return opps.filter((o) => o.action === action);
+  if (tokenSymbols.length === 0) {
+    return opps.filter(
+      (o) => o.action === action && getKnownOpportunityAssetSymbols(o).length > 0
+    );
+  }
 
-  const symbols = new Set(tokenSymbols.map((s) => s.toUpperCase()));
+  const symbols = new Set(tokenSymbols.map(normalizeYieldSymbol));
   return opps.filter((o) => {
     if (o.action !== action) return false;
-    return o.tokens.some((t) => symbols.has(t.symbol.toUpperCase()));
+    return getKnownOpportunityAssetSymbols(o).some((symbol) => symbols.has(symbol));
+  });
+}
+
+export function filterBorrowOpportunities(
+  opps: YieldOpportunity[],
+  borrowTokens: string[],
+  supplyTokens: string[] = []
+): YieldOpportunity[] {
+  const borrowOpps = filterByTokens(opps, borrowTokens, "BORROW");
+  if (supplyTokens.length === 0) return borrowOpps;
+
+  const selectedSupply = new Set(supplyTokens.map(normalizeYieldSymbol));
+  return borrowOpps.filter((opp) => {
+    const collateralSymbols = getBorrowCollateralSymbols(opp).map(normalizeYieldSymbol);
+    return (
+      collateralSymbols.includes("ANY LISTED COLLATERAL") ||
+      collateralSymbols.includes("PROTOCOL COLLATERAL") ||
+      collateralSymbols.some((symbol) => selectedSupply.has(symbol))
+    );
   });
 }
 
@@ -173,15 +280,15 @@ export function calculateLoopStrategies(
 ): LoopStrategy[] {
   const supplyOpps = filterByTokens(opps, supplyTokens, "LEND")
     .filter((o) => o.apr > 0);
-  const borrowOpps = filterByTokens(opps, borrowTokens, "BORROW");
+  const borrowOpps = filterBorrowOpportunities(opps, borrowTokens, supplyTokens);
 
   const strategies: LoopStrategy[] = [];
 
   for (const supply of supplyOpps) {
     for (const borrow of borrowOpps) {
       // Skip same protocol + same token (can't loop with yourself)
-      const supplySymbol = supply.tokens[0]?.symbol || "";
-      const borrowSymbol = borrow.tokens[0]?.symbol || "";
+      const supplySymbol = getSelectedOpportunitySymbol(supply, supplyTokens);
+      const borrowSymbol = getSelectedOpportunitySymbol(borrow, borrowTokens);
 
       // Borrow APR is a cost (negative). Merkl reports borrow incentive APR as positive,
       // but the actual borrow rate is a cost. We estimate net = supply APR - borrow cost + borrow incentive.
