@@ -1,11 +1,13 @@
 // ─── Yield Aggregator via Merkl API ───
 //
-// Fetches all lending/borrowing opportunities on Monad from Merkl's API.
-// Single source of truth for APR, TVL, protocol, tokens, deposit URLs.
+// Fetches lending/borrowing opportunities on Monad from Merkl and DefiLlama.
+// Merkl is action-first; DefiLlama expands APY pool coverage.
 
 export interface YieldOpportunity {
   id: string;
   action: "LEND" | "BORROW";
+  source: "Merkl" | "DefiLlama" | "Both";
+  opportunityType?: "Lending" | "Borrow" | "LP" | "Vault";
   name: string;
   protocol: string;
   protocolIcon: string;
@@ -38,7 +40,9 @@ export interface LoopStrategy {
 }
 
 const MERKL_API = "https://api.merkl.xyz/v4";
+const DEFILLAMA_YIELDS_API = "https://yields.llama.fi/pools";
 const MONAD_CHAIN_ID = "143";
+const MONAD_CHAIN = "Monad";
 const YIELD_ASSET_SYMBOLS = new Set([
   "WMON",
   "MON",
@@ -53,11 +57,104 @@ const YIELD_ASSET_SYMBOLS = new Set([
   "WBTC",
   "CBBTC",
   "USD1",
+  "EBTC",
+  "ENZOBTC",
+  "VUSD",
+  "WSTETH",
+  "STEAKETH",
+  "EARNAUSD",
 ]);
 
-// Cache Merkl data for 5 minutes
+interface DefiLlamaYieldPool {
+  pool?: string;
+  chain?: string;
+  project?: string;
+  symbol?: string;
+  tvlUsd?: number;
+  apy?: number;
+  apyBase?: number | null;
+  apyReward?: number | null;
+  apyBaseBorrow?: number | null;
+  apyRewardBorrow?: number | null;
+  totalSupplyUsd?: number | null;
+  totalBorrowUsd?: number | null;
+  url?: string;
+}
+
+// Cache combined yield data for 5 minutes
 let cache: { data: YieldOpportunity[]; ts: number } | null = null;
 const CACHE_TTL = 300_000;
+
+function humanizeProjectSlug(slug: string) {
+  if (slug === "morpho-blue") return "Morpho";
+
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function normalizeProtocolForKey(protocol: string) {
+  const normalized = protocol.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (normalized.includes("morpho")) return "morpho";
+  if (normalized.includes("townsquare")) return "townsquare";
+  if (normalized.includes("neverland")) return "neverland";
+  if (normalized.includes("curvance")) return "curvance";
+  if (normalized.includes("upshift")) return "upshift";
+  if (normalized.includes("euler")) return "euler";
+  return normalized;
+}
+
+function splitDefiLlamaSymbols(symbol: string) {
+  return symbol
+    .split(/[-/,+]/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function inferDefiLlamaPoolType(symbol: string, tokenSymbols: string[]): "Lending" | "LP" | "Vault" {
+  if (/[-/,+]/u.test(symbol) && tokenSymbols.length > 1) return "LP";
+
+  const normalized = symbol.toUpperCase();
+  if (
+    normalized.startsWith("EARN") ||
+    normalized.startsWith("HYPER") ||
+    normalized.startsWith("STEAK") ||
+    normalized.startsWith("GROVE") ||
+    normalized.startsWith("AUGUST") ||
+    normalized.startsWith("VAULT") ||
+    normalized.endsWith("VAULT")
+  ) {
+    return "Vault";
+  }
+
+  return "Lending";
+}
+
+function normalizeDefiLlamaDisplaySymbols(symbol: string) {
+  const parts = splitDefiLlamaSymbols(symbol.toUpperCase());
+
+  return parts.map((part) => {
+    if (part === "WNUSDC") return "USDC";
+    if (part === "WNUSDT0") return "USDT0";
+    if (part === "WNAUSD") return "AUSD";
+    if (part === "EARNAUSD" || part.endsWith("AUSD")) return "AUSD";
+    if (part === "STEAKETH" || part.endsWith("WSTETH")) return "WETH";
+    if (part.endsWith("USDC") || part.includes("USDC")) return "USDC";
+    if (part.endsWith("BTC") || part.includes("BTC")) return "WBTC";
+    return part;
+  });
+}
+
+function opportunityMergeKey(opportunity: YieldOpportunity) {
+  const assets = getOpportunityAssetSymbols(opportunity);
+  return [
+    opportunity.action,
+    normalizeProtocolForKey(opportunity.protocol),
+    assets[0] || opportunity.tokens[0]?.symbol?.toUpperCase() || opportunity.name.toUpperCase(),
+  ].join(":");
+}
 
 async function fetchMerklPage(action: string, page: number): Promise<YieldOpportunity[]> {
   const params = new URLSearchParams({
@@ -98,6 +195,8 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
     return {
       id: (item.identifier as string) || "",
       action: action as "LEND" | "BORROW",
+      source: "Merkl",
+      opportunityType: action === "BORROW" ? "Borrow" : "Lending",
       name: (item.name as string) || "",
       protocol: (protocol?.name as string) || "Unknown",
       protocolIcon: (protocol?.icon as string) || "",
@@ -115,10 +214,89 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
   });
 }
 
-export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]> {
-  // Return cache if fresh
-  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
+async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
+  const res = await fetch(DEFILLAMA_YIELDS_API);
+  if (!res.ok) return [];
 
+  const body = (await res.json()) as { data?: DefiLlamaYieldPool[] };
+  const pools = Array.isArray(body.data) ? body.data : [];
+
+  return pools
+    .filter((pool) => pool.chain === MONAD_CHAIN && pool.symbol && pool.project)
+    .map((pool) => {
+      const project = pool.project || "unknown";
+      const protocol = humanizeProjectSlug(project);
+      const symbol = (pool.symbol || "UNKNOWN").toUpperCase();
+      const displaySymbols = normalizeDefiLlamaDisplaySymbols(symbol);
+      const poolType = inferDefiLlamaPoolType(symbol, displaySymbols);
+      const tokens = displaySymbols.map((tokenSymbol) => ({
+        symbol: tokenSymbol,
+        address: "",
+        decimals: 18,
+        price: 0,
+      }));
+      const baseApr = pool.apyBase ?? 0;
+      const rewardApr = pool.apyReward ?? 0;
+      const apr = pool.apy ?? baseApr + rewardApr;
+
+      return {
+        id: `defillama:${pool.pool || `${project}:${symbol}`}`,
+        action: "LEND" as const,
+        source: "DefiLlama" as const,
+        opportunityType: poolType,
+        name: `${poolType === "LP" ? "LP" : poolType === "Vault" ? "Vault" : "Supply"} ${symbol} on ${protocol}`,
+        protocol,
+        protocolIcon: `https://icons.llama.fi/${project}.png`,
+        protocolUrl: pool.url || `https://defillama.com/yields?project=${encodeURIComponent(project)}`,
+        apr,
+        tvl: pool.totalSupplyUsd ?? pool.tvlUsd ?? 0,
+        dailyRewards: 0,
+        tokens,
+        depositUrl: pool.url || `https://defillama.com/yields/pool/${pool.pool}`,
+        status: "LIVE",
+        tags: ["defillama-yield"],
+        baseApr,
+        rewardApr,
+      };
+    })
+    .filter((opportunity) => opportunity.tvl > 0 || opportunity.apr > 0);
+}
+
+function mergeYieldOpportunities(opportunities: YieldOpportunity[]): YieldOpportunity[] {
+  const byKey = new Map<string, YieldOpportunity>();
+
+  for (const opportunity of opportunities) {
+    const key = opportunityMergeKey(opportunity);
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, opportunity);
+      continue;
+    }
+
+    const preferIncoming =
+      existing.source === "DefiLlama" && opportunity.source === "Merkl";
+    const preferred = preferIncoming ? opportunity : existing;
+    const secondary = preferIncoming ? existing : opportunity;
+
+    byKey.set(key, {
+      ...preferred,
+      source: preferred.source === secondary.source ? preferred.source : "Both",
+      baseApr: preferred.baseApr || secondary.baseApr,
+      rewardApr: preferred.rewardApr || secondary.rewardApr,
+      tvl: Math.max(preferred.tvl, secondary.tvl),
+      dailyRewards: Math.max(preferred.dailyRewards, secondary.dailyRewards),
+      protocolIcon: preferred.protocolIcon || secondary.protocolIcon,
+      protocolUrl: preferred.protocolUrl || secondary.protocolUrl,
+      depositUrl: preferred.depositUrl || secondary.depositUrl,
+      tags: [...new Set([...preferred.tags, ...secondary.tags])],
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]> {
   // Fetch LEND and BORROW pages in parallel (first 5 pages each = 200 opps max)
   const pages = [0, 1, 2, 3, 4];
   const fetches = [
@@ -142,13 +320,28 @@ export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]
     return true;
   });
 
-  cache = { data: deduped, ts: Date.now() };
   return deduped;
+}
+
+export async function fetchCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
+  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
+
+  const [merklResult, defiLlamaResult] = await Promise.allSettled([
+    fetchMerklYieldOpportunities(),
+    fetchDefiLlamaYieldOpportunities(),
+  ]);
+
+  const merkl = merklResult.status === "fulfilled" ? merklResult.value : [];
+  const defiLlama = defiLlamaResult.status === "fulfilled" ? defiLlamaResult.value : [];
+  const data = mergeYieldOpportunities([...merkl, ...defiLlama]);
+
+  cache = { data, ts: Date.now() };
+  return data;
 }
 
 export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
   if (typeof window === "undefined") {
-    return fetchMerklYieldOpportunities();
+    return fetchCombinedYieldOpportunities();
   }
 
   const res = await fetch("/api/yield-opportunities");
@@ -164,9 +357,17 @@ function normalizeYieldSymbol(symbol: string): string {
 }
 
 export function getKnownOpportunityAssetSymbols(opp: YieldOpportunity): string[] {
-  return opp.tokens
+  const knownSymbols = opp.tokens
     .map((token) => normalizeYieldSymbol(token.symbol))
     .filter((symbol) => YIELD_ASSET_SYMBOLS.has(symbol));
+
+  if (knownSymbols.length > 0) return knownSymbols;
+
+  if (opp.tags.includes("defillama-yield")) {
+    return opp.tokens.map((token) => normalizeYieldSymbol(token.symbol)).filter(Boolean);
+  }
+
+  return knownSymbols;
 }
 
 export function getOpportunityAssetSymbols(opp: YieldOpportunity): string[] {

@@ -16,6 +16,8 @@ function opportunity(
   return {
     id: `${action}-${tokens.join("-")}`,
     action,
+    source: "Merkl",
+    opportunityType: action === "BORROW" ? "Borrow" : "Lending",
     name: `${action} ${tokens.join("/")}`,
     protocol: "Morpho",
     protocolIcon: "",
@@ -57,6 +59,16 @@ describe("yield aggregator filtering", () => {
     ];
 
     expect(filterByTokens(opps, [], "LEND")).toEqual([opps[0]]);
+  });
+
+  it("includes DefiLlama yield pools in the default all-token view", () => {
+    const defillamaPool = {
+      ...opportunity("LEND", ["hyperUSDCa"]),
+      source: "DefiLlama" as const,
+      tags: ["defillama-yield"],
+    };
+
+    expect(filterByTokens([defillamaPool], [], "LEND")).toEqual([defillamaPool]);
   });
 
   it("labels loop strategies with the selected underlying symbols", () => {

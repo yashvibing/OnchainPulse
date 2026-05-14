@@ -15,6 +15,9 @@ export function Header() {
         <Link href="/" className="transition-colors hover:text-[var(--color-text-secondary)]">
           Portfolio
         </Link>
+        <Link href="/yield-aggregator" className="transition-colors hover:text-[var(--color-text-secondary)]">
+          Yield Aggregator
+        </Link>
         <Link href="/yield" className="transition-colors hover:text-[var(--color-text-secondary)]">
           Yield
         </Link>
