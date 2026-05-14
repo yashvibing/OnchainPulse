@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   calculateLoopStrategies,
@@ -144,7 +144,7 @@ function TokenSelectorPanel({
   onSelect: (symbol: string) => void;
 }) {
   return (
-    <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4">
+    <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div
@@ -200,38 +200,6 @@ function SortButton({
   );
 }
 
-function SourceExplainer({ opportunities }: { opportunities: YieldOpportunity[] }) {
-  const counts = useMemo(() => {
-    return opportunities.reduce(
-      (acc, opp) => {
-        acc[opp.source] += 1;
-        return acc;
-      },
-      { Merkl: 0, DefiLlama: 0, Both: 0 }
-    );
-  }, [opportunities]);
-
-  return (
-    <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="text-[12px] font-semibold text-[var(--color-text-primary)]">
-            Sources blended for coverage and actionability
-          </div>
-          <p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            Merkl powers direct lend/borrow opportunities. DefiLlama adds pool APY discovery, including LP and vault rows when Monad pools are not in Merkl.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="positive">Merkl {counts.Merkl}</Badge>
-          <Badge tone="violet">DefiLlama {counts.DefiLlama}</Badge>
-          <Badge tone="neutral">Both {counts.Both}</Badge>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
   const assetSymbols = getOpportunityAssetSymbols(opp);
   const collateralSymbols = getBorrowCollateralSymbols(opp);
@@ -244,7 +212,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
       href={opp.depositUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[rgba(255,255,255,0.045)]"
+      className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]"
     >
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-center">
         <div className="flex min-w-0 gap-3">
@@ -279,7 +247,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.025)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+        <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
           <div>
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
@@ -316,7 +284,7 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
       href={strategy.depositUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[rgba(255,255,255,0.045)]"
+      className="block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
@@ -339,7 +307,7 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.025)] px-3 py-3 text-right">
+        <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-right">
           <div>
             <div className="text-[10px] text-[var(--color-text-dim)]">1x</div>
             <div className="font-semibold text-[var(--color-text-primary)]">{strategy.netAprAt1x.toFixed(2)}%</div>
@@ -370,7 +338,7 @@ function EmptyOpportunities({
   onPickToken?: (symbol: string) => void;
 }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-5 py-8 text-center">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8 text-center">
       <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">{label}</p>
       {onPickToken && (
         <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -429,7 +397,7 @@ function OpportunitySection({
 function AggregatorSkeleton() {
   return (
     <div>
-      <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4">
+      <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
         <div className="h-4 w-52 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
         <div className="mt-3 h-3 w-full max-w-[560px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
       </div>
@@ -520,8 +488,6 @@ export function YieldAggregator() {
 
   return (
     <div>
-      <SourceExplainer opportunities={allOpps} />
-
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
           title="Lend"

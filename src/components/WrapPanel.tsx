@@ -160,7 +160,7 @@ export function WrapPanel() {
                   onClick={() => handleModeChange(option)}
                   className={`flex-1 rounded-[var(--radius-sm)] px-3 py-2 text-[12px] font-semibold capitalize transition-colors ${
                     mode === option
-                      ? "bg-[var(--color-accent-primary)] text-[#0A0E17]"
+                      ? "bg-[var(--color-accent-primary)] text-[#08140F]"
                       : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
                   }`}
                 >

@@ -138,7 +138,7 @@ function MarketRow({
 }) {
   return (
     <tr className="border-b border-[rgba(255,255,255,0.05)] last:border-b-0">
-      <td className="sticky left-0 z-10 bg-[#0A0E17] px-4 py-4 shadow-[12px_0_18px_rgba(10,14,23,0.65)]">
+      <td className="sticky left-0 z-10 bg-[var(--color-bg-surface-solid)] px-4 py-4 shadow-[12px_0_18px_rgba(12,18,17,0.42)]">
         <div className="flex min-w-[210px] items-center">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-semibold text-[var(--color-text-primary)]">
@@ -287,7 +287,7 @@ function MarketDetailsDrawer({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <aside className="relative h-full w-full max-w-[420px] overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-bg-surface)] px-5 py-5 shadow-2xl">
+      <aside className="relative h-full w-full max-w-[420px] overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-5 py-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0">
@@ -308,7 +308,7 @@ function MarketDetailsDrawer({
           </button>
         </div>
 
-        <div className="mt-5 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 py-3">
+        <div className="mt-5 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <ProtocolAvatar market={market} />
             <div className="min-w-0">
@@ -691,7 +691,7 @@ export function ProjectsExplorer() {
               </colgroup>
               <thead>
                 <tr className="border-b border-[var(--color-border)] text-left text-[11px] uppercase">
-                  <th className="sticky left-0 z-20 bg-[#0A0E17] px-4 py-3 text-[var(--color-text-dim)] shadow-[12px_0_18px_rgba(10,14,23,0.65)]">
+                  <th className="sticky left-0 z-20 bg-[var(--color-bg-surface-solid)] px-4 py-3 text-[var(--color-text-dim)] shadow-[12px_0_18px_rgba(12,18,17,0.42)]">
                     Asset
                   </th>
                   <th className="px-4 py-3 text-[var(--color-text-dim)]">Protocol</th>

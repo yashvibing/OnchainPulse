@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Header() {
   return (
-    <header className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] px-6 py-3">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] px-6 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl">
       <Link href="/" className="flex items-center gap-3">
         <div className="gradient-brand-animated flex h-8 w-8 items-center justify-center rounded-[8px] text-[10px] font-extrabold text-white">
           OP
@@ -16,10 +16,10 @@ export function Header() {
           Portfolio
         </Link>
         <Link href="/yield-aggregator" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Yield Aggregator
+          Yield Strategies
         </Link>
         <Link href="/yield" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Yield
+          Yield Markets
         </Link>
       </nav>
     </header>

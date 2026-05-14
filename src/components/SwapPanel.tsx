@@ -160,7 +160,7 @@ export function SwapPanel() {
                   key={s}
                   onClick={() => setSlippage(s)}
                   className={`rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                    slippage === s ? "bg-[var(--color-accent-primary)] text-[#0A0E17]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                    slippage === s ? "bg-[var(--color-accent-primary)] text-[#08140F]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
                   }`}
                 >
                   {s}%
