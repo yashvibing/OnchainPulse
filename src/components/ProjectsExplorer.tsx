@@ -36,16 +36,6 @@ function formatUpdatedAt(value: string) {
   return diffHours === 1 ? "Updated 1 hour ago" : `Updated ${diffHours} hours ago`;
 }
 
-function AssetAvatar({ asset }: { asset: string }) {
-  const label = asset.replace(/^W/u, "").slice(0, 2).toUpperCase();
-
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(255,255,255,0.15)] bg-[rgba(0,232,123,0.12)] text-[11px] font-extrabold text-[var(--color-positive)]">
-      {label || "A"}
-    </div>
-  );
-}
-
 function ProtocolAvatar({ market }: { market: MonadMarket }) {
   const initials = market.protocol
     .split(/\s+/)
@@ -149,8 +139,7 @@ function MarketRow({
   return (
     <tr className="border-b border-[rgba(255,255,255,0.05)] last:border-b-0">
       <td className="sticky left-0 z-10 bg-[#0A0E17] px-4 py-4 shadow-[12px_0_18px_rgba(10,14,23,0.65)]">
-        <div className="flex min-w-[210px] items-center gap-3">
-          <AssetAvatar asset={market.asset} />
+        <div className="flex min-w-[210px] items-center">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-semibold text-[var(--color-text-primary)]">
               {market.assetLabel}
@@ -224,8 +213,7 @@ function MarketCard({
   return (
     <article className="card px-4 py-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <AssetAvatar asset={market.asset} />
+        <div className="flex min-w-0 items-center">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-semibold text-[var(--color-text-primary)]">
               {market.assetLabel}
@@ -302,7 +290,6 @@ function MarketDetailsDrawer({
       <aside className="relative h-full w-full max-w-[420px] overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-bg-surface)] px-5 py-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <AssetAvatar asset={market.asset} />
             <div className="min-w-0">
               <h2 className="truncate text-[20px] font-bold text-[var(--color-text-primary)]">
                 {market.assetLabel}
