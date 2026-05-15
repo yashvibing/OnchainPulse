@@ -49,7 +49,7 @@ export function buildWalletYieldMatches(
     const lendingOpps = sortOpportunities(
       filterByTokens(opportunities, [symbol], "LEND").filter((opp) => {
         const assets = getOpportunityAssetSymbols(opp);
-        return opp.apr > 0 && assets.length > 0;
+        return opp.apr > 0 && assets.length > 0 && opp.opportunityType !== "LP";
       }),
       "apr"
     );
