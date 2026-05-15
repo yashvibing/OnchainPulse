@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { usePortfolio, useTokenApprovals } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -15,7 +16,15 @@ import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
 import { ApprovalManager } from "@/components/ApprovalManager";
-import { shortenAddress, isValidEvmAddress } from "@/lib/format";
+import { shortenAddress, isValidEvmAddress, formatUsd } from "@/lib/format";
+import { fetchYieldOpportunities, type YieldOpportunity } from "@/services/yields-aggregator";
+import { buildWalletYieldMatches } from "@/lib/walletOpportunities";
+import {
+  loadSavedAddresses,
+  removeSavedAddress,
+  saveAddress,
+  type SavedAddress,
+} from "@/lib/savedAddresses";
 
 const PORTFOLIO_TABS = [
   { key: "overview", label: "Overview", icon: "◎" },
@@ -45,12 +54,18 @@ function DashboardInner() {
   const [tabFade, setTabFade] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [showPortfolio, setShowPortfolio] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+
+  useEffect(() => {
+    setSavedAddresses(loadSavedAddresses());
+  }, []);
 
   useEffect(() => {
     const urlAddr = searchParams.get("address");
     if (urlAddr && isValidEvmAddress(urlAddr) && !address) {
       setAddress(urlAddr);
       setShowPortfolio(true);
+      setSavedAddresses(saveAddress(urlAddr));
     }
   }, [searchParams, address]);
 
@@ -61,7 +76,12 @@ function DashboardInner() {
     setAddress(addr);
     setShowPortfolio(true);
     setActiveTab("overview");
+    setSavedAddresses(saveAddress(addr));
     router.replace(`?address=${addr}`, { scroll: false });
+  }
+
+  function handleRemoveSavedAddress(addr: string) {
+    setSavedAddresses(removeSavedAddress(addr));
   }
 
   const handleTabChange = useCallback((key: string) => {
@@ -102,6 +122,12 @@ function DashboardInner() {
                 liquidity, vaults, and approvals.
               </p>
               <AddressInput onSubmit={handleSearch} initialAddress={address} />
+              <SavedAddressBar
+                addresses={savedAddresses}
+                activeAddress={address}
+                onSelect={handleSearch}
+                onRemove={handleRemoveSavedAddress}
+              />
             </div>
           </div>
         )}
@@ -130,10 +156,11 @@ function DashboardInner() {
               <button
                 onClick={() => {
                   const v = Math.round(portfolio.totalValue);
-                  const d = v > 0 ? `${address}S${v}` : address;
-                  const url = `${window.location.origin}?address=${address}&d=${d}`;
+                  const y = Math.round(portfolio.dailyYield * 100) / 100;
+                  const d = `${address}|${v}|${y}|${portfolio.positionCount}|${portfolio.protocolCount}`;
+                  const url = `${window.location.origin}?address=${address}&d=${encodeURIComponent(d)}`;
                   navigator.clipboard.writeText(url).then(() => {
-                    setCopyFeedback("Link copied!");
+                    setCopyFeedback("Card link copied!");
                     setTimeout(() => setCopyFeedback(null), 2000);
                   });
                 }}
@@ -150,6 +177,12 @@ function DashboardInner() {
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
               </div>
             </div>
+            <SavedAddressBar
+              addresses={savedAddresses}
+              activeAddress={address}
+              onSelect={handleSearch}
+              onRemove={handleRemoveSavedAddress}
+            />
 
             {/* Skeleton loading */}
             {portfolio.isLoading && (
@@ -182,6 +215,11 @@ function DashboardInner() {
                   holdings={new Map(
                     portfolio.tokens.map((t) => [t.token.symbol, t.valueUsd])
                   )}
+                />
+
+                <IdleOpportunityPanel
+                  address={address}
+                  tokens={portfolio.tokens}
                 />
 
                 <RefreshBar onRefresh={portfolio.refetch} />
@@ -335,6 +373,161 @@ function SectionTitle({ icon, title, count }: { icon: string; title: string; cou
 
 function NoPositions({ label }: { label: string }) {
   return <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">No {label} found for this wallet.</p>;
+}
+
+function SavedAddressBar({
+  addresses,
+  activeAddress,
+  onSelect,
+  onRemove,
+}: {
+  addresses: SavedAddress[];
+  activeAddress: string | null;
+  onSelect: (address: string) => void;
+  onRemove: (address: string) => void;
+}) {
+  if (addresses.length === 0) return null;
+
+  return (
+    <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3">
+      <div className="mb-2 text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">
+        Saved Addresses
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {addresses.map((item) => {
+          const active = activeAddress?.toLowerCase() === item.address.toLowerCase();
+          return (
+            <div
+              key={item.address}
+              className={`flex items-center gap-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-[11px] ${
+                active
+                  ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] text-[var(--color-positive)]"
+                  : "border-[var(--color-border)] text-[var(--color-text-secondary)]"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(item.address)}
+                className="font-mono hover:text-[var(--color-text-primary)]"
+              >
+                {item.label}
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove ${item.label}`}
+                onClick={() => onRemove(item.address)}
+                className="ml-1 text-[var(--color-text-dim)] hover:text-[var(--color-negative)]"
+              >
+                x
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function IdleOpportunityPanel({
+  address,
+  tokens,
+}: {
+  address: string;
+  tokens: ReturnType<typeof usePortfolio>["tokens"];
+}) {
+  const [opportunities, setOpportunities] = useState<YieldOpportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchYieldOpportunities()
+      .then((data) => {
+        if (!mounted) return;
+        setOpportunities(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+        <div className="h-4 w-44 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
+        <div className="mt-3 h-3 w-full max-w-[520px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
+      </section>
+    );
+  }
+
+  const matches = buildWalletYieldMatches(tokens, opportunities).slice(0, 4);
+  if (matches.length === 0 && tokens.length === 0) return null;
+
+  const totalDaily = matches.reduce((sum, match) => sum + match.estimatedDailyUsd, 0);
+
+  return (
+    <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">
+            Idle Asset Opportunities
+          </h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+            Lending matches for tokens already sitting in this wallet.
+          </p>
+        </div>
+        <div className="text-left md:text-right">
+          <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Matched daily yield</div>
+          <div className="text-[16px] font-bold text-[var(--color-positive)]">
+            {formatUsd(totalDaily)}
+          </div>
+        </div>
+      </div>
+
+      {matches.length === 0 ? (
+        <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-4 text-[12px] text-[var(--color-text-muted)]">
+          No direct lending matches found for this wallet&apos;s current token holdings.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {matches.map((match) => (
+            <Link
+              key={`${match.symbol}-${match.opportunity.id}`}
+              href={`/yield-aggregator?address=${address}&lend=${match.symbol}`}
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 transition-colors hover:border-[var(--color-border-hover)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                    {match.symbol}
+                  </div>
+                  <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
+                    {match.balanceLabel} - {formatUsd(match.valueUsd)}
+                  </div>
+                  <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
+                    Best match: {match.opportunity.protocol}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[14px] font-bold text-[var(--color-positive)]">
+                    {match.opportunity.apr.toFixed(2)}%
+                  </div>
+                  <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
+                    {formatUsd(match.estimatedDailyUsd)}/day
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function RefreshBar({ onRefresh }: { onRefresh: () => void }) {

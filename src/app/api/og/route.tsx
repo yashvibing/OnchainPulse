@@ -15,14 +15,25 @@ function fmtUsd(v: number): string {
   return "$0";
 }
 
-// Single "d" param: first 42 chars = address, after "S" = total value (integer)
-// Format: "0x1234...abcd" or "0x1234...abcdS15420"
 function parseData(d: string | null) {
   if (!d || d.length < 42) return null;
+
+  if (d.includes("|")) {
+    const [addr, value, dailyYield, positions, protocols] = d.split("|");
+    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return null;
+    return {
+      address: addr,
+      value: Number.parseFloat(value || "0") || 0,
+      dailyYield: Number.parseFloat(dailyYield || "0") || 0,
+      positions: Number.parseInt(positions || "0", 10) || 0,
+      protocols: Number.parseInt(protocols || "0", 10) || 0,
+    };
+  }
+
   const addr = d.slice(0, 42);
   if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return null;
   const value = d.length > 43 && d[42] === "S" ? parseInt(d.slice(43)) || 0 : 0;
-  return { address: addr, value };
+  return { address: addr, value, dailyYield: 0, positions: 0, protocols: 0 };
 }
 
 export function GET(req: NextRequest) {
@@ -55,8 +66,23 @@ export function GET(req: NextRequest) {
           <div style={{ fontSize: "18px", color: "#A0A0B8", fontFamily: "monospace" }}>{short(data.address)}</div>
         </div>
 
-        <div style={{ fontSize: "14px", color: "#5A5A74", letterSpacing: "1.5px", marginBottom: "10px" }}>PORTFOLIO VALUE</div>
-        <div style={{ fontSize: "68px", fontWeight: 700, color: "#E8E8FF", lineHeight: 1 }}>{data.value > 0 ? fmtUsd(data.value) : "View Portfolio"}</div>
+        <div style={{ fontSize: "14px", color: "#86A79B", letterSpacing: "1.5px", marginBottom: "10px" }}>MONAD PORTFOLIO VALUE</div>
+        <div style={{ fontSize: "68px", fontWeight: 700, color: "#F4FFF9", lineHeight: 1 }}>{data.value > 0 ? fmtUsd(data.value) : "View Portfolio"}</div>
+
+        <div style={{ display: "flex", gap: "16px", marginTop: "42px" }}>
+          <div style={{ width: "210px", border: "1px solid rgba(130,255,186,0.22)", background: "rgba(130,255,186,0.08)", borderRadius: "18px", padding: "20px" }}>
+            <div style={{ fontSize: "13px", color: "#86A79B", marginBottom: "8px" }}>DAILY YIELD</div>
+            <div style={{ fontSize: "30px", fontWeight: 800, color: "#00E87B" }}>{fmtUsd(data.dailyYield)}</div>
+          </div>
+          <div style={{ width: "210px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", borderRadius: "18px", padding: "20px" }}>
+            <div style={{ fontSize: "13px", color: "#86A79B", marginBottom: "8px" }}>POSITIONS</div>
+            <div style={{ fontSize: "30px", fontWeight: 800, color: "#F4FFF9" }}>{data.positions}</div>
+          </div>
+          <div style={{ width: "210px", border: "1px solid rgba(167,139,250,0.22)", background: "rgba(167,139,250,0.08)", borderRadius: "18px", padding: "20px" }}>
+            <div style={{ fontSize: "13px", color: "#86A79B", marginBottom: "8px" }}>PROTOCOLS</div>
+            <div style={{ fontSize: "30px", fontWeight: 800, color: "#A78BFA" }}>{data.protocols}</div>
+          </div>
+        </div>
 
         <div style={{ flex: 1 }} />
 

@@ -23,7 +23,7 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   }
 
   // Use d param if present (has stats), otherwise just address
-  const ogUrl = d ? `/api/og?d=${d}` : `/api/og?d=${address}`;
+  const ogUrl = d ? `/api/og?d=${encodeURIComponent(d)}` : `/api/og?d=${address}`;
   const short = address.slice(0, 6) + "..." + address.slice(-4);
 
   return {

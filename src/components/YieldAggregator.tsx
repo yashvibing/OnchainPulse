@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  useTokenBalances,
+} from "@/hooks/usePortfolio";
+import {
   calculateLoopStrategies,
   fetchYieldOpportunities,
   filterBorrowOpportunities,
@@ -14,7 +17,12 @@ import {
   type SortField,
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, isValidEvmAddress, shortenAddress } from "@/lib/format";
+import {
+  buildWalletYieldMatches,
+  getHeldYieldSymbols,
+} from "@/lib/walletOpportunities";
+import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -170,6 +178,105 @@ function TokenSelectorPanel({
           />
         ))}
       </div>
+    </section>
+  );
+}
+
+function WalletHoldingsPanel({
+  address,
+  input,
+  onInputChange,
+  onLoad,
+  onUseBest,
+  onPick,
+  loading,
+  heldSymbols,
+  matches,
+}: {
+  address: string;
+  input: string;
+  onInputChange: (value: string) => void;
+  onLoad: () => void;
+  onUseBest: () => void;
+  onPick: (symbol: string) => void;
+  loading: boolean;
+  heldSymbols: string[];
+  matches: ReturnType<typeof buildWalletYieldMatches>;
+}) {
+  return (
+    <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div>
+          <div className="text-[12px] font-bold uppercase text-[var(--color-text-secondary)]">
+            Use My Holdings
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+            Paste an address to match strategy tokens against assets already in that wallet.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={input}
+            onChange={(event) => onInputChange(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && onLoad()}
+            placeholder="0x wallet address"
+            className="min-w-[240px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+          />
+          <button
+            type="button"
+            onClick={onLoad}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            Load
+          </button>
+        </div>
+      </div>
+
+      {address && (
+        <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
+              Wallet {shortenAddress(address)}
+            </div>
+            <button
+              type="button"
+              onClick={onUseBest}
+              disabled={matches.length === 0}
+              className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[12px] font-bold text-[#07110C] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Use best holding
+            </button>
+          </div>
+          {loading ? (
+            <div className="text-[12px] text-[var(--color-text-muted)]">Loading wallet holdings...</div>
+          ) : heldSymbols.length === 0 ? (
+            <div className="text-[12px] text-[var(--color-text-muted)]">
+              No supported yield tokens found in this wallet.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {heldSymbols.map((symbol) => {
+                const hasMatch = matches.some((match) => match.symbol === symbol);
+                return (
+                  <button
+                    key={symbol}
+                    type="button"
+                    onClick={() => onPick(symbol)}
+                    disabled={!hasMatch}
+                    className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-semibold transition-colors ${
+                      hasMatch
+                        ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] text-[var(--color-positive)] hover:bg-[rgba(0,232,123,0.12)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-dim)] opacity-60"
+                    }`}
+                  >
+                    {symbol}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -441,8 +548,22 @@ export function YieldAggregator() {
   const [lendTokens, setLendTokens] = useState<string[]>([]);
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletInput, setWalletInput] = useState("");
+  const walletBalances = useTokenBalances(walletAddress || null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const addressParam = params.get("address") || getLastAddress();
+    const lendParam = params.get("lend");
+    if (addressParam && isValidEvmAddress(addressParam)) {
+      setWalletAddress(addressParam);
+      setWalletInput(addressParam);
+    }
+    if (lendParam) {
+      setLendTokens([lendParam]);
+    }
+
     fetchYieldOpportunities()
       .then((data) => {
         setAllOpps(data);
@@ -472,6 +593,27 @@ export function YieldAggregator() {
   const loopStrategies = showLooping
     ? calculateLoopStrategies(allOpps, lendTokens, borrowTokens)
     : [];
+  const walletTokens = walletBalances.data || [];
+  const walletMatches = buildWalletYieldMatches(walletTokens, allOpps);
+  const heldYieldSymbols = getHeldYieldSymbols(walletTokens);
+
+  function loadWalletHoldings() {
+    const nextAddress = walletInput.trim();
+    if (!isValidEvmAddress(nextAddress)) return;
+    saveAddress(nextAddress);
+    setWalletAddress(nextAddress);
+    const params = new URLSearchParams(window.location.search);
+    params.set("address", nextAddress);
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, "", nextUrl);
+  }
+
+  function useBestHolding() {
+    const best = walletMatches[0];
+    if (!best) return;
+    setLendTokens([best.symbol]);
+    setBorrowTokens([]);
+  }
 
   if (loading) return <AggregatorSkeleton />;
 
@@ -488,6 +630,21 @@ export function YieldAggregator() {
 
   return (
     <div>
+      <WalletHoldingsPanel
+        address={walletAddress}
+        input={walletInput}
+        onInputChange={setWalletInput}
+        onLoad={loadWalletHoldings}
+        onUseBest={useBestHolding}
+        onPick={(symbol) => {
+          setLendTokens([symbol]);
+          setBorrowTokens([]);
+        }}
+        loading={walletBalances.isLoading}
+        heldSymbols={heldYieldSymbols}
+        matches={walletMatches}
+      />
+
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
           title="Lend"
