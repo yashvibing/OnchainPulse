@@ -3,6 +3,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3010"),
   title: "Onchain Pulse — Monad Portfolio Tracker",
   description:
     "Track your DeFi positions across the Monad ecosystem. Community-made, not affiliated with Monad Foundation.",
