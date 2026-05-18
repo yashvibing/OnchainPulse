@@ -1,40 +1,39 @@
 @import "tailwindcss";
 
 @theme {
-  /* ─── Onchain Pulse Design Tokens ─── */
-  /* Swap-first, action-oriented, high-energy dark theme */
+  /* Onchain Pulse terminal design tokens */
 
   /* Backgrounds */
-  --color-bg-primary: #070C12;
-  --color-bg-surface: rgba(8, 14, 20, 0.86);
-  --color-bg-surface-solid: #0A1218;
-  --color-bg-card: rgba(11, 21, 29, 0.76);
-  --color-bg-card-elevated: rgba(14, 24, 36, 0.88);
-  --color-bg-card-hover: rgba(19, 34, 47, 0.92);
+  --color-bg-primary: #08100d;
+  --color-bg-surface: rgba(13, 21, 18, 0.96);
+  --color-bg-surface-solid: #0d1512;
+  --color-bg-card: #151d1a;
+  --color-bg-card-elevated: #19211e;
+  --color-bg-card-hover: #232c29;
 
   /* Borders */
-  --color-border: rgba(103, 122, 255, 0.14);
-  --color-border-hover: rgba(50, 231, 255, 0.32);
-  --color-border-elevated: rgba(131, 110, 249, 0.24);
+  --color-border: #3a4a45;
+  --color-border-hover: rgba(0, 245, 204, 0.42);
+  --color-border-elevated: #84948e;
 
   /* Text */
-  --color-text-primary: #FBFDFB;
-  --color-text-secondary: #D6E0F2;
-  --color-text-muted: #8C9AAF;
-  --color-text-dim: #5F6B7D;
+  --color-text-primary: #dbe5e0;
+  --color-text-secondary: #b9cac3;
+  --color-text-muted: #84948e;
+  --color-text-dim: #5d6c66;
 
-  /* Accents: Hyper teal/blue with Monad violet */
-  --color-accent-primary: #33CC99;
-  --color-accent-secondary: #32E7FF;
-  --color-accent-violet: #836EF9;
+  /* Accents */
+  --color-accent-primary: #00f5cc;
+  --color-accent-secondary: #27fed5;
+  --color-accent-violet: #dcb8ff;
 
   /* Semantic */
-  --color-positive: #33CC99;
-  --color-negative: #FF4D6D;
-  --color-warning: #F8CD4C;
+  --color-positive: #00f5cc;
+  --color-negative: #ffb4ab;
+  --color-warning: #ffd64c;
 
   /* Typography */
-  --font-display: "Satoshi", "DM Sans", system-ui, sans-serif;
+  --font-display: "Geist", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Type scale */
@@ -45,28 +44,27 @@
   --text-xl: 28px;
 
   /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 }
 
 @layer base {
   html {
-    --color-page-bg-1: rgba(50, 231, 255, 0.06);
-    --color-page-bg-2: rgba(131, 110, 249, 0.12);
-    --color-page-bg-3: rgba(51, 204, 153, 0.045);
-    --color-grid-row: rgba(50, 231, 255, 0.024);
-    --color-grid-col: rgba(131, 110, 249, 0.026);
-    --color-scrollbar: rgba(50, 231, 255, 0.2);
-    --color-scrollbar-hover: rgba(131, 110, 249, 0.34);
+    --color-page-bg-1: rgba(0, 245, 204, 0.045);
+    --color-page-bg-2: rgba(220, 184, 255, 0.05);
+    --color-grid-row: rgba(255, 255, 255, 0.03);
+    --color-grid-col: rgba(255, 255, 255, 0.03);
+    --color-scrollbar: rgba(0, 245, 204, 0.2);
+    --color-scrollbar-hover: rgba(0, 245, 204, 0.38);
   }
 
   body {
     background:
-      radial-gradient(circle at 12% 0%, var(--color-page-bg-1), transparent 28%),
-      radial-gradient(circle at 88% 10%, var(--color-page-bg-2), transparent 32%),
-      linear-gradient(180deg, #0A1118 0%, var(--color-bg-primary) 48%, #07100D 100%);
+      radial-gradient(circle at 18% 0%, var(--color-page-bg-1), transparent 26%),
+      radial-gradient(circle at 88% 8%, var(--color-page-bg-2), transparent 30%),
+      var(--color-bg-primary);
     color: var(--color-text-primary);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
@@ -74,12 +72,13 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent-primary);
+    outline: 2px solid rgba(0, 245, 204, 0.68);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
 
-  .font-mono {
+  .font-mono,
+  [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
   }
 }
@@ -89,12 +88,12 @@
     background:
       linear-gradient(var(--color-grid-row) 1px, transparent 1px),
       linear-gradient(90deg, var(--color-grid-col) 1px, transparent 1px),
-      radial-gradient(circle at 12% 0%, var(--color-page-bg-1), transparent 30%),
-      radial-gradient(circle at 88% 10%, var(--color-page-bg-2), transparent 34%),
-      linear-gradient(180deg, #0A1118 0%, var(--color-bg-primary) 48%, #07100D 100%);
+      radial-gradient(circle at 18% 0%, var(--color-page-bg-1), transparent 30%),
+      radial-gradient(circle at 88% 8%, var(--color-page-bg-2), transparent 34%),
+      var(--color-bg-primary);
     background-size:
-      44px 44px,
-      44px 44px,
+      32px 32px,
+      32px 32px,
       auto,
       auto,
       auto;
@@ -104,50 +103,54 @@
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    backdrop-filter: blur(12px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.045),
-      0 12px 36px rgba(0, 0, 0, 0.2),
-      0 0 0 1px rgba(51, 204, 153, 0.025);
+    box-shadow: none;
   }
 
   .card-elevated {
     background: var(--color-bg-card-elevated);
-    border: 1px solid var(--color-border-elevated);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    backdrop-filter: blur(16px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.065),
-      0 18px 42px rgba(0, 0, 0, 0.28),
-      0 0 44px rgba(131, 110, 249, 0.05);
+    box-shadow: none;
   }
 
   .card-hover {
-    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
-    &:hover {
-      background: var(--color-bg-card-hover);
-      border-color: var(--color-border-hover);
-    }
+    transition: background 0.18s, border-color 0.18s;
+  }
+
+  .card-hover:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
   }
 
   .gradient-brand {
-    background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary), var(--color-accent-violet));
+    background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
   }
 
   .btn-primary {
     background: var(--color-accent-primary);
-    color: #08140F;
+    color: #002019;
+    font-family: var(--font-mono);
     font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     border-radius: var(--radius-md);
-    transition: opacity 0.15s, box-shadow 0.15s;
-    &:hover {
-      opacity: 0.9;
-      box-shadow: 0 0 20px rgba(51, 204, 153, 0.22);
-    }
+    transition: opacity 0.15s, background 0.15s;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .label-caps {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
   }
 }
 
-/* ─── Animations ─── */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -157,6 +160,7 @@
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
 }
+
 .gradient-brand-animated {
   background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary), var(--color-accent-violet), var(--color-accent-primary));
   background-size: 300% 300%;
@@ -167,17 +171,13 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up {
-  animation: fade-up 0.3s ease-out both;
-}
+.animate-fade-up { animation: fade-up 0.3s ease-out both; }
 
 @keyframes count-fade {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-count {
-  animation: count-fade 0.5s ease-out both;
-}
+.animate-count { animation: count-fade 0.5s ease-out both; }
 
 @keyframes pulse-ring {
   0% { transform: scale(0.8); opacity: 0.5; }
@@ -186,18 +186,15 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(37, 240, 156, 0.1); }
-  50% { box-shadow: 0 0 25px rgba(37, 240, 156, 0.2); }
+  0%, 100% { border-color: rgba(0, 245, 204, 0.2); }
+  50% { border-color: rgba(0, 245, 204, 0.44); }
 }
 
-/* ─── Dark scrollbar ─── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-scrollbar-hover);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
 html { scrollbar-color: var(--color-scrollbar) transparent; }

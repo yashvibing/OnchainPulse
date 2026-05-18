@@ -23,7 +23,7 @@ export function EmptyState() {
 export function LoadingSpinner() {
   return (
     <div className="py-16 text-center">
-      <div className="mx-auto mb-5 h-11 w-11 animate-spin rounded-full border-[3px] border-[rgba(0,232,123,0.18)] border-t-[var(--color-accent-primary)]" />
+      <div className="mx-auto mb-5 h-11 w-11 animate-spin rounded-full border-[3px] border-[rgba(0,245,204,0.18)] border-t-[var(--color-accent-primary)]" />
       <div className="text-[13px] text-[var(--color-text-muted)]">
         Scanning public Monad data…
       </div>

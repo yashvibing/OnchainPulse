@@ -96,7 +96,7 @@ function DashboardInner() {
     <div className="min-h-screen pb-20 md:pb-0">
       <Header />
 
-      <main className="mx-auto max-w-[1000px] px-5 pb-16 pt-6">
+      <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
 
 
         {/* ══════ PORTFOLIO SECTION ══════ */}
@@ -113,11 +113,14 @@ function DashboardInner() {
 
         {!address && (
           <div className="mt-10">
-            <div className="mx-auto max-w-[520px]">
-              <h1 className="text-center text-[28px] font-bold text-[var(--color-text-primary)]">
+            <div className="mx-auto max-w-[620px]">
+              <div className="label-caps text-center text-[var(--color-accent-primary)]">
+                Portfolio terminal
+              </div>
+              <h1 className="mt-3 text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
                 Track a Monad wallet
               </h1>
-              <p className="mb-5 mt-2 text-center text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+              <p className="mb-6 mt-3 text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
                 Enter any address to view token holdings, staking, lending,
                 liquidity, vaults, and approvals.
               </p>
@@ -136,7 +139,7 @@ function DashboardInner() {
           <section className="mt-6 border-t border-[var(--color-border)] pt-6">
             {/* Wallet badge */}
             <div className="mb-4 flex items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-1.5">
+              <div className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-1.5">
                 <div className="h-2 w-2 rounded-full bg-[var(--color-positive)] animate-pulse" />
                 <span className="font-mono text-[12px] text-[var(--color-text-secondary)]">
                   {shortenAddress(address)}
@@ -365,7 +368,7 @@ function SectionTitle({ icon, title, count }: { icon: string; title: string; cou
       <span className="text-lg">{icon}</span>
       <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">{title}</h2>
       {count !== undefined && (
-        <span className="rounded-full bg-[rgba(0,232,123,0.1)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-positive)]">{count}</span>
+        <span className="rounded-full bg-[rgba(0,245,204,0.1)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-positive)]">{count}</span>
       )}
     </div>
   );
@@ -401,7 +404,7 @@ function SavedAddressBar({
               key={item.address}
               className={`flex items-center gap-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-[11px] ${
                 active
-                  ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] text-[var(--color-positive)]"
+                  ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] text-[var(--color-positive)]"
                   : "border-[var(--color-border)] text-[var(--color-text-secondary)]"
               }`}
             >

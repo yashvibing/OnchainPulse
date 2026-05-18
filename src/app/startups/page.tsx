@@ -13,7 +13,7 @@ export default function StartupsPage() {
     <div className="min-h-screen">
       <Header />
 
-      <main className="mx-auto max-w-[1180px] px-5 pb-16 pt-8">
+      <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
         <StartupDirectory />
       </main>
     </div>

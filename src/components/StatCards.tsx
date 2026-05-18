@@ -85,24 +85,16 @@ function StatCard({
 
   return (
     <div
-      className="card-elevated card-hover flex-1 min-w-[155px] px-5 py-4 transition-shadow duration-300"
+      className="card-elevated card-hover flex-1 min-w-[155px] border-t-4 px-5 py-4"
       style={{
-        ["--glow-color" as string]: accent || "var(--color-accent-primary)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow =
-          `0 0 20px ${accent || "var(--color-accent-primary)"}15, inset 0 1px 0 rgba(255,255,255,0.05)`;
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow =
-          "inset 0 1px 0 rgba(255,255,255,0.03)";
+        borderTopColor: accent || "var(--color-accent-primary)",
       }}
     >
-      <div className="mb-1 text-[11px] tracking-[0.6px] text-[var(--color-text-muted)]">
+      <div className="label-caps mb-2 text-[var(--color-text-muted)]">
         {label}
       </div>
       <div
-        className="text-[20px] font-bold tabular-nums animate-count"
+        className="animate-count font-mono text-[20px] font-semibold tabular-nums"
         style={{ color: accent || "var(--color-text-primary)" }}
       >
         {display}

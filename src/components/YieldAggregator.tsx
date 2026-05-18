@@ -68,7 +68,7 @@ function Badge({
 }) {
   const tones = {
     neutral: "bg-[rgba(255,255,255,0.06)] text-[var(--color-text-secondary)]",
-    positive: "bg-[rgba(0,232,123,0.1)] text-[var(--color-positive)]",
+    positive: "bg-[rgba(0,245,204,0.1)] text-[var(--color-positive)]",
     blue: "bg-[rgba(59,130,246,0.12)] text-[var(--color-accent-secondary)]",
     violet: "bg-[rgba(167,139,250,0.12)] text-[var(--color-accent-violet)]",
     warning: "bg-[rgba(255,184,0,0.12)] text-[var(--color-warning)]",
@@ -113,7 +113,7 @@ function AssetStack({ symbols }: { symbols: string[] }) {
       {visibleSymbols.map((symbol, index) => (
         <div
           key={`${symbol}-${index}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--color-bg-primary)] bg-[rgba(0,232,123,0.14)] text-[9px] font-extrabold text-[var(--color-positive)]"
+          className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--color-bg-primary)] bg-[rgba(0,245,204,0.14)] text-[9px] font-extrabold text-[var(--color-positive)]"
           style={{ zIndex: visibleSymbols.length - index }}
         >
           {symbol.slice(0, 2).toUpperCase()}
@@ -138,7 +138,7 @@ function TokenChip({
       onClick={onClick}
       className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-semibold transition-all ${
         selected
-          ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.12)] text-[var(--color-positive)] shadow-[0_0_0_1px_rgba(0,232,123,0.08)]"
+          ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.12)] text-[var(--color-positive)]"
           : "border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] text-[var(--color-text-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-secondary)]"
       }`}
     >
@@ -295,7 +295,7 @@ function WalletHoldingsPanel({
 
               {bestMatch && (
                 <div
-                  className="mb-3 max-w-[520px] rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-3"
+                  className="mb-3 max-w-[520px] rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] px-3 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
@@ -379,7 +379,7 @@ function SortButton({
       onClick={() => onClick(field)}
       className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-semibold transition-colors ${
         current === field
-          ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.1)] text-[var(--color-positive)]"
+          ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.1)] text-[var(--color-positive)]"
           : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
       }`}
     >

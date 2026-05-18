@@ -41,7 +41,7 @@ function TokenSelector({
         <span className="text-[var(--color-text-dim)]">▾</span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-primary)]">
           {filtered.map((t) => (
             <button
               key={t.address}
@@ -194,7 +194,7 @@ export function SwapPanel() {
 
             {/* Success */}
             {txSuccess && txHash && (
-              <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(0,232,123,0.08)] px-4 py-2 text-[12px] text-[var(--color-positive)]">
+              <div className="mt-3 rounded-[var(--radius-md)] bg-[rgba(0,245,204,0.08)] px-4 py-2 text-[12px] text-[var(--color-positive)]">
                 Swap successful!{" "}
                 <a href={`https://monadvision.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">View tx</a>
               </div>
@@ -222,7 +222,7 @@ export function SwapPanel() {
                 onClick={() => setSelectedIdx(i)}
                 className={`animate-fade-up flex w-full items-center gap-3 rounded-[var(--radius-lg)] border px-3 py-3 text-left transition-all ${
                   selectedIdx === i
-                    ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.06)]"
+                    ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.06)]"
                     : "border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-border-hover)]"
                 }`}
                 style={{ animationDelay: `${i * 40}ms` }}
@@ -241,7 +241,7 @@ export function SwapPanel() {
                       {q.aggregator}
                     </span>
                     {i === 0 && (
-                      <span className="rounded bg-[rgba(0,232,123,0.15)] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[var(--color-positive)]">
+                      <span className="rounded bg-[rgba(0,245,204,0.15)] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[var(--color-positive)]">
                         Top rate
                       </span>
                     )}

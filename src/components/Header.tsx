@@ -1,33 +1,60 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+const NAV_ITEMS = [
+  { href: "/", label: "Portfolio" },
+  { href: "/yield-aggregator", label: "DeFi Rates" },
+  { href: "/startups", label: "Startups" },
+];
 
 export function Header() {
+  const pathname = usePathname();
+
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] px-6 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl">
-      <Link href="/" className="flex items-center gap-3">
-        <Image
-          src="/onchainpulse-mark.png"
-          alt=""
-          width={44}
-          height={37}
-          priority
-          className="h-9 w-10 rounded-[8px] border border-[rgba(255,255,255,0.08)] object-cover"
-        />
-        <div className="text-[15px] font-bold tracking-tight text-[var(--color-text-primary)]">
-          Onchain Pulse
-        </div>
-      </Link>
-      <nav className="flex items-center gap-4 text-[12px] font-medium text-[var(--color-text-muted)]">
-        <Link href="/" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Portfolio
+    <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-4 px-5 md:px-6">
+        <Link href="/" className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)]">
+            <Image
+              src="/onchainpulse-mark.png"
+              alt=""
+              width={28}
+              height={28}
+              priority
+              className="h-7 w-7 object-contain"
+            />
+          </span>
+          <span className="hidden text-[18px] font-black uppercase tracking-[-0.02em] text-[var(--color-accent-primary)] sm:inline">
+            Onchain Pulse
+          </span>
         </Link>
-        <Link href="/yield-aggregator" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          DeFi Rates
-        </Link>
-        <Link href="/startups" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Startups
-        </Link>
-      </nav>
+
+        <nav className="flex items-center gap-1 sm:gap-4">
+          {NAV_ITEMS.map((item) => {
+            const active =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`border-b-2 px-2 py-2 text-[12px] font-semibold transition-colors sm:text-[14px] ${
+                  active
+                    ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
+                    : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-accent-primary)]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </header>
   );
 }

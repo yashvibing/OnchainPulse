@@ -49,17 +49,17 @@ export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
 
   return (
     <div className="mb-6">
-      <div className="flex gap-2.5 flex-wrap">
+      <div className="flex flex-wrap gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="Enter wallet address (0x...)"
-          className="min-w-[220px] flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+          className="min-w-[220px] flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
         />
         <button
           onClick={handleSubmit}
-          className="btn-primary whitespace-nowrap rounded-[var(--radius-md)] px-7 py-3 text-sm"
+          className="btn-primary whitespace-nowrap px-7 py-3 text-sm"
         >
           Track
         </button>

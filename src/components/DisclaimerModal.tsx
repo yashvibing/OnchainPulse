@@ -42,7 +42,7 @@ export function DisclaimerModal() {
       aria-modal="true"
       aria-labelledby="disclaimer-title"
     >
-      <div className="relative max-h-[92vh] w-full max-w-[860px] overflow-y-auto border border-[rgba(244,247,242,0.75)] bg-[var(--color-bg-surface-solid)] px-5 py-6 shadow-2xl sm:px-8 sm:py-8">
+      <div className="relative max-h-[92vh] w-full max-w-[860px] overflow-y-auto border border-[var(--color-border-elevated)] bg-[var(--color-bg-surface-solid)] px-5 py-6 sm:px-8 sm:py-8">
         <div className="pointer-events-none absolute -left-px -top-px h-8 w-8 border-l-2 border-t-2 border-[var(--color-text-primary)]" />
         <div className="pointer-events-none absolute -right-px -bottom-px h-8 w-8 border-b-2 border-r-2 border-[var(--color-text-primary)]" />
 

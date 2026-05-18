@@ -27,62 +27,63 @@ function StartupInitial({ startup }: { startup: DeltavStartup }) {
 
   return (
     <div
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[rgba(56,189,248,0.22)] bg-[linear-gradient(135deg,rgba(37,240,156,0.14),rgba(56,189,248,0.12),rgba(185,156,255,0.16))] text-[12px] font-black text-[var(--color-text-primary)]"
+      className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] font-mono text-[20px] font-black text-[var(--color-accent-primary)]"
       aria-hidden="true"
     >
       {initials || "DV"}
+      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-tl-[var(--radius-sm)] bg-[var(--color-accent-primary)]" />
     </div>
   );
 }
 
 function StartupCard({ startup }: { startup: DeltavStartup }) {
   return (
-    <article className="card card-hover flex min-h-[250px] flex-col p-4">
-      <div className="flex items-start gap-3">
+    <article className="card card-hover flex min-h-[300px] flex-col border-t-4 border-t-[var(--color-accent-primary)] p-4">
+      <div className="flex items-start gap-4">
         <StartupInitial startup={startup} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="truncate text-[16px] font-bold text-[var(--color-text-primary)]">
+              <h2 className="truncate text-[20px] font-bold text-[var(--color-text-primary)]">
                 {startup.name}
               </h2>
-              <p className="mt-1 truncate text-[12px] text-[var(--color-text-muted)]">
+              <p className="mt-1 truncate font-mono text-[13px] text-[var(--color-text-muted)]">
                 {startup.founder || "Founder/team"}
               </p>
             </div>
-            <span className="rounded-[var(--radius-sm)] bg-[rgba(185,156,255,0.13)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[var(--color-accent-violet)]">
+            <span className="label-caps rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-2 py-1 text-[var(--color-text-secondary)]">
               {startup.category}
             </span>
           </div>
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-3 min-h-[62px] text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+      <p className="mt-5 line-clamp-4 min-h-[82px] text-[14px] leading-relaxed text-[var(--color-text-secondary)]">
         {startup.description || "Public startup listing from DeltaV."}
       </p>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 border-y border-[var(--color-border)] py-3">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--color-text-dim)]">
+      <div className="mt-5 grid grid-cols-3 gap-2 border-y border-[var(--color-border)] bg-[rgba(8,16,13,0.42)] py-3">
+        <div className="text-center">
+          <div className="label-caps text-[var(--color-text-muted)]">
             Page
           </div>
-          <div className="mt-1 font-mono text-[13px] text-[var(--color-text-primary)]">
+          <div className="mt-2 font-mono text-[18px] font-semibold text-[var(--color-accent-primary)]">
             {startup.sourcePage}
           </div>
         </div>
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--color-text-dim)]">
+        <div className="border-x border-[var(--color-border)] text-center">
+          <div className="label-caps text-[var(--color-text-muted)]">
             Believers
           </div>
-          <div className="mt-1 font-mono text-[13px] text-[var(--color-text-primary)]">
+          <div className="mt-2 font-mono text-[18px] font-semibold text-[var(--color-text-primary)]">
             {metricLabel(startup.believers)}
           </div>
         </div>
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--color-text-dim)]">
+        <div className="text-center">
+          <div className="label-caps text-[var(--color-text-muted)]">
             Followers
           </div>
-          <div className="mt-1 font-mono text-[13px] text-[var(--color-text-primary)]">
+          <div className="mt-2 font-mono text-[18px] font-semibold text-[var(--color-text-primary)]">
             {metricLabel(startup.followers)}
           </div>
         </div>
@@ -91,9 +92,9 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
       <div className="mt-auto pt-4">
         <a
           href={getFeedbackUrl(startup)}
-          className="block rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-center text-[12px] font-black text-[#07110C] transition-opacity hover:opacity-90"
+          className="btn-primary block px-3 py-2 text-center text-[11px]"
         >
-          Give Feedback on DeltaV
+          Give Feedback on DeltaV ↗
         </a>
       </div>
     </article>
@@ -120,21 +121,21 @@ export function StartupDirectory() {
   }, [category, query]);
 
   return (
-    <section className="space-y-5">
-      <div className="card-elevated p-4 sm:p-5">
-        <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-secondary)]">
+    <section className="space-y-6">
+      <div className="border-b border-[var(--color-border)] pb-8 pt-2">
+        <div className="label-caps text-[var(--color-accent-primary)]">
           DeltaV public listings
         </div>
-        <h1 className="mt-2 text-[28px] font-bold text-[var(--color-text-primary)]">
+        <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
           Startup Feedback
         </h1>
-        <p className="mt-2 max-w-[720px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+        <p className="mt-3 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
           Browse public DeltaV startup listings. Each feedback link opens the
           relevant DeltaV feedback page for that startup.
         </p>
       </div>
 
-      <div className="card p-4">
+      <div className="card bg-[var(--color-bg-card-hover)] p-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <label className="relative block lg:w-[420px]">
             <span className="sr-only">Search startups</span>
@@ -142,7 +143,7 @@ export function StartupDirectory() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search by startup, founder, category, or summary"
-              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3 text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-border-hover)]"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-4 py-3 font-mono text-[13px] text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
             />
           </label>
 
@@ -152,10 +153,10 @@ export function StartupDirectory() {
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
-                className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-colors ${
+                className={`label-caps rounded-[var(--radius-md)] border px-3 py-2 transition-colors ${
                   category === item
-                    ? "border-[rgba(37,240,156,0.36)] bg-[rgba(37,240,156,0.13)] text-[var(--color-accent-primary)]"
-                    : "border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] text-[var(--color-text-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-secondary)]"
+                    ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.1)] text-[var(--color-accent-primary)]"
+                    : "border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] text-[var(--color-text-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-secondary)]"
                 }`}
               >
                 {item}
@@ -164,7 +165,7 @@ export function StartupDirectory() {
           </div>
         </div>
 
-        <div className="mt-3 text-[12px] text-[var(--color-text-muted)]">
+        <div className="label-caps mt-3 text-[var(--color-text-muted)]">
           Showing {filteredStartups.length} of {DELTAV_STARTUPS.length} startup listings.
         </div>
       </div>

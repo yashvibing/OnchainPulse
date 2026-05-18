@@ -6,15 +6,15 @@ interface TabBarProps {
 
 export function TabBar({ tabs, active, onChange }: TabBarProps) {
   return (
-    <div className="mb-5 flex flex-wrap gap-1">
+    <div className="card mb-5 flex flex-wrap gap-1 p-2">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          className={`rounded-[9px] px-4 py-2.5 text-[13px] font-semibold tracking-[0.2px] transition-all ${
+          className={`rounded-[var(--radius-md)] border px-4 py-2.5 text-[13px] font-semibold tracking-[0.2px] transition-all ${
             active === tab.key
-              ? "border border-[rgba(0,232,123,0.2)] bg-[rgba(0,232,123,0.08)] text-[var(--color-accent-primary)]"
-              : "border border-transparent bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+              ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] text-[var(--color-accent-primary)]"
+              : "border-transparent bg-transparent text-[var(--color-text-muted)] hover:border-[var(--color-border)] hover:text-[var(--color-text-secondary)]"
           }`}
         >
           {tab.label}
