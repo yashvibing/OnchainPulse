@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { usePortfolio, useTokenApprovals } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
@@ -17,8 +16,6 @@ import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
 import { ApprovalManager } from "@/components/ApprovalManager";
 import { shortenAddress, isValidEvmAddress, formatUsd } from "@/lib/format";
-import { fetchYieldOpportunities, type YieldOpportunity } from "@/services/yields-aggregator";
-import { buildWalletYieldMatches } from "@/lib/walletOpportunities";
 import {
   loadSavedAddresses,
   removeSavedAddress,
@@ -218,11 +215,6 @@ function DashboardInner() {
                   holdings={new Map(
                     portfolio.tokens.map((t) => [t.token.symbol, t.valueUsd])
                   )}
-                />
-
-                <IdleOpportunityPanel
-                  address={address}
-                  tokens={portfolio.tokens}
                 />
 
                 <RefreshBar onRefresh={portfolio.refetch} />
@@ -428,108 +420,6 @@ function SavedAddressBar({
         })}
       </div>
     </div>
-  );
-}
-
-function IdleOpportunityPanel({
-  address,
-  tokens,
-}: {
-  address: string;
-  tokens: ReturnType<typeof usePortfolio>["tokens"];
-}) {
-  const [opportunities, setOpportunities] = useState<YieldOpportunity[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchYieldOpportunities()
-      .then((data) => {
-        if (!mounted) return;
-        setOpportunities(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-        <div className="h-4 w-44 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
-        <div className="mt-3 h-3 w-full max-w-[520px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
-      </section>
-    );
-  }
-
-  const matches = buildWalletYieldMatches(tokens, opportunities).slice(0, 4);
-  if (matches.length === 0 && tokens.length === 0) return null;
-
-  const totalDaily = matches.reduce((sum, match) => sum + match.estimatedDailyUsd, 0);
-
-  return (
-    <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">
-            Matching Markets
-          </h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            Lending market rows matched to tokens already sitting in this wallet.
-          </p>
-        </div>
-        <div className="text-left md:text-right">
-          <div className="text-[10px] uppercase text-[var(--color-text-dim)]">APR-based estimate</div>
-          <div className="text-[16px] font-bold text-[var(--color-positive)]">
-            {formatUsd(totalDaily)}
-          </div>
-        </div>
-      </div>
-
-      {matches.length === 0 ? (
-        <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-4 text-[12px] text-[var(--color-text-muted)]">
-          No direct lending matches found for this wallet&apos;s current token holdings.
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-2 md:grid-cols-2">
-          {matches.map((match) => (
-            <Link
-              key={`${match.symbol}-${match.opportunity.id}`}
-              href={`/yield-aggregator?address=${address}&lend=${match.symbol}`}
-              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 transition-colors hover:border-[var(--color-border-hover)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                    {match.symbol}
-                  </div>
-                  <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                    {match.balanceLabel} - {formatUsd(match.valueUsd)}
-                  </div>
-                  <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
-                    Top displayed rate: {match.opportunity.protocol}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[14px] font-bold text-[var(--color-positive)]">
-                    {match.opportunity.apr.toFixed(2)}%
-                  </div>
-                  <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                    Est. daily {formatUsd(match.estimatedDailyUsd)}
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 

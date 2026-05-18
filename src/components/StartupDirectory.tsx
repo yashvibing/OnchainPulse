@@ -164,10 +164,6 @@ export function StartupDirectory() {
             ))}
           </div>
         </div>
-
-        <div className="label-caps mt-3 text-[var(--color-text-muted)]">
-          Showing {filteredStartups.length} of {DELTAV_STARTUPS.length} startup listings.
-        </div>
       </div>
 
       {filteredStartups.length > 0 ? (

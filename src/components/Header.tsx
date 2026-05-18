@@ -27,7 +27,7 @@ export function Header() {
               className="h-7 w-7 object-contain"
             />
           </span>
-          <span className="hidden text-[18px] font-black uppercase tracking-[-0.02em] text-[var(--color-accent-primary)] sm:inline">
+          <span className="hidden text-[18px] font-black tracking-[-0.02em] text-[var(--color-accent-primary)] sm:inline">
             Onchain Pulse
           </span>
         </Link>
