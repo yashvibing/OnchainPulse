@@ -128,21 +128,6 @@ function DashboardInner() {
                 onSelect={handleSearch}
                 onRemove={handleRemoveSavedAddress}
               />
-              <div className="mt-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-4 text-center">
-                <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-secondary)]">
-                  Startup feedback
-                </div>
-                <p className="mx-auto mt-2 max-w-[390px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-                  Browse public DeltaV startup listings and continue to DeltaV
-                  to give feedback to founders and teams.
-                </p>
-                <Link
-                  href="/startups"
-                  className="mt-3 inline-flex rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-black text-[#07110C] transition-opacity hover:opacity-90"
-                >
-                  Browse Startups
-                </Link>
-              </div>
             </div>
           </div>
         )}
