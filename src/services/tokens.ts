@@ -134,7 +134,7 @@ export async function fetchTokenChanges24h(): Promise<Map<string, number>> {
       if (token) changes.set(token.symbol, val);
     }
   } catch (err) {
-    console.error("Failed to fetch 24h price changes:", err);
+    console.warn("Token 24h changes unavailable; continuing without them.", err);
   }
   return changes;
 }
@@ -187,7 +187,7 @@ export async function fetchTokenPrices(): Promise<Map<string, number>> {
     if (!prices.has("sMON")) prices.set("sMON", monPrice * 1.054);
     if (!prices.has("gMON")) prices.set("gMON", monPrice * 1.048);
   } catch (err) {
-    console.error("Failed to fetch token prices:", err);
+    console.warn("Token prices unavailable; using fallback pricing where possible.", err);
   }
 
   return prices;

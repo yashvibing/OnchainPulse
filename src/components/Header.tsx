@@ -18,9 +18,6 @@ export function Header() {
         <Link href="/yield-aggregator" className="transition-colors hover:text-[var(--color-text-secondary)]">
           Yield Strategies
         </Link>
-        <Link href="/yield" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Yield Markets
-        </Link>
       </nav>
     </header>
   );

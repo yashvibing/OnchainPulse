@@ -192,6 +192,7 @@ function WalletHoldingsPanel({
   loading,
   heldSymbols,
   matches,
+  selectedLendToken,
 }: {
   address: string;
   input: string;
@@ -202,77 +203,157 @@ function WalletHoldingsPanel({
   loading: boolean;
   heldSymbols: string[];
   matches: ReturnType<typeof buildWalletYieldMatches>;
+  selectedLendToken: string;
 }) {
+  const bestMatch = matches[0];
+  const matchedSymbols = new Set(matches.map((match) => match.symbol));
+  const unmatchedSymbols = heldSymbols.filter((symbol) => !matchedSymbols.has(symbol));
+
   return (
-    <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[12px] font-bold uppercase text-[var(--color-text-secondary)]">
-            Use My Holdings
+            Wallet Holdings
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            Paste an address to match strategy tokens against assets already in that wallet.
+          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+            Paste an address to prefill lending tokens from assets already held.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={input}
-            onChange={(event) => onInputChange(event.target.value)}
-            onKeyDown={(event) => event.key === "Enter" && onLoad()}
-            placeholder="0x wallet address"
-            className="min-w-[240px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
-          />
-          <button
-            type="button"
-            onClick={onLoad}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
-          >
-            Load
-          </button>
-        </div>
+        {selectedLendToken && (
+          <Badge tone="positive">Selected {selectedLendToken}</Badge>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={input}
+          onChange={(event) => onInputChange(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && onLoad()}
+          placeholder="0x wallet address"
+          className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+        />
+        <button
+          type="button"
+          onClick={onLoad}
+          className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
+        >
+          Find matches
+        </button>
       </div>
 
       {address && (
         <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
-              Wallet {shortenAddress(address)}
+          {!address ? (
+            null
+          ) : loading ? (
+            <div>
+              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
+                Wallet {shortenAddress(address)}
+              </div>
+              <div className="mt-3 h-4 w-48 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
+              <div className="mt-2 h-3 w-full max-w-[520px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
             </div>
-            <button
-              type="button"
-              onClick={onUseBest}
-              disabled={matches.length === 0}
-              className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[12px] font-bold text-[#07110C] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              Use best holding
-            </button>
-          </div>
-          {loading ? (
-            <div className="text-[12px] text-[var(--color-text-muted)]">Loading wallet holdings...</div>
           ) : heldSymbols.length === 0 ? (
-            <div className="text-[12px] text-[var(--color-text-muted)]">
-              No supported yield tokens found in this wallet.
+            <div>
+              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
+                Wallet {shortenAddress(address)}
+              </div>
+              <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
+                No supported strategy tokens were found in this wallet.
+              </div>
+            </div>
+          ) : matches.length === 0 ? (
+            <div>
+              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
+                Wallet {shortenAddress(address)}
+              </div>
+              <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
+                This wallet has supported tokens, but none currently have direct lending matches.
+              </div>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {heldSymbols.map((symbol) => {
-                const hasMatch = matches.some((match) => match.symbol === symbol);
-                return (
+            <div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
+                    Wallet {shortenAddress(address)}
+                  </div>
+                  <div className="mt-1 text-[12px] text-[var(--color-text-muted)]">
+                    {matches.length} matched holding{matches.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+              </div>
+
+              {bestMatch && (
+                <button
+                  type="button"
+                  onClick={onUseBest}
+                  className="mb-3 w-full rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(0,232,123,0.12)]"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <span className="mr-2 rounded-[var(--radius-sm)] bg-[rgba(0,232,123,0.12)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-positive)]">
+                        Best
+                      </span>
+                      <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                        {bestMatch.symbol} on {bestMatch.opportunity.protocol}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <span className="font-bold text-[var(--color-positive)]">
+                        {bestMatch.opportunity.apr.toFixed(2)}%
+                      </span>
+                      <span className="text-[var(--color-text-muted)]">
+                        {formatUsd(bestMatch.estimatedDailyUsd)}/day
+                      </span>
+                      <span className="font-semibold text-[var(--color-text-secondary)]">
+                        Select
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {matches.slice(0, 6).map((match) => (
                   <button
-                    key={symbol}
+                    key={`${match.symbol}-${match.opportunity.id}`}
                     type="button"
-                    onClick={() => onPick(symbol)}
-                    disabled={!hasMatch}
-                    className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-semibold transition-colors ${
-                      hasMatch
-                        ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] text-[var(--color-positive)] hover:bg-[rgba(0,232,123,0.12)]"
-                        : "border-[var(--color-border)] text-[var(--color-text-dim)] opacity-60"
+                    onClick={() => onPick(match.symbol)}
+                    className={`rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
+                      selectedLendToken === match.symbol
+                        ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.1)]"
+                        : "border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] hover:border-[var(--color-border-hover)]"
                     }`}
                   >
-                    {symbol}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                          {match.symbol}
+                        </div>
+                        <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
+                          {match.opportunity.protocol} · {match.balanceLabel}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[12px] font-bold text-[var(--color-positive)]">
+                          {match.opportunity.apr.toFixed(2)}%
+                        </div>
+                        <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
+                          {formatUsd(match.estimatedDailyUsd)}/day
+                        </div>
+                      </div>
+                    </div>
                   </button>
-                );
-              })}
+                ))}
+              </div>
+
+              {unmatchedSymbols.length > 0 && (
+                <div className="mt-3 text-[11px] text-[var(--color-text-dim)]">
+                  Held but no direct match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -643,6 +724,7 @@ export function YieldAggregator() {
         loading={walletBalances.isLoading}
         heldSymbols={heldYieldSymbols}
         matches={walletMatches}
+        selectedLendToken={lendTokens[0] || ""}
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
