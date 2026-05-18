@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatUsd } from "@/lib/format";
+import { formatUsd, formatUsdEstimate, getPeriodicYieldEstimate } from "@/lib/format";
 
 interface StatCardsProps {
   totalValue: number;
@@ -16,13 +16,15 @@ export function StatCards({
   positionCount,
   protocolCount,
 }: StatCardsProps) {
+  const yieldEstimate = getPeriodicYieldEstimate(totalValue, dailyYield);
+
   return (
     <div className="mb-5 flex flex-wrap gap-3">
       <StatCard label="TOTAL VALUE" value={totalValue} format="usd" />
       <StatCard
-        label="EST. DAILY EARNINGS"
-        value={dailyYield}
-        format="usd"
+        label={`EST. ${yieldEstimate.period.toUpperCase()} AMOUNT`}
+        value={yieldEstimate.amount}
+        format="usd-estimate"
         sub="From staking, vault, and lending APR/APY"
         note="Estimate only. Rates and balances can change."
         accent="var(--color-positive)"
@@ -75,13 +77,18 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  format: "usd" | "int";
+  format: "usd" | "usd-estimate" | "int";
   sub?: string;
   accent?: string;
   note?: string;
 }) {
   const animated = useCountUp(value);
-  const display = format === "usd" ? formatUsd(animated) : String(Math.round(animated));
+  const display =
+    format === "usd"
+      ? formatUsd(animated)
+      : format === "usd-estimate"
+        ? formatUsdEstimate(animated)
+        : String(Math.round(animated));
 
   return (
     <div

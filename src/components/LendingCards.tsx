@@ -1,5 +1,5 @@
 import { type LendingPosition } from "@/services/lending";
-import { formatUsd, formatNumber } from "@/lib/format";
+import { formatUsd, formatNumber, getPeriodicYieldEstimate } from "@/lib/format";
 
 interface LendingCardsProps {
   positions: LendingPosition[];
@@ -11,7 +11,13 @@ export function LendingCards({ positions }: LendingCardsProps) {
 
   return (
     <div className="grid gap-3">
-      {supplies.map((pos, i) => (
+      {supplies.map((pos, i) => {
+        const estimate = getPeriodicYieldEstimate(
+          pos.valueUsd,
+          (pos.valueUsd * pos.apy) / 36500
+        );
+
+        return (
         <div
           key={`supply-${pos.protocol}-${i}`}
           className="card card-hover px-5 py-5 animate-fade-up"
@@ -52,16 +58,17 @@ export function LendingCards({ positions }: LendingCardsProps) {
             {pos.apy > 0 && (
               <div>
                 <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
-                  Estimated Daily Amount
+                  {estimate.label}
                 </div>
                 <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
-                  ≈ {formatUsd((pos.valueUsd * pos.apy) / 36500)}
+                  ≈ {estimate.formatted}
                 </div>
               </div>
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {borrows.map((pos, i) => (
         <div

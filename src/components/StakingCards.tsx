@@ -1,5 +1,5 @@
 import { type StakingPosition } from "@/services/staking";
-import { formatUsd, formatNumber } from "@/lib/format";
+import { formatUsd, formatNumber, getPeriodicYieldEstimate } from "@/lib/format";
 
 interface StakingCardsProps {
   positions: StakingPosition[];
@@ -8,7 +8,13 @@ interface StakingCardsProps {
 export function StakingCards({ positions }: StakingCardsProps) {
   return (
     <div className="grid gap-3">
-      {positions.map((pos, i) => (
+      {positions.map((pos, i) => {
+        const estimate = getPeriodicYieldEstimate(
+          pos.stakedValueUsd,
+          (pos.stakedValueUsd * pos.apy) / 36500
+        );
+
+        return (
         <div
           key={pos.protocol}
           className="card card-hover px-5 py-5 animate-fade-up"
@@ -76,15 +82,16 @@ export function StakingCards({ positions }: StakingCardsProps) {
             </div>
             <div>
               <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
-                Estimated Daily Amount
+                {estimate.label}
               </div>
               <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
-                ≈ {formatUsd((pos.stakedValueUsd * pos.apy) / 36500)}
+                ≈ {estimate.formatted}
               </div>
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

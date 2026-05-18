@@ -17,7 +17,12 @@ import {
   type SortField,
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
-import { formatNumber, isValidEvmAddress, shortenAddress } from "@/lib/format";
+import {
+  formatNumber,
+  getPeriodicYieldEstimate,
+  isValidEvmAddress,
+  shortenAddress,
+} from "@/lib/format";
 import {
   buildWalletYieldMatches,
   getHeldYieldSymbols,
@@ -46,13 +51,6 @@ function formatUsd(value: number) {
   if (value >= 1_000_000) return `$${formatNumber(value / 1_000_000, 2)}M`;
   if (value >= 1_000) return `$${formatNumber(value / 1_000, 1)}K`;
   return `$${formatNumber(value, 0)}`;
-}
-
-function formatDailyUsd(value: number) {
-  if (value <= 0) return "$0";
-  if (value < 0.01) return "<$0.01";
-  if (value < 1) return `$${formatNumber(value, 2)}`;
-  return formatUsd(value);
 }
 
 function formatRateLabel(apr: number) {
@@ -211,6 +209,9 @@ function WalletHoldingsPanel({
   matches: ReturnType<typeof buildWalletYieldMatches>;
 }) {
   const bestMatch = matches[0];
+  const bestEstimate = bestMatch
+    ? getPeriodicYieldEstimate(bestMatch.valueUsd, bestMatch.estimatedDailyUsd)
+    : null;
   const matchedSymbols = new Set(matches.map((match) => match.symbol));
   const unmatchedSymbols = heldSymbols.filter((symbol) => !matchedSymbols.has(symbol));
 
@@ -313,20 +314,25 @@ function WalletHoldingsPanel({
                       <div className="text-[14px] font-bold text-[var(--color-positive)]">
                         {formatRateLabel(bestMatch.opportunity.apr)}
                       </div>
-                      <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">
-                        Est. weekly {formatDailyUsd(bestMatch.estimatedDailyUsd * 7)}
-                      </div>
+                      {bestEstimate && (
+                        <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                          {bestEstimate.shortLabel} {bestEstimate.formatted}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {matches.slice(0, 6).map((match) => (
-                  <div
-                    key={`${match.symbol}-${match.opportunity.id}`}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-3"
-                  >
+                {matches.slice(0, 6).map((match) => {
+                  const estimate = getPeriodicYieldEstimate(match.valueUsd, match.estimatedDailyUsd);
+
+                  return (
+                    <div
+                      key={`${match.symbol}-${match.opportunity.id}`}
+                      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-3"
+                    >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="text-[13px] font-bold text-[var(--color-text-primary)]">
@@ -341,12 +347,13 @@ function WalletHoldingsPanel({
                           {formatRateLabel(match.opportunity.apr)}
                         </div>
                         <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          Est. weekly {formatDailyUsd(match.estimatedDailyUsd * 7)}
+                          {estimate.shortLabel} {estimate.formatted}
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {unmatchedSymbols.length > 0 && (
