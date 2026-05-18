@@ -38,13 +38,14 @@ function parseData(d: string | null) {
 
 export function GET(req: NextRequest) {
   const data = parseData(req.nextUrl.searchParams.get("d"));
+  const logoUrl = new URL("/onchainpulse-mark.png", req.nextUrl.origin).toString();
 
   if (!data) {
     return new ImageResponse(
       (
         <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
-            <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
+            <div style={{ width: "48px", height: "48px", borderRadius: "14px", backgroundImage: `url(${logoUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
           <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>View public-wallet DeFi positions relating to Monad, including staking, lending, LP, vault, and token data.</div>
@@ -60,7 +61,7 @@ export function GET(req: NextRequest) {
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "linear-gradient(135deg,#0D0B1A,#1a1535,#0D0B1A)", fontFamily: "system-ui", padding: "60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "44px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "white" }}>OP</div>
+            <div style={{ width: "44px", height: "44px", borderRadius: "12px", backgroundImage: `url(${logoUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             <div style={{ fontSize: "24px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
           <div style={{ fontSize: "18px", color: "#A0A0B8", fontFamily: "monospace" }}>{short(data.address)}</div>

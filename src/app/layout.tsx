@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   title: "Onchain Pulse — Monad Portfolio Tracker",
   description:
     "Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.",
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: "/onchainpulse-mark.png",
+    apple: "/onchainpulse-mark.png",
+  },
   openGraph: {
     title: "Onchain Pulse",
     description:
