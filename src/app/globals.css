@@ -5,33 +5,33 @@
   /* Swap-first, action-oriented, high-energy dark theme */
 
   /* Backgrounds */
-  --color-bg-primary: #10161A;
-  --color-bg-surface: rgba(18, 25, 31, 0.82);
-  --color-bg-surface-solid: #12191F;
-  --color-bg-card: rgba(24, 33, 38, 0.72);
-  --color-bg-card-elevated: rgba(31, 39, 48, 0.82);
-  --color-bg-card-hover: rgba(38, 50, 56, 0.86);
+  --color-bg-primary: #070C12;
+  --color-bg-surface: rgba(8, 14, 20, 0.86);
+  --color-bg-surface-solid: #0A1218;
+  --color-bg-card: rgba(11, 21, 29, 0.76);
+  --color-bg-card-elevated: rgba(14, 24, 36, 0.88);
+  --color-bg-card-hover: rgba(19, 34, 47, 0.92);
 
   /* Borders */
-  --color-border: rgba(171, 222, 205, 0.11);
-  --color-border-hover: rgba(181, 230, 216, 0.24);
-  --color-border-elevated: rgba(191, 235, 219, 0.16);
+  --color-border: rgba(103, 122, 255, 0.14);
+  --color-border-hover: rgba(50, 231, 255, 0.32);
+  --color-border-elevated: rgba(131, 110, 249, 0.24);
 
   /* Text */
-  --color-text-primary: #F4F7F2;
-  --color-text-secondary: #B7C4BD;
-  --color-text-muted: #75857E;
-  --color-text-dim: #52615B;
+  --color-text-primary: #FBFDFB;
+  --color-text-secondary: #D6E0F2;
+  --color-text-muted: #8C9AAF;
+  --color-text-dim: #5F6B7D;
 
-  /* Accents — neon green primary, electric blue secondary */
-  --color-accent-primary: #25F09C;
-  --color-accent-secondary: #38BDF8;
-  --color-accent-violet: #B99CFF;
+  /* Accents: Hyper teal/blue with Monad violet */
+  --color-accent-primary: #33CC99;
+  --color-accent-secondary: #32E7FF;
+  --color-accent-violet: #836EF9;
 
   /* Semantic */
-  --color-positive: #25F09C;
-  --color-negative: #FF6070;
-  --color-warning: #FFD166;
+  --color-positive: #33CC99;
+  --color-negative: #FF4D6D;
+  --color-warning: #F8CD4C;
 
   /* Typography */
   --font-display: "Satoshi", "DM Sans", system-ui, sans-serif;
@@ -52,11 +52,21 @@
 }
 
 @layer base {
+  html {
+    --color-page-bg-1: rgba(50, 231, 255, 0.06);
+    --color-page-bg-2: rgba(131, 110, 249, 0.12);
+    --color-page-bg-3: rgba(51, 204, 153, 0.045);
+    --color-grid-row: rgba(50, 231, 255, 0.024);
+    --color-grid-col: rgba(131, 110, 249, 0.026);
+    --color-scrollbar: rgba(50, 231, 255, 0.2);
+    --color-scrollbar-hover: rgba(131, 110, 249, 0.34);
+  }
+
   body {
     background:
-      linear-gradient(135deg, rgba(37, 240, 156, 0.045), transparent 28%),
-      linear-gradient(225deg, rgba(185, 156, 255, 0.055), transparent 32%),
-      linear-gradient(180deg, #161B22 0%, #10161A 48%, #121913 100%);
+      radial-gradient(circle at 12% 0%, var(--color-page-bg-1), transparent 28%),
+      radial-gradient(circle at 88% 10%, var(--color-page-bg-2), transparent 32%),
+      linear-gradient(180deg, #0A1118 0%, var(--color-bg-primary) 48%, #07100D 100%);
     color: var(--color-text-primary);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
@@ -77,11 +87,11 @@
 @layer utilities {
   .bg-radial-glow {
     background:
-      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-      linear-gradient(135deg, rgba(37, 240, 156, 0.055), transparent 30%),
-      linear-gradient(225deg, rgba(185, 156, 255, 0.055), transparent 34%),
-      linear-gradient(180deg, #161B22 0%, #10161A 48%, #121913 100%);
+      linear-gradient(var(--color-grid-row) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid-col) 1px, transparent 1px),
+      radial-gradient(circle at 12% 0%, var(--color-page-bg-1), transparent 30%),
+      radial-gradient(circle at 88% 10%, var(--color-page-bg-2), transparent 34%),
+      linear-gradient(180deg, #0A1118 0%, var(--color-bg-primary) 48%, #07100D 100%);
     background-size:
       44px 44px,
       44px 44px,
@@ -96,8 +106,9 @@
     border-radius: var(--radius-lg);
     backdrop-filter: blur(12px);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.035),
-      0 12px 36px rgba(0, 0, 0, 0.16);
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 12px 36px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(51, 204, 153, 0.025);
   }
 
   .card-elevated {
@@ -106,8 +117,9 @@
     border-radius: var(--radius-lg);
     backdrop-filter: blur(16px);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      0 18px 42px rgba(0, 0, 0, 0.22);
+      inset 0 1px 0 rgba(255, 255, 255, 0.065),
+      0 18px 42px rgba(0, 0, 0, 0.28),
+      0 0 44px rgba(131, 110, 249, 0.05);
   }
 
   .card-hover {
@@ -130,7 +142,7 @@
     transition: opacity 0.15s, box-shadow 0.15s;
     &:hover {
       opacity: 0.9;
-      box-shadow: 0 0 20px rgba(37, 240, 156, 0.22);
+      box-shadow: 0 0 20px rgba(51, 204, 153, 0.22);
     }
   }
 }
@@ -182,10 +194,10 @@
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(181, 230, 216, 0.16);
+  background: var(--color-scrollbar);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(181, 230, 216, 0.28);
+  background: var(--color-scrollbar-hover);
 }
-html { scrollbar-color: rgba(181, 230, 216, 0.16) transparent; }
+html { scrollbar-color: var(--color-scrollbar) transparent; }

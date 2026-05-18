@@ -455,7 +455,7 @@ export function filterBorrowOpportunities(
 }
 
 // Sort opportunities
-export type SortField = "apr" | "tvl" | "dailyRewards" | "protocol";
+export type SortField = "apr" | "tvl";
 export function sortOpportunities(
   opps: YieldOpportunity[],
   field: SortField,
@@ -463,9 +463,6 @@ export function sortOpportunities(
 ): YieldOpportunity[] {
   const sorted = [...opps];
   sorted.sort((a, b) => {
-    if (field === "protocol") {
-      return desc ? b.protocol.localeCompare(a.protocol) : a.protocol.localeCompare(b.protocol);
-    }
     const av = a[field] as number;
     const bv = b[field] as number;
     return desc ? bv - av : av - bv;

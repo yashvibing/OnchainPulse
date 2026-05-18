@@ -20,10 +20,11 @@ export function StatCards({
     <div className="mb-5 flex flex-wrap gap-3">
       <StatCard label="TOTAL VALUE" value={totalValue} format="usd" />
       <StatCard
-        label="RATE ESTIMATE"
+        label="EST. DAILY EARNINGS"
         value={dailyYield}
         format="usd"
-        sub="Based on source APR/APY snapshots"
+        sub="From staking, vault, and lending APR/APY"
+        note="Estimate only. Rates and balances can change."
         accent="var(--color-positive)"
       />
       <StatCard
@@ -70,12 +71,14 @@ function StatCard({
   format,
   sub,
   accent,
+  note,
 }: {
   label: string;
   value: number;
   format: "usd" | "int";
   sub?: string;
   accent?: string;
+  note?: string;
 }) {
   const animated = useCountUp(value);
   const display = format === "usd" ? formatUsd(animated) : String(Math.round(animated));
@@ -107,6 +110,11 @@ function StatCard({
       {sub && (
         <div className="mt-0.5 text-[12px] text-[var(--color-text-muted)]">
           {sub}
+        </div>
+      )}
+      {note && (
+        <div className="mt-2 text-[10px] leading-relaxed text-[var(--color-text-dim)]">
+          {note}
         </div>
       )}
     </div>

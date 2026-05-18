@@ -187,23 +187,17 @@ function WalletHoldingsPanel({
   input,
   onInputChange,
   onLoad,
-  onUseBest,
-  onPick,
   loading,
   heldSymbols,
   matches,
-  selectedLendToken,
 }: {
   address: string;
   input: string;
   onInputChange: (value: string) => void;
   onLoad: () => void;
-  onUseBest: () => void;
-  onPick: (symbol: string) => void;
   loading: boolean;
   heldSymbols: string[];
   matches: ReturnType<typeof buildWalletYieldMatches>;
-  selectedLendToken: string;
 }) {
   const bestMatch = matches[0];
   const matchedSymbols = new Set(matches.map((match) => match.symbol));
@@ -214,15 +208,13 @@ function WalletHoldingsPanel({
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[12px] font-bold uppercase text-[var(--color-text-secondary)]">
-            Wallet Holdings
+            Best Places For Wallet Tokens
           </div>
           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            Paste an address to match displayed market rows with assets already held.
+            Paste a wallet address. For each token it already holds, we show
+            the strongest displayed lending place we can match.
           </p>
         </div>
-        {selectedLendToken && (
-          <Badge tone="positive">Selected {selectedLendToken}</Badge>
-        )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -238,7 +230,7 @@ function WalletHoldingsPanel({
           onClick={onLoad}
           className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
         >
-          Find matches
+          Check wallet
         </button>
       </div>
 
@@ -260,7 +252,7 @@ function WalletHoldingsPanel({
                 Wallet {shortenAddress(address)}
               </div>
               <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-                No supported market tokens were found in this wallet.
+                We did not find wallet tokens that match the displayed markets.
               </div>
             </div>
           ) : matches.length === 0 ? (
@@ -269,7 +261,8 @@ function WalletHoldingsPanel({
                 Wallet {shortenAddress(address)}
               </div>
               <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-                This wallet has supported tokens, but none currently have direct lending matches.
+                We found supported wallet tokens, but none have a displayed
+                lending-rate row right now.
               </div>
             </div>
           ) : (
@@ -279,22 +272,24 @@ function WalletHoldingsPanel({
                   <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
                     Wallet {shortenAddress(address)}
                   </div>
-                  <div className="mt-1 text-[12px] text-[var(--color-text-muted)]">
-                    {matches.length} matched holding{matches.length === 1 ? "" : "s"}
+                  <div className="mt-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+                    Best displayed lending place found for {matches.length} wallet token{matches.length === 1 ? "" : "s"}
+                  </div>
+                  <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
+                    These are static recommendations from the current market
+                    list. They do not change your lend/borrow filters.
                   </div>
                 </div>
               </div>
 
               {bestMatch && (
-                <button
-                  type="button"
-                  onClick={onUseBest}
-                  className="mb-3 w-full rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(0,232,123,0.12)]"
+                <div
+                  className="mb-3 w-full rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-2.5"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <span className="mr-2 rounded-[var(--radius-sm)] bg-[rgba(0,232,123,0.12)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-positive)]">
-                        Top displayed rate
+                        Highest wallet match
                       </span>
                       <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
                         {bestMatch.symbol} on {bestMatch.opportunity.protocol}
@@ -307,25 +302,16 @@ function WalletHoldingsPanel({
                       <span className="text-[var(--color-text-muted)]">
                         Est. daily {formatUsd(bestMatch.estimatedDailyUsd)}
                       </span>
-                      <span className="font-semibold text-[var(--color-text-secondary)]">
-                        Select
-                      </span>
                     </div>
                   </div>
-                </button>
+                </div>
               )}
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {matches.slice(0, 6).map((match) => (
-                  <button
+                  <div
                     key={`${match.symbol}-${match.opportunity.id}`}
-                    type="button"
-                    onClick={() => onPick(match.symbol)}
-                    className={`rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
-                      selectedLendToken === match.symbol
-                        ? "border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.1)]"
-                        : "border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] hover:border-[var(--color-border-hover)]"
-                    }`}
+                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -333,7 +319,7 @@ function WalletHoldingsPanel({
                           {match.symbol}
                         </div>
                         <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          {match.opportunity.protocol} · {match.balanceLabel}
+                          {match.opportunity.protocol} - wallet holds {match.balanceLabel}
                         </div>
                       </div>
                       <div className="text-right">
@@ -345,13 +331,13 @@ function WalletHoldingsPanel({
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 
               {unmatchedSymbols.length > 0 && (
                 <div className="mt-3 text-[11px] text-[var(--color-text-dim)]">
-                  Held but no direct match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
+                  Wallet tokens without a displayed lending match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
                 </div>
               )}
             </div>
@@ -388,6 +374,47 @@ function SortButton({
   );
 }
 
+function protocolFilterKey(protocol: string) {
+  return protocol.trim().toLowerCase();
+}
+
+function preferredProtocolLabel(current: string | undefined, next: string) {
+  if (!current) return next;
+  const currentLooksLowercase = current === current.toLowerCase();
+  const nextLooksLowercase = next === next.toLowerCase();
+  return currentLooksLowercase && !nextLooksLowercase ? next : current;
+}
+
+function ProtocolFilter({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: { key: string; label: string; count: number }[];
+  selected: string;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <label className="flex min-w-[220px] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 py-2">
+      <span className="text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
+        Protocol
+      </span>
+      <select
+        value={selected}
+        onChange={(event) => onSelect(event.target.value)}
+        className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-[var(--color-text-secondary)] outline-none"
+      >
+        <option value="all">All protocols</option>
+        {options.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label} ({option.count})
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
   const assetSymbols = getOpportunityAssetSymbols(opp);
   const collateralSymbols = getBorrowCollateralSymbols(opp);
@@ -402,7 +429,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
       rel="noopener noreferrer"
       className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]"
     >
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-center">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:items-center">
         <div className="flex min-w-0 gap-3">
           <AssetStack symbols={assetSymbols} />
           <div className="min-w-0">
@@ -411,9 +438,6 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
                 {tokenLabel}
               </span>
               <Badge tone={opp.action === "LEND" ? "positive" : "blue"}>{opp.action === "LEND" ? "Lend" : "Borrow"}</Badge>
-              <Badge tone={opp.source === "DefiLlama" ? "violet" : opp.source === "Both" ? "neutral" : "positive"}>
-                {opp.source}
-              </Badge>
               {!["Lending", "Borrow"].includes(type) && <Badge tone="violet">{type}</Badge>}
             </div>
             <div className="mt-2 flex min-w-0 items-center gap-2">
@@ -437,7 +461,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
 
         <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
           <div>
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Source APR</div>
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
               {opp.apr.toFixed(2)}%
             </div>
@@ -449,7 +473,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Open</div>
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">View</div>
             <div className="mt-1 text-[15px] text-[var(--color-text-muted)] transition-colors group-hover:text-[var(--color-text-primary)]">
               &gt;
             </div>
@@ -485,13 +509,13 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
           <div className="mt-2 grid gap-1 text-[12px] text-[var(--color-text-muted)] md:grid-cols-2">
             <span>
               Supply on <span className="text-[var(--color-text-secondary)]">{strategy.supplyProtocol}</span>{" "}
-              source APR{" "}
+              displayed APR{" "}
               <span className="text-[var(--color-positive)]">{strategy.supplyApr.toFixed(2)}%</span>
             </span>
             <span>
               Borrow on <span className="text-[var(--color-text-secondary)]">{strategy.borrowProtocol}</span>{" "}
               {strategy.borrowApr > 0 && (
-                <span className="text-[var(--color-accent-secondary)]">+{strategy.borrowApr.toFixed(2)}% source incentive</span>
+                <span className="text-[var(--color-accent-secondary)]">+{strategy.borrowApr.toFixed(2)}% incentive APR</span>
               )}
             </span>
           </div>
@@ -630,6 +654,7 @@ export function YieldAggregator() {
   const [lendTokens, setLendTokens] = useState<string[]>([]);
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
+  const [protocolFilter, setProtocolFilter] = useState("all");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletInput, setWalletInput] = useState("");
   const walletBalances = useTokenBalances(walletAddress || null);
@@ -667,14 +692,43 @@ export function YieldAggregator() {
   const showSupplyOnly = hasLendSelection && !hasBorrowSelection;
   const showBorrowOnly = hasBorrowSelection && !hasLendSelection;
   const showLooping = hasLendSelection && hasBorrowSelection;
-  const lendOpps = sortOpportunities(filterByTokens(allOpps, lendTokens, "LEND"), sortField);
-  const borrowOpps = sortOpportunities(
-    filterBorrowOpportunities(allOpps, borrowTokens, showLooping ? lendTokens : []),
-    sortField
-  );
-  const loopStrategies = showLooping
+  const baseLendOpps = filterByTokens(allOpps, lendTokens, "LEND");
+  const baseBorrowOpps = filterBorrowOpportunities(allOpps, borrowTokens, showLooping ? lendTokens : []);
+  const protocolCounts = new Map<string, { label: string; count: number }>();
+  const protocolSource = showSupplyOnly
+    ? baseLendOpps
+    : showBorrowOnly
+      ? baseBorrowOpps
+      : [...baseLendOpps, ...baseBorrowOpps];
+  protocolSource.forEach((opp) => {
+    const key = protocolFilterKey(opp.protocol);
+    const existing = protocolCounts.get(key);
+    protocolCounts.set(key, {
+      label: preferredProtocolLabel(existing?.label, opp.protocol),
+      count: (existing?.count || 0) + 1,
+    });
+  });
+  const protocolOptions = [...protocolCounts.entries()]
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, 30);
+  const activeProtocol = protocolFilter === "all" || protocolCounts.has(protocolFilter) ? protocolFilter : "all";
+  const filterByProtocol = (opps: YieldOpportunity[]) =>
+    activeProtocol === "all"
+      ? opps
+      : opps.filter((opp) => protocolFilterKey(opp.protocol) === activeProtocol);
+  const lendOpps = sortOpportunities(filterByProtocol(baseLendOpps), sortField);
+  const borrowOpps = sortOpportunities(filterByProtocol(baseBorrowOpps), sortField);
+  const baseLoopStrategies = showLooping
     ? calculateLoopStrategies(allOpps, lendTokens, borrowTokens)
     : [];
+  const loopStrategies = activeProtocol === "all"
+    ? baseLoopStrategies
+    : baseLoopStrategies.filter(
+        (strategy) =>
+          protocolFilterKey(strategy.supplyProtocol) === activeProtocol ||
+          protocolFilterKey(strategy.borrowProtocol) === activeProtocol
+      );
   const walletTokens = walletBalances.data || [];
   const walletMatches = buildWalletYieldMatches(walletTokens, allOpps);
   const heldYieldSymbols = getHeldYieldSymbols(walletTokens);
@@ -688,13 +742,6 @@ export function YieldAggregator() {
     params.set("address", nextAddress);
     const nextUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, "", nextUrl);
-  }
-
-  function useBestHolding() {
-    const best = walletMatches[0];
-    if (!best) return;
-    setLendTokens([best.symbol]);
-    setBorrowTokens([]);
   }
 
   if (loading) return <AggregatorSkeleton />;
@@ -717,21 +764,15 @@ export function YieldAggregator() {
         input={walletInput}
         onInputChange={setWalletInput}
         onLoad={loadWalletHoldings}
-        onUseBest={useBestHolding}
-        onPick={(symbol) => {
-          setLendTokens([symbol]);
-          setBorrowTokens([]);
-        }}
         loading={walletBalances.isLoading}
         heldSymbols={heldYieldSymbols}
         matches={walletMatches}
-        selectedLendToken={lendTokens[0] || ""}
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
           title="Lend"
-          subtitle="Pick one asset to see source-reported supply rates."
+          subtitle="Pick one asset to see available supply rates."
           tone="positive"
           tokens={POPULAR_TOKENS}
           selectedTokens={lendTokens}
@@ -748,13 +789,18 @@ export function YieldAggregator() {
       </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
-          Sort by
-        </span>
-        <SortButton label="Source APR" field="apr" current={sortField} onClick={setSortField} />
-        <SortButton label="TVL" field="tvl" current={sortField} onClick={setSortField} />
-        <SortButton label="Rewards" field="dailyRewards" current={sortField} onClick={setSortField} />
-        <SortButton label="Protocol" field="protocol" current={sortField} onClick={setSortField} />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
+            Sort by
+          </span>
+          <SortButton label="Displayed APR" field="apr" current={sortField} onClick={setSortField} />
+          <SortButton label="TVL" field="tvl" current={sortField} onClick={setSortField} />
+        </div>
+        <ProtocolFilter
+          options={protocolOptions}
+          selected={activeProtocol}
+          onSelect={setProtocolFilter}
+        />
       </div>
 
       {!hasLendSelection && !hasBorrowSelection && (
@@ -779,7 +825,7 @@ export function YieldAggregator() {
       {showSupplyOnly && (
         <OpportunitySection
           title={`Lending markets for ${lendTokens.join(", ")}`}
-          subtitle="Source-reported supply market rows from Merkl and DefiLlama."
+          subtitle="Available supply market rows for this token."
           emptyLabel="No lending markets found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
@@ -804,7 +850,7 @@ export function YieldAggregator() {
                 Loop Scenarios
               </h2>
               <p className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                Scenario using {lendTokens.join(", ")} as supply and {borrowTokens.join(", ")} as borrow. Source APR does not include unknown base borrow cost.
+                Scenario using {lendTokens.join(", ")} as supply and {borrowTokens.join(", ")} as borrow. Displayed APR does not include unknown base borrow cost.
               </p>
             </div>
             <Badge tone="positive">{loopStrategies.length}</Badge>
