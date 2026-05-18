@@ -48,6 +48,17 @@ function formatUsd(value: number) {
   return `$${formatNumber(value, 0)}`;
 }
 
+function formatDailyUsd(value: number) {
+  if (value <= 0) return "$0";
+  if (value < 0.01) return "<$0.01";
+  if (value < 1) return `$${formatNumber(value, 2)}`;
+  return formatUsd(value);
+}
+
+function formatRateLabel(apr: number) {
+  return `${apr.toFixed(2)}% APR`;
+}
+
 function Badge({
   children,
   tone = "neutral",
@@ -284,24 +295,27 @@ function WalletHoldingsPanel({
 
               {bestMatch && (
                 <div
-                  className="mb-3 w-full rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-2.5"
+                  className="mb-3 max-w-[520px] rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,232,123,0.08)] px-3 py-3"
                 >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <span className="mr-2 rounded-[var(--radius-sm)] bg-[rgba(0,232,123,0.12)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-positive)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="text-[9px] font-bold uppercase text-[var(--color-positive)]">
                         Highest wallet match
-                      </span>
-                      <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                        {bestMatch.symbol} on {bestMatch.opportunity.protocol}
-                      </span>
+                      </div>
+                      <div className="truncate text-[15px] font-bold text-[var(--color-text-primary)]">
+                        {bestMatch.symbol}
+                      </div>
+                      <div className="truncate text-[11px] text-[var(--color-text-dim)]">
+                        {bestMatch.opportunity.protocol} - wallet holds {bestMatch.balanceLabel}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px]">
-                      <span className="font-bold text-[var(--color-positive)]">
-                        {bestMatch.opportunity.apr.toFixed(2)}%
-                      </span>
-                      <span className="text-[var(--color-text-muted)]">
-                        Est. daily {formatUsd(bestMatch.estimatedDailyUsd)}
-                      </span>
+                    <div className="shrink-0 text-right">
+                      <div className="text-[14px] font-bold text-[var(--color-positive)]">
+                        {formatRateLabel(bestMatch.opportunity.apr)}
+                      </div>
+                      <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                        Est. weekly {formatDailyUsd(bestMatch.estimatedDailyUsd * 7)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -324,10 +338,10 @@ function WalletHoldingsPanel({
                       </div>
                       <div className="text-right">
                         <div className="text-[12px] font-bold text-[var(--color-positive)]">
-                          {match.opportunity.apr.toFixed(2)}%
+                          {formatRateLabel(match.opportunity.apr)}
                         </div>
                         <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          Est. daily {formatUsd(match.estimatedDailyUsd)}
+                          Est. weekly {formatDailyUsd(match.estimatedDailyUsd * 7)}
                         </div>
                       </div>
                     </div>
@@ -463,7 +477,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
           <div>
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
-              {opp.apr.toFixed(2)}%
+              {formatRateLabel(opp.apr)}
             </div>
           </div>
           <div>
@@ -510,12 +524,12 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
             <span>
               Supply on <span className="text-[var(--color-text-secondary)]">{strategy.supplyProtocol}</span>{" "}
               displayed APR{" "}
-              <span className="text-[var(--color-positive)]">{strategy.supplyApr.toFixed(2)}%</span>
+              <span className="text-[var(--color-positive)]">{formatRateLabel(strategy.supplyApr)}</span>
             </span>
             <span>
               Borrow on <span className="text-[var(--color-text-secondary)]">{strategy.borrowProtocol}</span>{" "}
               {strategy.borrowApr > 0 && (
-                <span className="text-[var(--color-accent-secondary)]">+{strategy.borrowApr.toFixed(2)}% incentive APR</span>
+                <span className="text-[var(--color-accent-secondary)]">+{formatRateLabel(strategy.borrowApr)} incentive</span>
               )}
             </span>
           </div>
@@ -523,15 +537,15 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
         <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-right">
           <div>
             <div className="text-[10px] text-[var(--color-text-dim)]">Est. 1x</div>
-            <div className="font-semibold text-[var(--color-text-primary)]">{strategy.netAprAt1x.toFixed(2)}%</div>
+            <div className="font-semibold text-[var(--color-text-primary)]">{formatRateLabel(strategy.netAprAt1x)}</div>
           </div>
           <div>
             <div className="text-[10px] text-[var(--color-text-dim)]">Est. 2x</div>
-            <div className="font-semibold text-[var(--color-positive)]">{strategy.netAprAt2x.toFixed(2)}%</div>
+            <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt2x)}</div>
           </div>
           <div>
             <div className="text-[10px] text-[var(--color-text-dim)]">Est. 3x</div>
-            <div className="font-semibold text-[var(--color-positive)]">{strategy.netAprAt3x.toFixed(2)}%</div>
+            <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt3x)}</div>
           </div>
           <div>
             <div className="text-[10px] text-[var(--color-text-dim)]">Max</div>
