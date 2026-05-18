@@ -14,7 +14,7 @@ export function EmptyState() {
       <div className="mx-auto max-w-[420px] text-[12px] leading-relaxed text-[var(--color-text-dim)]">
         Tracks liquid staking (aPriori, FastLane, Kintsu, Magma), lending
         (Morpho, Neverland, Curvance), Uniswap V3 + Curve LP positions,
-        yield vaults, and all token holdings.
+        vault positions, and token holdings.
       </div>
     </div>
   );
@@ -25,7 +25,7 @@ export function LoadingSpinner() {
     <div className="py-16 text-center">
       <div className="mx-auto mb-5 h-11 w-11 animate-spin rounded-full border-[3px] border-[rgba(0,232,123,0.18)] border-t-[var(--color-accent-primary)]" />
       <div className="text-[13px] text-[var(--color-text-muted)]">
-        Scanning Monad ecosystem…
+        Scanning public Monad data…
       </div>
       <div className="mt-1.5 text-[12px] text-[var(--color-text-dim)]">
         aPriori · FastLane · Kintsu · Magma · Morpho · Neverland · Curvance

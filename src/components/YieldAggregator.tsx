@@ -217,7 +217,7 @@ function WalletHoldingsPanel({
             Wallet Holdings
           </div>
           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            Paste an address to prefill lending tokens from assets already held.
+            Paste an address to match displayed market rows with assets already held.
           </p>
         </div>
         {selectedLendToken && (
@@ -260,7 +260,7 @@ function WalletHoldingsPanel({
                 Wallet {shortenAddress(address)}
               </div>
               <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-                No supported strategy tokens were found in this wallet.
+                No supported market tokens were found in this wallet.
               </div>
             </div>
           ) : matches.length === 0 ? (
@@ -294,7 +294,7 @@ function WalletHoldingsPanel({
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <span className="mr-2 rounded-[var(--radius-sm)] bg-[rgba(0,232,123,0.12)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-positive)]">
-                        Best
+                        Top displayed rate
                       </span>
                       <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
                         {bestMatch.symbol} on {bestMatch.opportunity.protocol}
@@ -305,7 +305,7 @@ function WalletHoldingsPanel({
                         {bestMatch.opportunity.apr.toFixed(2)}%
                       </span>
                       <span className="text-[var(--color-text-muted)]">
-                        {formatUsd(bestMatch.estimatedDailyUsd)}/day
+                        Est. daily {formatUsd(bestMatch.estimatedDailyUsd)}
                       </span>
                       <span className="font-semibold text-[var(--color-text-secondary)]">
                         Select
@@ -341,7 +341,7 @@ function WalletHoldingsPanel({
                           {match.opportunity.apr.toFixed(2)}%
                         </div>
                         <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          {formatUsd(match.estimatedDailyUsd)}/day
+                          Est. daily {formatUsd(match.estimatedDailyUsd)}
                         </div>
                       </div>
                     </div>
@@ -437,7 +437,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
 
         <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
           <div>
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">APR</div>
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Source APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
               {opp.apr.toFixed(2)}%
             </div>
@@ -485,27 +485,28 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
           <div className="mt-2 grid gap-1 text-[12px] text-[var(--color-text-muted)] md:grid-cols-2">
             <span>
               Supply on <span className="text-[var(--color-text-secondary)]">{strategy.supplyProtocol}</span>{" "}
+              source APR{" "}
               <span className="text-[var(--color-positive)]">{strategy.supplyApr.toFixed(2)}%</span>
             </span>
             <span>
               Borrow on <span className="text-[var(--color-text-secondary)]">{strategy.borrowProtocol}</span>{" "}
               {strategy.borrowApr > 0 && (
-                <span className="text-[var(--color-accent-secondary)]">+{strategy.borrowApr.toFixed(2)}% incentive</span>
+                <span className="text-[var(--color-accent-secondary)]">+{strategy.borrowApr.toFixed(2)}% source incentive</span>
               )}
             </span>
           </div>
         </div>
         <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-right">
           <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">1x</div>
+            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 1x</div>
             <div className="font-semibold text-[var(--color-text-primary)]">{strategy.netAprAt1x.toFixed(2)}%</div>
           </div>
           <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">2x</div>
+            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 2x</div>
             <div className="font-semibold text-[var(--color-positive)]">{strategy.netAprAt2x.toFixed(2)}%</div>
           </div>
           <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">3x</div>
+            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 3x</div>
             <div className="font-semibold text-[var(--color-positive)]">{strategy.netAprAt3x.toFixed(2)}%</div>
           </div>
           <div>
@@ -730,7 +731,7 @@ export function YieldAggregator() {
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
           title="Lend"
-          subtitle="Pick one asset to see direct supply APRs."
+          subtitle="Pick one asset to see source-reported supply rates."
           tone="positive"
           tokens={POPULAR_TOKENS}
           selectedTokens={lendTokens}
@@ -750,7 +751,7 @@ export function YieldAggregator() {
         <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
           Sort by
         </span>
-        <SortButton label="APR" field="apr" current={sortField} onClick={setSortField} />
+        <SortButton label="Source APR" field="apr" current={sortField} onClick={setSortField} />
         <SortButton label="TVL" field="tvl" current={sortField} onClick={setSortField} />
         <SortButton label="Rewards" field="dailyRewards" current={sortField} onClick={setSortField} />
         <SortButton label="Protocol" field="protocol" current={sortField} onClick={setSortField} />
@@ -759,16 +760,16 @@ export function YieldAggregator() {
       {!hasLendSelection && !hasBorrowSelection && (
         <div className="grid gap-6 md:grid-cols-2">
           <OpportunitySection
-            title="Lending APRs"
-            subtitle="All supported Monad supply opportunities."
-            emptyLabel="No lending opportunities found."
+            title="Lending Markets"
+            subtitle="All supported supply market rows relating to Monad."
+            emptyLabel="No lending markets found."
             opportunities={lendOpps}
             onPickToken={(symbol) => setLendTokens([symbol])}
           />
           <OpportunitySection
             title="Borrow Markets"
             subtitle="Borrow rows include collateral hints where available."
-            emptyLabel="No borrowing opportunities found."
+            emptyLabel="No borrow markets found."
             opportunities={borrowOpps}
             onPickToken={(symbol) => setBorrowTokens([symbol])}
           />
@@ -777,9 +778,9 @@ export function YieldAggregator() {
 
       {showSupplyOnly && (
         <OpportunitySection
-          title={`Lending APRs for ${lendTokens.join(", ")}`}
-          subtitle="Direct supply opportunities from Merkl and DefiLlama."
-          emptyLabel="No lending opportunities found for this token."
+          title={`Lending markets for ${lendTokens.join(", ")}`}
+          subtitle="Source-reported supply market rows from Merkl and DefiLlama."
+          emptyLabel="No lending markets found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
         />
@@ -788,8 +789,8 @@ export function YieldAggregator() {
       {showBorrowOnly && (
         <OpportunitySection
           title={`Borrow markets for ${borrowTokens.join(", ")}`}
-          subtitle="Borrow opportunities show which collateral can be needed."
-          emptyLabel="No borrow opportunities found for this token."
+          subtitle="Borrow market rows show collateral hints where available."
+          emptyLabel="No borrow markets found for this token."
           opportunities={borrowOpps}
           onPickToken={(symbol) => setBorrowTokens([symbol])}
         />
@@ -800,10 +801,10 @@ export function YieldAggregator() {
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">
-                Loop Strategies
+                Loop Scenarios
               </h2>
               <p className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                Lending {lendTokens.join(", ")} and borrowing {borrowTokens.join(", ")}. APR does not include unknown base borrow cost.
+                Scenario using {lendTokens.join(", ")} as supply and {borrowTokens.join(", ")} as borrow. Source APR does not include unknown base borrow cost.
               </p>
             </div>
             <Badge tone="positive">{loopStrategies.length}</Badge>
@@ -820,7 +821,7 @@ export function YieldAggregator() {
             ))}
             {loopStrategies.length === 0 && (
               <EmptyOpportunities
-                label="No loop strategies available for this combination."
+                label="No loop scenarios available for this combination."
                 onPickToken={(symbol) => setLendTokens([symbol])}
               />
             )}

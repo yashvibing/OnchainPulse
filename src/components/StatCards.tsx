@@ -20,10 +20,10 @@ export function StatCards({
     <div className="mb-5 flex flex-wrap gap-3">
       <StatCard label="TOTAL VALUE" value={totalValue} format="usd" />
       <StatCard
-        label="DAILY YIELD"
+        label="RATE ESTIMATE"
         value={dailyYield}
         format="usd"
-        sub={`≈ ${formatUsd(dailyYield * 365)}/yr`}
+        sub="Based on source APR/APY snapshots"
         accent="var(--color-positive)"
       />
       <StatCard

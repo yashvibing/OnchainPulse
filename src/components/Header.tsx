@@ -16,7 +16,7 @@ export function Header() {
           Portfolio
         </Link>
         <Link href="/yield-aggregator" className="transition-colors hover:text-[var(--color-text-secondary)]">
-          Yield Strategies
+          DeFi Rates
         </Link>
       </nav>
     </header>

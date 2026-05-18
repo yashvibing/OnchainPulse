@@ -47,7 +47,7 @@ export function GET(req: NextRequest) {
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg,#6D3BF5,#0EA5A0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white" }}>OP</div>
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
-          <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens.</div>
+          <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>View public-wallet DeFi positions relating to Monad, including staking, lending, LP, vault, and token data.</div>
           <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
         </div>
       ),
@@ -71,7 +71,7 @@ export function GET(req: NextRequest) {
 
         <div style={{ display: "flex", gap: "16px", marginTop: "42px" }}>
           <div style={{ width: "210px", border: "1px solid rgba(130,255,186,0.22)", background: "rgba(130,255,186,0.08)", borderRadius: "18px", padding: "20px" }}>
-            <div style={{ fontSize: "13px", color: "#86A79B", marginBottom: "8px" }}>DAILY YIELD</div>
+            <div style={{ fontSize: "13px", color: "#86A79B", marginBottom: "8px" }}>RATE ESTIMATE</div>
             <div style={{ fontSize: "30px", fontWeight: 800, color: "#00E87B" }}>{fmtUsd(data.dailyYield)}</div>
           </div>
           <div style={{ width: "210px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", borderRadius: "18px", padding: "20px" }}>
@@ -87,7 +87,7 @@ export function GET(req: NextRequest) {
         <div style={{ flex: 1 }} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div style={{ fontSize: "18px", color: "#5A5A74" }}>Monad DeFi Portfolio</div>
+          <div style={{ fontSize: "18px", color: "#5A5A74" }}>Monad Wallet View</div>
           <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
         </div>
       </div>

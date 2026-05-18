@@ -212,7 +212,7 @@ export function SwapPanel() {
         {/* RIGHT — Aggregator routes */}
         <div className="w-full md:w-[280px] shrink-0">
           <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
-            {loading ? "Finding best rates..." : quotes.length > 0 ? `${quotes.length} routes found` : "Enter amount to compare"}
+            {loading ? "Comparing source rates..." : quotes.length > 0 ? `${quotes.length} routes found` : "Enter amount to compare"}
           </div>
 
           <div className="space-y-1.5">
@@ -242,7 +242,7 @@ export function SwapPanel() {
                     </span>
                     {i === 0 && (
                       <span className="rounded bg-[rgba(0,232,123,0.15)] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[var(--color-positive)]">
-                        Best
+                        Top rate
                       </span>
                     )}
                   </div>

@@ -32,7 +32,7 @@ const PORTFOLIO_TABS = [
   { key: "staking", label: "Staking", icon: "⬡" },
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
-  { key: "yield", label: "Yield", icon: "⬢" },
+  { key: "yield", label: "Vaults", icon: "⬢" },
   { key: "security", label: "Security", icon: "⛨" },
 ] as const;
 
@@ -259,7 +259,7 @@ function DashboardInner() {
                       )}
                       {portfolio.vaults.length > 0 && (
                         <section className="animate-fade-up" style={{ animationDelay: "240ms" }}>
-                          <SectionTitle icon="⬢" title="Yield Vaults" />
+                          <SectionTitle icon="⬢" title="Vault Positions" />
                           <VaultCards positions={portfolio.vaults} />
                         </section>
                       )}
@@ -296,8 +296,8 @@ function DashboardInner() {
 
                   {activeTab === "yield" && (
                     <div className="animate-fade-up">
-                      <SectionTitle icon="⬢" title="Yield Vaults" count={portfolio.vaults.length} />
-                      {portfolio.vaults.length > 0 ? <VaultCards positions={portfolio.vaults} /> : <NoPositions label="yield vault positions" />}
+                      <SectionTitle icon="⬢" title="Vault Positions" count={portfolio.vaults.length} />
+                      {portfolio.vaults.length > 0 ? <VaultCards positions={portfolio.vaults} /> : <NoPositions label="vault positions" />}
                     </div>
                   )}
 
@@ -315,8 +315,8 @@ function DashboardInner() {
                 </div>
 
                 <footer className="mt-12 text-center text-[11px] leading-relaxed text-[var(--color-text-dim)]">
-                  <p>Onchain Pulse is a community-built tool. Not affiliated with Monad Foundation.</p>
-                  <p className="mt-1">Data powered by Monad RPC · DefiLlama</p>
+                  <p>Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.</p>
+                  <p className="mt-1">Data from third-party sources including DefiLlama and Merkl.</p>
                 </footer>
               </>
             )}
@@ -326,8 +326,8 @@ function DashboardInner() {
         {/* Footer when no portfolio */}
         {!showPortfolio && (
           <footer className="mt-16 text-center text-[11px] leading-relaxed text-[var(--color-text-dim)]">
-            <p>Onchain Pulse is a community-built tool. Not affiliated with Monad Foundation.</p>
-            <p className="mt-1">Data powered by Monad RPC · DefiLlama</p>
+            <p>Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.</p>
+            <p className="mt-1">Data from third-party sources including DefiLlama and Merkl.</p>
           </footer>
         )}
       </main>
@@ -475,14 +475,14 @@ function IdleOpportunityPanel({
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">
-            Idle Asset Opportunities
+            Matching Markets
           </h2>
           <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            Lending matches for tokens already sitting in this wallet.
+            Lending market rows matched to tokens already sitting in this wallet.
           </p>
         </div>
         <div className="text-left md:text-right">
-          <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Matched daily yield</div>
+          <div className="text-[10px] uppercase text-[var(--color-text-dim)]">APR-based estimate</div>
           <div className="text-[16px] font-bold text-[var(--color-positive)]">
             {formatUsd(totalDaily)}
           </div>
@@ -510,7 +510,7 @@ function IdleOpportunityPanel({
                     {match.balanceLabel} - {formatUsd(match.valueUsd)}
                   </div>
                   <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
-                    Best match: {match.opportunity.protocol}
+                    Top displayed rate: {match.opportunity.protocol}
                   </div>
                 </div>
                 <div className="text-right">
@@ -518,7 +518,7 @@ function IdleOpportunityPanel({
                     {match.opportunity.apr.toFixed(2)}%
                   </div>
                   <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                    {formatUsd(match.estimatedDailyUsd)}/day
+                    Est. daily {formatUsd(match.estimatedDailyUsd)}
                   </div>
                 </div>
               </div>

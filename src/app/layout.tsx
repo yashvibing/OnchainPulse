@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -6,12 +7,12 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3010"),
   title: "Onchain Pulse — Monad Portfolio Tracker",
   description:
-    "Track your DeFi positions across the Monad ecosystem. Community-made, not affiliated with Monad Foundation.",
+    "Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.",
   icons: { icon: "/favicon.ico" },
   openGraph: {
     title: "Onchain Pulse",
     description:
-      "Track your DeFi positions across the Monad ecosystem. Staking, lending, LP, vaults, and tokens.",
+      "View public-wallet DeFi positions relating to Monad, including staking, lending, LP, vault, and token data.",
     images: [{ url: "/api/og", width: 1200, height: 630 }],
     type: "website",
     siteName: "Onchain Pulse",
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Onchain Pulse — Monad Portfolio Tracker",
     description:
-      "Track your DeFi positions across the Monad ecosystem.",
+      "View public-wallet DeFi positions relating to Monad.",
     images: ["/api/og"],
   },
 };
@@ -50,6 +51,7 @@ export default function RootLayout({
       </head>
       <body className="bg-radial-glow min-h-screen antialiased">
         <Providers>{children}</Providers>
+        <DisclaimerModal />
       </body>
     </html>
   );

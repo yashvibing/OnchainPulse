@@ -30,7 +30,7 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     title: `${short} — Onchain Pulse`,
     openGraph: {
       title: `Portfolio ${short}`,
-      description: "View this wallet's DeFi positions on the Monad ecosystem.",
+      description: "View this wallet's public DeFi positions relating to Monad.",
       images: [{ url: ogUrl, width: 1200, height: 630 }],
     },
     twitter: {

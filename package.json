@@ -2,7 +2,7 @@
   "name": "monfolio",
   "version": "0.1.0",
   "private": true,
-  "description": "MonFolio — Community Monad Portfolio Dashboard. Not affiliated with Monad Foundation.",
+  "description": "Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.",
   "scripts": {
     "dev": "next dev",
     "dev:fresh": "npm run clean && next dev",

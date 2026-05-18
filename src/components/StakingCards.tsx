@@ -29,14 +29,14 @@ export function StakingCards({ positions }: StakingCardsProps) {
               </div>
             </div>
             <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
-              {pos.apy.toFixed(1)}% APY
+              {pos.apy.toFixed(1)}% source APY
             </span>
           </div>
 
-          {/* Yield progress bar — shows APY as a visual bar */}
+          {/* Source-rate progress bar shows APY as a visual reference. */}
           <div className="mb-4">
             <div className="mb-1 flex items-center justify-between text-[11px]">
-              <span className="text-[var(--color-text-dim)]">Yield rate</span>
+              <span className="text-[var(--color-text-dim)]">Source APY</span>
               <span className="font-semibold text-[var(--color-positive)]">{pos.apy.toFixed(1)}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.04)]">
@@ -76,7 +76,7 @@ export function StakingCards({ positions }: StakingCardsProps) {
             </div>
             <div>
               <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
-                Daily Earnings
+                Estimated Daily Amount
               </div>
               <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
                 ≈ {formatUsd((pos.stakedValueUsd * pos.apy) / 36500)}

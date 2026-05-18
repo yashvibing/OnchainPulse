@@ -24,12 +24,12 @@ export function VaultCards({ positions }: VaultCardsProps) {
                 {pos.vaultName}
               </div>
               <div className="text-[12px] text-[var(--color-text-muted)]">
-                Yield Vault
+                Vault Position
               </div>
             </div>
             {pos.apy > 0 && (
               <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
-                {pos.apy.toFixed(1)}% APY
+                {pos.apy.toFixed(1)}% source APY
               </span>
             )}
           </div>
@@ -58,7 +58,7 @@ export function VaultCards({ positions }: VaultCardsProps) {
             {pos.apy > 0 && (
               <div>
                 <div className="mb-0.5 text-[11px] text-[var(--color-text-dim)]">
-                  Daily Earnings
+                  Estimated Daily Amount
                 </div>
                 <div className="text-[14px] font-semibold text-[var(--color-accent-violet)]">
                   ≈ {formatUsd((pos.valueUsd * pos.apy) / 36500)}
