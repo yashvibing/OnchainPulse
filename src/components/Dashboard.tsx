@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { usePortfolio, useTokenApprovals } from "@/hooks/usePortfolio";
+import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
 import { AddressInput } from "@/components/AddressInput";
 import { StatCards } from "@/components/StatCards";
@@ -14,8 +14,7 @@ import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
-import { ApprovalManager } from "@/components/ApprovalManager";
-import { shortenAddress, isValidEvmAddress, formatUsd } from "@/lib/format";
+import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 import {
   loadSavedAddresses,
   removeSavedAddress,
@@ -30,7 +29,6 @@ const PORTFOLIO_TABS = [
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
   { key: "yield", label: "Vaults", icon: "⬢" },
-  { key: "security", label: "Security", icon: "⛨" },
 ] as const;
 
 type PortfolioTabKey = (typeof PORTFOLIO_TABS)[number]["key"];
@@ -67,8 +65,6 @@ function DashboardInner() {
   }, [searchParams, address]);
 
   const portfolio = usePortfolio(address);
-  const approvals = useTokenApprovals(address);
-
   function handleSearch(addr: string) {
     setAddress(addr);
     setShowPortfolio(true);
@@ -119,7 +115,7 @@ function DashboardInner() {
               </h1>
               <p className="mb-6 mt-3 text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
                 Enter any address to view token holdings, staking, lending,
-                liquidity, vaults, and approvals.
+                liquidity, and vaults.
               </p>
               <AddressInput onSubmit={handleSearch} initialAddress={address} />
               <SavedAddressBar
@@ -296,17 +292,6 @@ function DashboardInner() {
                     </div>
                   )}
 
-                  {activeTab === "security" && (
-                    <div className="animate-fade-up">
-                      <SectionTitle icon="⛨" title="Token Approvals" count={approvals.data?.length} />
-                      <ApprovalManager
-                        approvals={approvals.data || []}
-                        isLoading={approvals.isLoading}
-                        isConnected={false}
-                        onRevoked={() => approvals.refetch()}
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <footer className="mt-12 text-center text-[11px] leading-relaxed text-[var(--color-text-dim)]">

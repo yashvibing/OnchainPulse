@@ -24,6 +24,7 @@ export const NATIVE_MON: TokenInfo = {
   decimals: 18,
   category: "native",
   logoColor: "#6D3BF5",
+  logoURI: "/monad-logomark.svg",
 };
 
 export const TOKENS: Record<string, TokenInfo> = {
@@ -34,6 +35,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "wrapped",
     logoColor: "#5B2FD6",
+    logoURI: "/monad-logomark.svg",
   },
   USDC: {
     address: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",

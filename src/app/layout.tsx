@@ -5,26 +5,26 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3010"),
-  title: "Onchain Pulse — Monad Portfolio Tracker",
+  title: "Onchain Pulse - Portfolio & DeFi Rates",
   description:
-    "Onchain Pulse is an independent, unofficial interface. It is not associated with, endorsed by, or affiliated with Monad Foundation.",
+    "Explore public wallet portfolios and displayed DeFi rates relating to Monad. Onchain Pulse is independent and not affiliated with Monad Foundation.",
   icons: {
     icon: "/onchainpulse-mark.png",
     apple: "/onchainpulse-mark.png",
   },
   openGraph: {
-    title: "Onchain Pulse",
+    title: "Onchain Pulse - Portfolio & DeFi Rates",
     description:
-      "View public-wallet DeFi positions relating to Monad, including staking, lending, LP, vault, and token data.",
+      "Explore public wallet portfolios, holdings, and displayed DeFi rates relating to Monad.",
     images: [{ url: "/api/og", width: 1200, height: 630 }],
     type: "website",
     siteName: "Onchain Pulse",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Onchain Pulse — Monad Portfolio Tracker",
+    title: "Onchain Pulse - Portfolio & DeFi Rates",
     description:
-      "View public-wallet DeFi positions relating to Monad.",
+      "Explore public wallet portfolios and displayed DeFi rates relating to Monad.",
     images: ["/api/og"],
   },
 };

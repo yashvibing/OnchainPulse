@@ -19,10 +19,6 @@ import {
   type LiquidityPosition,
 } from "@/services/liquidity";
 import { fetchMonadYields, type YieldPool } from "@/services/yields";
-import {
-  fetchTokenApprovals,
-  type TokenApproval,
-} from "@/services/approvals";
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -92,17 +88,6 @@ export function useMonadYields() {
     queryKey: ["monadYields"],
     queryFn: fetchMonadYields,
     staleTime: 300_000,
-  });
-}
-
-// ─── Token Approvals Hook ───
-export function useTokenApprovals(address: string | null) {
-  return useQuery<TokenApproval[]>({
-    queryKey: ["tokenApprovals", address],
-    queryFn: () => fetchTokenApprovals(address as `0x${string}`),
-    enabled: !!address && ADDRESS_RE.test(address),
-    staleTime: 120_000,
-    retry: 1,
   });
 }
 

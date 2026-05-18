@@ -254,7 +254,7 @@ export function WrapPanel() {
             <BalanceRow label="WMON" value={wrappedBalance?.value} loading={isWrappedBalanceLoading} />
             <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
               {mode === "wrap"
-                ? "Wrapping keeps your value 1:1 while making MON usable in token routes and DeFi approvals."
+                ? "Wrapping keeps your value 1:1 while making MON usable in token routes and DeFi apps."
                 : "Unwrapping converts WMON back into native MON for gas and wallet transfers."}
             </div>
           </div>

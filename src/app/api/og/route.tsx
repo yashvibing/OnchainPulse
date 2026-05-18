@@ -48,7 +48,7 @@ export function GET(req: NextRequest) {
             <div style={{ width: "48px", height: "48px", borderRadius: "14px", backgroundImage: `url(${logoUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
-          <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>View public-wallet DeFi positions relating to Monad, including staking, lending, LP, vault, and token data.</div>
+          <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Explore public wallet portfolios and displayed DeFi rates relating to Monad.</div>
           <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
         </div>
       ),
