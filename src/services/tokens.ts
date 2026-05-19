@@ -1,11 +1,14 @@
-import { formatUnits, getAddress } from "viem";
+import { formatUnits, getAddress, parseUnits } from "viem";
 import { monadClient } from "@/lib/client";
 import { ERC20_ABI } from "@/lib/abis";
 import { TOKENS, NATIVE_MON, type TokenInfo } from "@/config/tokens";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
+import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 
 const TOKEN_LIST_URL =
   "https://raw.githubusercontent.com/monad-crypto/token-list/main/tokenlist-mainnet.json";
+const BLOCKVISION_ACCOUNT_TOKENS_URL =
+  "https://api.blockvision.org/v2/monad/account/tokens";
 
 interface TokenListItem {
   chainId?: number;
@@ -15,6 +18,8 @@ interface TokenListItem {
   decimals?: number;
   logoURI?: string;
 }
+
+type BlockVisionTokenRecord = Record<string, unknown>;
 
 // ─── Token Balance Types ───
 
@@ -33,6 +38,8 @@ let cachedExtendedTokens: TokenInfo[] | null = null;
 
 // LST symbols that must keep category:"lst" for double-count protection
 const LST_SYMBOLS = new Set(["aprMON", "shMON", "sMON", "gMON"]);
+const STABLECOIN_SYMBOLS = new Set(["USDC", "USDT0", "USDT", "AUSD", "USD1", "VUSD"]);
+const NATIVE_SENTINEL = "0x0000000000000000000000000000000000000000";
 
 async function getExtendedTokenList(): Promise<TokenInfo[]> {
   if (cachedExtendedTokens) return cachedExtendedTokens;
@@ -128,6 +135,192 @@ async function getErc20Balances(
   return balances;
 }
 
+function getNestedString(record: BlockVisionTokenRecord, paths: string[][]) {
+  for (const path of paths) {
+    let value: unknown = record;
+    for (const part of path) {
+      value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined;
+    }
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function getNestedNumber(record: BlockVisionTokenRecord, paths: string[][]) {
+  const raw = getNestedString(record, paths);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getBlockVisionItems(payload: unknown): BlockVisionTokenRecord[] {
+  const candidates = [
+    payload,
+    (payload as Record<string, unknown> | undefined)?.result,
+    (payload as Record<string, unknown> | undefined)?.data,
+    ((payload as Record<string, unknown> | undefined)?.result as Record<string, unknown> | undefined)?.data,
+    ((payload as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.data,
+    ((payload as Record<string, unknown> | undefined)?.result as Record<string, unknown> | undefined)?.tokens,
+    ((payload as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.tokens,
+    ((payload as Record<string, unknown> | undefined)?.result as Record<string, unknown> | undefined)?.items,
+    ((payload as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.items,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as BlockVisionTokenRecord[];
+  }
+
+  return [];
+}
+
+function tokenCategoryFor(symbol: string): TokenInfo["category"] {
+  if (LST_SYMBOLS.has(symbol)) return "lst";
+  if (STABLECOIN_SYMBOLS.has(symbol.toUpperCase())) return "stablecoin";
+  if (symbol.toUpperCase().startsWith("W")) return "wrapped";
+  return "defi";
+}
+
+function parseTokenBalance(
+  record: BlockVisionTokenRecord,
+  decimals: number
+): bigint {
+  const rawBalance = getNestedString(record, [
+    ["balanceRaw"],
+    ["rawBalance"],
+    ["raw_balance"],
+    ["tokenBalanceRaw"],
+    ["tokenBalance", "raw"],
+    ["balance", "raw"],
+    ["amountRaw"],
+  ]);
+
+  if (/^\d+$/u.test(rawBalance)) return BigInt(rawBalance);
+
+  const formattedBalance = getNestedString(record, [
+    ["balance"],
+    ["amount"],
+    ["quantity"],
+    ["tokenBalance"],
+    ["formattedBalance"],
+    ["balanceFormatted"],
+  ]).replace(/,/g, "");
+
+  if (/^\d+(\.\d+)?$/u.test(formattedBalance)) {
+    return parseUnits(formattedBalance, decimals);
+  }
+
+  return 0n;
+}
+
+function tokenFromBlockVisionRecord(
+  record: BlockVisionTokenRecord,
+  allTokens: Record<string, TokenInfo>
+): TokenInfo | null {
+  const symbol = getNestedString(record, [
+    ["symbol"],
+    ["tokenSymbol"],
+    ["token", "symbol"],
+    ["contract", "symbol"],
+  ]);
+  const address = getNestedString(record, [
+    ["address"],
+    ["tokenAddress"],
+    ["token_address"],
+    ["contractAddress"],
+    ["contract_address"],
+    ["token", "address"],
+    ["contract", "address"],
+  ]);
+  const normalizedAddress = address && /^0x[a-fA-F0-9]{40}$/u.test(address)
+    ? getAddress(address)
+    : "";
+  const upperSymbol = symbol.toUpperCase();
+
+  if (
+    upperSymbol === "MON" ||
+    !normalizedAddress ||
+    normalizedAddress.toLowerCase() === NATIVE_SENTINEL
+  ) {
+    return NATIVE_MON;
+  }
+
+  const knownByAddress = Object.values(allTokens).find(
+    (token) => token.address.toLowerCase() === normalizedAddress.toLowerCase()
+  );
+  if (knownByAddress) return knownByAddress;
+
+  const knownBySymbol = allTokens[symbol] || allTokens[upperSymbol];
+  if (knownBySymbol) return knownBySymbol;
+
+  const decimals = getNestedNumber(record, [
+    ["decimals"],
+    ["tokenDecimals"],
+    ["token", "decimals"],
+    ["contract", "decimals"],
+  ]);
+  const name = getNestedString(record, [
+    ["name"],
+    ["tokenName"],
+    ["token", "name"],
+    ["contract", "name"],
+  ]);
+  if (!symbol || typeof decimals !== "number") return null;
+
+  return {
+    address: normalizedAddress as `0x${string}`,
+    symbol,
+    name: name || symbol,
+    decimals,
+    category: tokenCategoryFor(symbol),
+    logoURI: getNestedString(record, [["logoURI"], ["logo"], ["icon"], ["token", "logoURI"]]) || undefined,
+  };
+}
+
+async function getBlockVisionTokenBalances(
+  walletAddress: `0x${string}`,
+  allTokens: Record<string, TokenInfo>
+): Promise<Map<string, { token: TokenInfo; balance: bigint }>> {
+  if (!process.env.BLOCKVISION_API_KEY) return new Map();
+
+  try {
+    const payload = await fetchJsonWithRetry<unknown>(
+      `${BLOCKVISION_ACCOUNT_TOKENS_URL}?address=${encodeURIComponent(walletAddress)}`,
+      {
+        headers: { "x-api-key": process.env.BLOCKVISION_API_KEY },
+        retries: 1,
+        timeoutMs: 8_000,
+        sourceName: "blockvision-account-tokens",
+      }
+    );
+    const records = getBlockVisionItems(payload);
+    const balances = new Map<string, { token: TokenInfo; balance: bigint }>();
+
+    for (const record of records) {
+      const token = tokenFromBlockVisionRecord(record, allTokens);
+      if (!token) continue;
+      const balance = parseTokenBalance(record, token.decimals);
+      if (balance <= 0n) continue;
+      balances.set(token.symbol, { token, balance });
+    }
+
+    if (balances.size > 0) {
+      logServerEvent("info", "indexer.token_balances_used", {
+        source: "blockvision",
+        tokenCount: balances.size,
+      });
+    }
+
+    return balances;
+  } catch (error) {
+    logServerEvent("warn", "indexer.token_balances_failed", {
+      source: "blockvision",
+      error: getErrorMessage(error),
+    });
+    return new Map();
+  }
+}
+
 // ─── Fetch 24h price change percentages from DefiLlama ───
 export async function fetchTokenChanges24h(): Promise<Map<string, number>> {
   const changes = new Map<string, number>();
@@ -217,16 +410,26 @@ export async function fetchTokenPrices(): Promise<Map<string, number>> {
 export async function fetchTokenBalances(
   walletAddress: `0x${string}`
 ): Promise<TokenBalance[]> {
-  const [nativeBalance, allTokens, prices, changes24h] = await Promise.all([
-    getNativeBalance(walletAddress).catch(() => 0n),
+  const [allTokens, prices, changes24h] = await Promise.all([
     getAllTokens(),
     fetchTokenPrices(),
     fetchTokenChanges24h().catch(() => new Map<string, number>()),
   ]);
 
-  const erc20Balances = await getErc20Balances(walletAddress, allTokens).catch(
-    () => new Map<string, bigint>()
-  );
+  const indexedBalances = await getBlockVisionTokenBalances(walletAddress, allTokens);
+  const nativeFromIndexer = indexedBalances.get("MON")?.balance || 0n;
+  const nativeBalance = nativeFromIndexer ||
+    (await getNativeBalance(walletAddress).catch(() => 0n));
+  const erc20Balances = indexedBalances.size > 0
+    ? indexedBalances
+    : await getErc20Balances(walletAddress, allTokens).then((balances) => {
+        const mapped = new Map<string, { token: TokenInfo; balance: bigint }>();
+        for (const [symbol, balance] of balances) {
+          const token = allTokens[symbol];
+          if (token) mapped.set(symbol, { token, balance });
+        }
+        return mapped;
+      }).catch(() => new Map<string, { token: TokenInfo; balance: bigint }>());
 
   const balances: TokenBalance[] = [];
 
@@ -245,9 +448,8 @@ export async function fetchTokenBalances(
   }
 
   // Add ERC-20 tokens
-  for (const [symbol, balance] of erc20Balances) {
-    const token = allTokens[symbol];
-    if (!token) continue;
+  for (const [symbol, { token, balance }] of erc20Balances) {
+    if (token.category === "native") continue;
 
     const formatted = formatUnits(balance, token.decimals);
     const price = prices.get(symbol) || 0;

@@ -10,6 +10,7 @@ Onchain Pulse is designed to stay read-only: users can paste a wallet address an
 - The MON chart calls `/api/mon-price-history`.
 - `/api/health` checks source reachability and returns cache stats for debugging.
 - Server-side Monad reads use `MONAD_RPC_URL` when configured. Keep keyed RPC URLs in this private env var rather than `NEXT_PUBLIC_MONAD_RPC_URL`.
+- Token balance reads use BlockVision's indexed account-token API first when `BLOCKVISION_API_KEY` is configured, then fall back to RPC balance reads.
 
 ## Caching And Request Dedupe
 
@@ -60,6 +61,8 @@ Current events:
 - `source.slow`: third-party source request exceeded the slow threshold.
 - `source.http_error` / `source.fetch_failed`: third-party source failures.
 - `rpc.health_failed`: health check RPC failure.
+- `indexer.token_balances_used`: BlockVision indexed token balances were used.
+- `indexer.token_balances_failed`: BlockVision indexed token balances failed and the app fell back to RPC.
 - `cache.miss`: cache miss triggered an upstream reload.
 - `cache.stale_fallback`: stale cached data was served after refresh failure.
 - `cache.redis_read_failed` / `cache.redis_write_failed`: Redis cache operation failed.
