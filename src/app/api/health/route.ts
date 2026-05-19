@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  withRateLimitHeaders,
+} from "@/lib/rateLimit";
 import { monadClient } from "@/lib/client";
 import { getServerCacheBackend, getServerCacheStats } from "@/lib/serverCache";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
@@ -24,7 +29,14 @@ async function checkSource(name: string, check: () => Promise<unknown>) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const rateLimit = await checkRateLimit(request, {
+    namespace: "health",
+    limit: 10,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
   const sources = await Promise.all([
     checkSource("defillama-yields", () =>
       fetchJsonWithRetry("https://yields.llama.fi/pools", {
@@ -54,6 +66,6 @@ export async function GET() {
         memoryEntries: getServerCacheStats(),
       },
     },
-    { status: ok ? 200 : 207 }
+    { status: ok ? 200 : 207, headers: withRateLimitHeaders(undefined, rateLimit) }
   );
 }

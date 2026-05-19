@@ -9,6 +9,7 @@ Onchain Pulse is designed to stay read-only: users can paste a wallet address an
 - DeFi Rates call `/api/yield-opportunities`.
 - The MON chart calls `/api/mon-price-history`.
 - `/api/health` checks source reachability and returns cache stats for debugging.
+- Server-side Monad reads use `MONAD_RPC_URL` when configured. Keep keyed RPC URLs in this private env var rather than `NEXT_PUBLIC_MONAD_RPC_URL`.
 
 ## Caching And Request Dedupe
 
@@ -24,6 +25,13 @@ Onchain Pulse is designed to stay read-only: users can paste a wallet address an
 - Third-party source calls use timeout, retry, and small backoff helpers.
 - If an upstream source fails and cached data is still valid, the app serves the cached response instead of failing the user experience.
 - No wallet connection is required, so there are no user signature prompts, approvals, or transaction flows to scale.
+- API routes use a light fixed-window limiter keyed by a hashed client fingerprint. Redis is used in production, with memory fallback locally.
+- Current limits:
+  - `/api/portfolio/:address`: 60 requests per minute.
+  - `/api/token-balances/:address`: 60 requests per minute.
+  - `/api/yield-opportunities`: 180 requests per minute.
+  - `/api/mon-price-history`: 180 requests per minute.
+  - `/api/health`: 10 requests per minute.
 
 ## 200 User Readiness
 

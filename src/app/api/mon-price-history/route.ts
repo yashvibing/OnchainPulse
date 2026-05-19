@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { withServerCache } from "@/lib/serverCache";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  withRateLimitHeaders,
+} from "@/lib/rateLimit";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 
 export const revalidate = 300;
@@ -30,7 +35,14 @@ async function fetchPriceHistory() {
   }));
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const rateLimit = await checkRateLimit(request, {
+    namespace: "mon-price-history",
+    limit: 180,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
   try {
     const result = await withServerCache(
       "mon-price-history",
@@ -51,9 +63,14 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control": "s-maxage=300, stale-while-revalidate=3600",
-          "X-Cache-Status": result.status,
-          "X-Cache-Age-Ms": String(result.ageMs),
+          ...withRateLimitHeaders(
+            {
+              "Cache-Control": "s-maxage=300, stale-while-revalidate=3600",
+              "X-Cache-Status": result.status,
+              "X-Cache-Age-Ms": String(result.ageMs),
+            },
+            rateLimit
+          ),
         },
       }
     );

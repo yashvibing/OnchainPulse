@@ -59,6 +59,10 @@ function getRedis() {
   return redis;
 }
 
+export function getServerRedisClient() {
+  return getRedis();
+}
+
 export function getServerCacheBackend(): CacheBackend {
   return getRedis() ? "redis" : "memory";
 }

@@ -1,5 +1,8 @@
 import { defineChain } from "viem";
 
+const PUBLIC_MONAD_RPC_URL =
+  process.env.NEXT_PUBLIC_MONAD_RPC_URL || "https://rpc.monad.xyz";
+
 // ─── Monad Mainnet (Chain ID 143) ───
 export const monad = defineChain({
   id: 143,
@@ -11,7 +14,7 @@ export const monad = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_MONAD_RPC_URL || "https://rpc.monad.xyz"],
+      http: [PUBLIC_MONAD_RPC_URL],
     },
   },
   blockExplorers: {

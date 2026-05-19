@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getAddress } from "viem";
 import { withServerCache } from "@/lib/serverCache";
 import { isValidEvmAddress } from "@/lib/format";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  withRateLimitHeaders,
+} from "@/lib/rateLimit";
 import { serializeTokenBalances } from "@/services/portfolio";
 import { fetchTokenBalances } from "@/services/tokens";
 
@@ -11,12 +16,22 @@ const TOKEN_BALANCE_TTL_MS = 60_000;
 const TOKEN_BALANCE_STALE_TTL_MS = 10 * 60_000;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const rateLimit = await checkRateLimit(request, {
+    namespace: "token-balances",
+    limit: 60,
+    windowSeconds: 60,
+  });
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
   const { address } = await params;
   if (!isValidEvmAddress(address)) {
-    return NextResponse.json({ error: "Invalid address" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid address" },
+      { status: 400, headers: withRateLimitHeaders(undefined, rateLimit) }
+    );
   }
 
   const normalized = getAddress(address);
@@ -41,9 +56,14 @@ export async function GET(
       },
       {
         headers: {
-          "Cache-Control": "s-maxage=60, stale-while-revalidate=600",
-          "X-Cache-Status": result.status,
-          "X-Cache-Age-Ms": String(result.ageMs),
+          ...withRateLimitHeaders(
+            {
+              "Cache-Control": "s-maxage=60, stale-while-revalidate=600",
+              "X-Cache-Status": result.status,
+              "X-Cache-Age-Ms": String(result.ageMs),
+            },
+            rateLimit
+          ),
         },
       }
     );
