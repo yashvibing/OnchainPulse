@@ -106,6 +106,40 @@ beforeEach(() => {
   vi.mocked(fetchVaultPositions).mockResolvedValue([]);
   vi.mocked(fetchLendingPositions).mockResolvedValue([]);
   vi.mocked(fetchLiquidityPositions).mockResolvedValue([]);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      if (url.startsWith("/api/portfolio/")) {
+        const [tokens, staking, vaults, lending, liquidity] = await Promise.all([
+          vi.mocked(fetchTokenBalances)(TEST_ADDRESS as `0x${string}`),
+          vi.mocked(fetchStakingPositions)(TEST_ADDRESS as `0x${string}`),
+          vi.mocked(fetchVaultPositions)(TEST_ADDRESS as `0x${string}`),
+          vi.mocked(fetchLendingPositions)(TEST_ADDRESS as `0x${string}`),
+          vi.mocked(fetchLiquidityPositions)(TEST_ADDRESS as `0x${string}`),
+        ]);
+
+        return {
+          ok: true,
+          json: async () => ({
+            tokens: tokens.map((token) => ({
+              ...token,
+              balance: token.balance.toString(),
+            })),
+            staking,
+            vaults,
+            lending,
+            liquidity,
+            updatedAt: Date.now(),
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: false,
+        json: async () => ({}),
+      } as Response;
+    })
+  );
 });
 
 describe("usePortfolio — ISSUE-001 LST double-count regression", () => {

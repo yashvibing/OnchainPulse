@@ -12,24 +12,12 @@ interface ChartPoint {
   value: number;
 }
 
-// Fetch 7-day MON price history from DefiLlama (main driver of portfolio value)
 async function fetchPriceHistory(): Promise<ChartPoint[]> {
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const weekAgo = now - 7 * 86400;
-    // Use MON price as the portfolio proxy (most holdings are MON-denominated)
-    const res = await fetch(
-      `https://coins.llama.fi/chart/coingecko:monad?start=${weekAgo}&span=168&period=1h`,
-      { next: { revalidate: 300 } }
-    );
+    const res = await fetch("/api/mon-price-history");
     if (!res.ok) return [];
     const data = await res.json();
-    const prices = data.coins?.["coingecko:monad"]?.prices;
-    if (!Array.isArray(prices)) return [];
-    return prices.map((p: { timestamp: number; price: number }) => ({
-      timestamp: p.timestamp,
-      value: p.price,
-    }));
+    return Array.isArray(data.data) ? data.data : [];
   } catch {
     return [];
   }

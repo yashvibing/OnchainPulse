@@ -7,7 +7,7 @@ import {
 } from "@/hooks/usePortfolio";
 import {
   calculateLoopStrategies,
-  fetchYieldOpportunities,
+  fetchYieldOpportunitiesWithClientMeta,
   filterBorrowOpportunities,
   filterByTokens,
   getBorrowCollateralSymbols,
@@ -672,6 +672,10 @@ export function YieldAggregator() {
   const [allOpps, setAllOpps] = useState<YieldOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataStatus, setDataStatus] = useState<{
+    cacheStatus?: string;
+    fetchedAt?: number;
+  }>({});
   const [lendTokens, setLendTokens] = useState<string[]>([]);
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
@@ -692,9 +696,13 @@ export function YieldAggregator() {
       setLendTokens([lendParam]);
     }
 
-    fetchYieldOpportunities()
-      .then((data) => {
-        setAllOpps(data);
+    fetchYieldOpportunitiesWithClientMeta()
+      .then((result) => {
+        setAllOpps(result.data);
+        setDataStatus({
+          cacheStatus: result.cacheStatus,
+          fetchedAt: result.fetchedAt || Date.now(),
+        });
         setError(null);
         setLoading(false);
       })
@@ -789,6 +797,23 @@ export function YieldAggregator() {
         heldSymbols={heldYieldSymbols}
         matches={walletMatches}
       />
+
+      {dataStatus.fetchedAt && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-dim)]">
+          <span>
+            Rates updated {new Date(dataStatus.fetchedAt).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          {dataStatus.cacheStatus === "stale" && (
+            <>
+              <span>·</span>
+              <span>Using cached rates</span>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel

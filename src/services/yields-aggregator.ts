@@ -3,6 +3,9 @@
 // Fetches lending/borrowing opportunities on Monad from Merkl and DefiLlama.
 // Merkl is action-first; DefiLlama expands APY pool coverage.
 
+import { withServerCache } from "@/lib/serverCache";
+import { fetchJsonWithRetry } from "@/lib/sourceFetch";
+
 export interface YieldOpportunity {
   id: string;
   action: "LEND" | "BORROW";
@@ -37,6 +40,13 @@ export interface LoopStrategy {
   maxLeverage: number; // based on typical LTV
   liquidationRisk: "low" | "medium" | "high";
   depositUrl: string;
+}
+
+export interface YieldOpportunityFetchResult {
+  data: YieldOpportunity[];
+  cacheStatus?: string;
+  cacheAgeMs?: number;
+  fetchedAt?: number;
 }
 
 const MERKL_API = "https://api.merkl.xyz/v4";
@@ -81,9 +91,8 @@ interface DefiLlamaYieldPool {
   url?: string;
 }
 
-// Cache combined yield data for 5 minutes
-let cache: { data: YieldOpportunity[]; ts: number } | null = null;
 const CACHE_TTL = 300_000;
+const STALE_CACHE_TTL = 30 * 60_000;
 
 function humanizeProjectSlug(slug: string) {
   if (slug === "morpho-blue") return "Morpho";
@@ -163,9 +172,10 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
     page: String(page),
   });
 
-  const res = await fetch(`${MERKL_API}/opportunities?${params}`);
-  if (!res.ok) return [];
-  const items = await res.json();
+  const items = await fetchJsonWithRetry<Array<Record<string, unknown>>>(
+    `${MERKL_API}/opportunities?${params}`,
+    { retries: 2, timeoutMs: 8_000 }
+  ).catch((): Array<Record<string, unknown>> => []);
   if (!Array.isArray(items) || items.length === 0) return [];
 
   return items.map((item: Record<string, unknown>) => {
@@ -215,10 +225,10 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
 }
 
 async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
-  const res = await fetch(DEFILLAMA_YIELDS_API);
-  if (!res.ok) return [];
-
-  const body = (await res.json()) as { data?: DefiLlamaYieldPool[] };
+  const body = await fetchJsonWithRetry<{ data?: DefiLlamaYieldPool[] }>(
+    DEFILLAMA_YIELDS_API,
+    { retries: 2, timeoutMs: 8_000 }
+  ).catch(() => ({ data: [] }));
   const pools = Array.isArray(body.data) ? body.data : [];
 
   return pools
@@ -323,9 +333,7 @@ export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]
   return deduped;
 }
 
-export async function fetchCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
-  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
-
+async function loadCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
   const [merklResult, defiLlamaResult] = await Promise.allSettled([
     fetchMerklYieldOpportunities(),
     fetchDefiLlamaYieldOpportunities(),
@@ -335,20 +343,49 @@ export async function fetchCombinedYieldOpportunities(): Promise<YieldOpportunit
   const defiLlama = defiLlamaResult.status === "fulfilled" ? defiLlamaResult.value : [];
   const data = mergeYieldOpportunities([...merkl, ...defiLlama]);
 
-  cache = { data, ts: Date.now() };
   return data;
 }
 
-export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
+export async function fetchCombinedYieldOpportunitiesWithMeta() {
+  return withServerCache(
+    "yield-opportunities",
+    CACHE_TTL,
+    loadCombinedYieldOpportunities,
+    STALE_CACHE_TTL
+  );
+}
+
+export async function fetchCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
+  const result = await fetchCombinedYieldOpportunitiesWithMeta();
+  return result.data;
+}
+
+export async function fetchYieldOpportunitiesWithClientMeta(): Promise<YieldOpportunityFetchResult> {
   if (typeof window === "undefined") {
-    return fetchCombinedYieldOpportunities();
+    const result = await fetchCombinedYieldOpportunitiesWithMeta();
+    return {
+      data: result.data,
+      cacheStatus: result.status,
+      cacheAgeMs: result.ageMs,
+      fetchedAt: result.fetchedAt,
+    };
   }
 
   const res = await fetch("/api/yield-opportunities");
   if (!res.ok) throw new Error("Failed to fetch yield opportunities");
 
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  return {
+    data: Array.isArray(data) ? data : [],
+    cacheStatus: res.headers.get("X-Cache-Status") || undefined,
+    cacheAgeMs: Number(res.headers.get("X-Cache-Age-Ms") || 0),
+    fetchedAt: Number(res.headers.get("X-Data-Fetched-At") || 0) || undefined,
+  };
+}
+
+export async function fetchYieldOpportunities(): Promise<YieldOpportunity[]> {
+  const result = await fetchYieldOpportunitiesWithClientMeta();
+  return result.data;
 }
 
 function normalizeYieldSymbol(symbol: string): string {

@@ -213,7 +213,11 @@ function DashboardInner() {
                   )}
                 />
 
-                <RefreshBar onRefresh={portfolio.refetch} />
+                <RefreshBar
+                  onRefresh={portfolio.refetch}
+                  updatedAt={portfolio.updatedAt}
+                  cacheStatus={portfolio.cacheStatus}
+                />
 
                 {/* Desktop tabs */}
                 <div className="hidden md:block">
@@ -408,10 +412,22 @@ function SavedAddressBar({
   );
 }
 
-function RefreshBar({ onRefresh }: { onRefresh: () => void }) {
-  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+function RefreshBar({
+  onRefresh,
+  updatedAt,
+  cacheStatus,
+}: {
+  onRefresh: () => void;
+  updatedAt?: number;
+  cacheStatus?: "hit" | "miss" | "stale";
+}) {
+  const [lastUpdated, setLastUpdated] = useState<number>(updatedAt || Date.now());
   const [ago, setAgo] = useState("just now");
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (updatedAt) setLastUpdated(updatedAt);
+  }, [updatedAt]);
 
   useEffect(() => {
     function tick() {
@@ -435,6 +451,12 @@ function RefreshBar({ onRefresh }: { onRefresh: () => void }) {
   return (
     <div className="mb-4 flex items-center gap-2 text-[11px] text-[var(--color-text-dim)]">
       <span>Updated {ago}</span>
+      {cacheStatus === "stale" && (
+        <>
+          <span>·</span>
+          <span>Using cached data</span>
+        </>
+      )}
       <span>·</span>
       <button onClick={handleRefresh} disabled={refreshing} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors disabled:opacity-50">
         {refreshing ? "Refreshing…" : "Refresh"}

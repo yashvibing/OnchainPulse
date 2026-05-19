@@ -1,0 +1,170 @@
+import { Redis } from "@upstash/redis";
+
+type CacheStatus = "hit" | "miss" | "stale";
+type CacheBackend = "redis" | "memory";
+
+interface CacheEntry<T> {
+  data: T;
+  fetchedAt: number;
+  lastDurationMs: number;
+}
+
+export interface CacheResult<T> {
+  data: T;
+  status: CacheStatus;
+  ageMs: number;
+  fetchedAt: number;
+  durationMs: number;
+}
+
+interface CacheStat {
+  key: string;
+  ageMs: number;
+  fetchedAt: number;
+  lastDurationMs: number;
+}
+
+const entries = new Map<string, CacheEntry<unknown>>();
+const pending = new Map<string, Promise<CacheEntry<unknown>>>();
+
+let redis: Redis | null | undefined;
+
+function redisCacheKey(key: string) {
+  return `onchain-pulse:cache:${key}`;
+}
+
+function getRedis() {
+  if (redis !== undefined) return redis;
+
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    redis = null;
+    return redis;
+  }
+
+  redis = Redis.fromEnv();
+  return redis;
+}
+
+export function getServerCacheBackend(): CacheBackend {
+  return getRedis() ? "redis" : "memory";
+}
+
+async function readEntry<T>(key: string): Promise<CacheEntry<T> | undefined> {
+  const local = entries.get(key) as CacheEntry<T> | undefined;
+  const client = getRedis();
+
+  if (!client) return local;
+
+  try {
+    const remote = await client.get<CacheEntry<T>>(redisCacheKey(key));
+    if (!remote) return local;
+    entries.set(key, remote as CacheEntry<unknown>);
+    return remote;
+  } catch (error) {
+    console.warn(`[cache] redis read failed for ${key}`, error);
+    return local;
+  }
+}
+
+async function writeEntry<T>(
+  key: string,
+  entry: CacheEntry<T>,
+  staleTtlMs: number
+) {
+  entries.set(key, entry as CacheEntry<unknown>);
+
+  const client = getRedis();
+  if (!client) return;
+
+  try {
+    await client.set(redisCacheKey(key), entry, {
+      ex: Math.ceil(staleTtlMs / 1000),
+    });
+  } catch (error) {
+    console.warn(`[cache] redis write failed for ${key}`, error);
+  }
+}
+
+export async function withServerCache<T>(
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<T>,
+  staleTtlMs = ttlMs * 6
+): Promise<CacheResult<T>> {
+  const now = Date.now();
+  const existing = await readEntry<T>(key);
+
+  if (existing && now - existing.fetchedAt < ttlMs) {
+    return {
+      data: existing.data,
+      status: "hit",
+      ageMs: now - existing.fetchedAt,
+      fetchedAt: existing.fetchedAt,
+      durationMs: existing.lastDurationMs,
+    };
+  }
+
+  const pendingLoad = pending.get(key) as Promise<CacheEntry<T>> | undefined;
+  if (pendingLoad) {
+    const entry = await pendingLoad;
+    return {
+      data: entry.data,
+      status: "hit",
+      ageMs: Date.now() - entry.fetchedAt,
+      fetchedAt: entry.fetchedAt,
+      durationMs: entry.lastDurationMs,
+    };
+  }
+
+  const load = (async () => {
+    const startedAt = Date.now();
+    const data = await loader();
+    const entry: CacheEntry<T> = {
+      data,
+      fetchedAt: Date.now(),
+      lastDurationMs: Date.now() - startedAt,
+    };
+    await writeEntry(key, entry, staleTtlMs);
+    return entry;
+  })();
+
+  pending.set(key, load);
+
+  try {
+    const entry = await load;
+    return {
+      data: entry.data,
+      status: "miss",
+      ageMs: Date.now() - entry.fetchedAt,
+      fetchedAt: entry.fetchedAt,
+      durationMs: entry.lastDurationMs,
+    };
+  } catch (error) {
+    if (existing && now - existing.fetchedAt < staleTtlMs) {
+      console.warn(`[cache] serving stale data for ${key}`, error);
+      return {
+        data: existing.data,
+        status: "stale",
+        ageMs: now - existing.fetchedAt,
+        fetchedAt: existing.fetchedAt,
+        durationMs: existing.lastDurationMs,
+      };
+    }
+    throw error;
+  } finally {
+    pending.delete(key);
+  }
+}
+
+export function getServerCacheStats(): CacheStat[] {
+  const now = Date.now();
+  return [...entries.entries()].map(([key, entry]) => ({
+    key,
+    ageMs: now - entry.fetchedAt,
+    fetchedAt: entry.fetchedAt,
+    lastDurationMs: entry.lastDurationMs,
+  }));
+}
