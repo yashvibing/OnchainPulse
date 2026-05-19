@@ -33,18 +33,29 @@ function redisCacheKey(key: string) {
   return `onchain-pulse:cache:${key}`;
 }
 
+function getRedisEnv() {
+  return {
+    url:
+      process.env.UPSTASH_REDIS_REST_URL ||
+      process.env.UPSTASH_REDIS_REST_KV_REST_API_URL ||
+      process.env.KV_REST_API_URL,
+    token:
+      process.env.UPSTASH_REDIS_REST_TOKEN ||
+      process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN ||
+      process.env.KV_REST_API_TOKEN,
+  };
+}
+
 function getRedis() {
   if (redis !== undefined) return redis;
 
-  if (
-    !process.env.UPSTASH_REDIS_REST_URL ||
-    !process.env.UPSTASH_REDIS_REST_TOKEN
-  ) {
+  const { url, token } = getRedisEnv();
+  if (!url || !token) {
     redis = null;
     return redis;
   }
 
-  redis = Redis.fromEnv();
+  redis = new Redis({ url, token });
   return redis;
 }
 

@@ -16,7 +16,7 @@ Onchain Pulse is designed to stay read-only: users can paste a wallet address an
 - DeFi Rates and MON price history are cached server-side for 5 minutes.
 - Concurrent requests for the same cache key share one in-flight promise, so a traffic burst does not fan out into identical upstream calls.
 - Responses include cache headers and lightweight `X-Cache-*` headers so the UI and operators can tell whether data was fresh, cached, or served from stale fallback.
-- Production uses Upstash Redis when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured. Local/dev falls back to in-memory cache automatically.
+- Production uses Upstash Redis when Redis REST env vars are configured. The app accepts `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`, Vercel integration names like `UPSTASH_REDIS_REST_KV_REST_API_URL` / `UPSTASH_REDIS_REST_KV_REST_API_TOKEN`, or `KV_REST_API_URL` / `KV_REST_API_TOKEN`. Local/dev falls back to in-memory cache automatically.
 
 ## Rate Limit Strategy
 
