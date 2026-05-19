@@ -5,6 +5,7 @@ import {
   rateLimitResponse,
   withRateLimitHeaders,
 } from "@/lib/rateLimit";
+import { getErrorMessage, logServerEvent, logSlowApi } from "@/lib/serverLog";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 
 export const revalidate = 300;
@@ -36,6 +37,7 @@ async function fetchPriceHistory() {
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "mon-price-history",
     limit: 180,
@@ -51,7 +53,7 @@ export async function GET(request: Request) {
       60 * 60_000
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         data: result.data,
         meta: {
@@ -74,8 +76,14 @@ export async function GET(request: Request) {
         },
       }
     );
+    logSlowApi("/api/mon-price-history", Date.now() - startedAt);
+    return response;
   } catch (error) {
-    console.error("[mon-price-history] failed", error);
+    logServerEvent("error", "api.failed", {
+      route: "/api/mon-price-history",
+      durationMs: Date.now() - startedAt,
+      error: getErrorMessage(error),
+    });
     return NextResponse.json({ error: "Failed to load price history" }, { status: 502 });
   }
 }

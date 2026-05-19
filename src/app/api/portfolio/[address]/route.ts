@@ -7,6 +7,7 @@ import {
   rateLimitResponse,
   withRateLimitHeaders,
 } from "@/lib/rateLimit";
+import { getErrorMessage, logServerEvent, logSlowApi } from "@/lib/serverLog";
 import { fetchPortfolioSnapshot } from "@/services/portfolio";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "portfolio",
     limit: 60,
@@ -43,7 +45,7 @@ export async function GET(
       PORTFOLIO_STALE_TTL_MS
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         ...result.data,
         meta: {
@@ -66,8 +68,14 @@ export async function GET(
         },
       }
     );
+    logSlowApi("/api/portfolio/[address]", Date.now() - startedAt);
+    return response;
   } catch (error) {
-    console.error("[portfolio] failed", error);
+    logServerEvent("error", "api.failed", {
+      route: "/api/portfolio/[address]",
+      durationMs: Date.now() - startedAt,
+      error: getErrorMessage(error),
+    });
     return NextResponse.json(
       { error: "Failed to load portfolio" },
       { status: 502 }

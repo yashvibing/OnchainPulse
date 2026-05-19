@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { getErrorMessage, logServerEvent, redactSensitiveText } from "@/lib/serverLog";
 
 type CacheStatus = "hit" | "miss" | "stale";
 type CacheBackend = "redis" | "memory";
@@ -79,7 +80,10 @@ async function readEntry<T>(key: string): Promise<CacheEntry<T> | undefined> {
     entries.set(key, remote as CacheEntry<unknown>);
     return remote;
   } catch (error) {
-    console.warn(`[cache] redis read failed for ${key}`, error);
+    logServerEvent("warn", "cache.redis_read_failed", {
+      cacheKey: key,
+      error: getErrorMessage(error),
+    });
     return local;
   }
 }
@@ -99,7 +103,10 @@ async function writeEntry<T>(
       ex: Math.ceil(staleTtlMs / 1000),
     });
   } catch (error) {
-    console.warn(`[cache] redis write failed for ${key}`, error);
+    logServerEvent("warn", "cache.redis_write_failed", {
+      cacheKey: key,
+      error: getErrorMessage(error),
+    });
   }
 }
 
@@ -150,6 +157,10 @@ export async function withServerCache<T>(
 
   try {
     const entry = await load;
+    logServerEvent("info", "cache.miss", {
+      cacheKey: key,
+      durationMs: entry.lastDurationMs,
+    });
     return {
       data: entry.data,
       status: "miss",
@@ -159,7 +170,11 @@ export async function withServerCache<T>(
     };
   } catch (error) {
     if (existing && now - existing.fetchedAt < staleTtlMs) {
-      console.warn(`[cache] serving stale data for ${key}`, error);
+      logServerEvent("warn", "cache.stale_fallback", {
+        cacheKey: key,
+        ageMs: now - existing.fetchedAt,
+        error: getErrorMessage(error),
+      });
       return {
         data: existing.data,
         status: "stale",
@@ -177,7 +192,7 @@ export async function withServerCache<T>(
 export function getServerCacheStats(): CacheStat[] {
   const now = Date.now();
   return [...entries.entries()].map(([key, entry]) => ({
-    key,
+    key: redactSensitiveText(key),
     ageMs: now - entry.fetchedAt,
     fetchedAt: entry.fetchedAt,
     lastDurationMs: entry.lastDurationMs,

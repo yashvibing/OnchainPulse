@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { getServerRedisClient } from "@/lib/serverCache";
+import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 
 interface RateLimitOptions {
   namespace: string;
@@ -10,6 +11,7 @@ interface RateLimitOptions {
 
 interface RateLimitResult {
   allowed: boolean;
+  namespace: string;
   limit: number;
   remaining: number;
   resetAt: number;
@@ -67,6 +69,13 @@ export function withRateLimitHeaders(
 }
 
 export function rateLimitResponse(result: RateLimitResult) {
+  logServerEvent("warn", "rate_limit.blocked", {
+    namespace: result.namespace,
+    limit: result.limit,
+    remaining: result.remaining,
+    retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000)),
+  });
+
   return NextResponse.json(
     {
       error: "Too many requests",
@@ -98,6 +107,7 @@ function checkMemoryRateLimit(
 
   return {
     allowed: count <= limit,
+    namespace: key.split(":")[2] || "unknown",
     limit,
     remaining: Math.max(0, limit - count),
     resetAt,
@@ -127,14 +137,19 @@ export async function checkRateLimit(
 
     return {
       allowed: count <= options.limit,
+      namespace: options.namespace,
       limit: options.limit,
       remaining: Math.max(0, options.limit - count),
       resetAt,
     };
   } catch (error) {
-    console.warn(`[rate-limit] redis failed for ${options.namespace}`, error);
+    logServerEvent("warn", "rate_limit.redis_failed", {
+      namespace: options.namespace,
+      error: getErrorMessage(error),
+    });
     return {
       allowed: true,
+      namespace: options.namespace,
       limit: options.limit,
       remaining: options.limit,
       resetAt,

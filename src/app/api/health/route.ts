@@ -4,6 +4,7 @@ import {
   rateLimitResponse,
   withRateLimitHeaders,
 } from "@/lib/rateLimit";
+import { getErrorMessage, logServerEvent, logSlowApi } from "@/lib/serverLog";
 import { monadClient } from "@/lib/client";
 import { getServerCacheBackend, getServerCacheStats } from "@/lib/serverCache";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
@@ -20,16 +21,22 @@ async function checkSource(name: string, check: () => Promise<unknown>) {
       durationMs: Date.now() - startedAt,
     };
   } catch (error) {
+    logServerEvent("error", name === "monad-rpc" ? "rpc.health_failed" : "source.health_failed", {
+      source: name,
+      durationMs: Date.now() - startedAt,
+      error: getErrorMessage(error),
+    });
     return {
       name,
       ok: false,
       durationMs: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "health",
     limit: 10,
@@ -56,7 +63,7 @@ export async function GET(request: Request) {
 
   const ok = sources.every((source) => source.ok);
 
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
       ok,
       checkedAt: Date.now(),
@@ -68,4 +75,7 @@ export async function GET(request: Request) {
     },
     { status: ok ? 200 : 207, headers: withRateLimitHeaders(undefined, rateLimit) }
   );
+
+  logSlowApi("/api/health", Date.now() - startedAt);
+  return response;
 }

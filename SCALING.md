@@ -46,9 +46,25 @@ The remaining bottleneck is unique wallet lookups. If many users paste different
 ## Next Production Steps
 
 - Add a paid or higher-limit Monad RPC provider.
-- Add low-cardinality server logs for source failures, latency, and cache hit rates.
 - Add a small admin-only debug page that reads `/api/health`.
 - Add synthetic canary checks for the home page, portfolio page, DeFi Rates page, and startups page.
+
+## Production Logs
+
+Server routes emit structured JSON logs to the hosting runtime logs. The logged events are intentionally low-cardinality and avoid raw wallet addresses, IP addresses, and secrets.
+
+Current events:
+
+- `api.slow`: API route response exceeded the slow threshold.
+- `api.failed`: API route returned a server failure.
+- `source.slow`: third-party source request exceeded the slow threshold.
+- `source.http_error` / `source.fetch_failed`: third-party source failures.
+- `rpc.health_failed`: health check RPC failure.
+- `cache.miss`: cache miss triggered an upstream reload.
+- `cache.stale_fallback`: stale cached data was served after refresh failure.
+- `cache.redis_read_failed` / `cache.redis_write_failed`: Redis cache operation failed.
+- `rate_limit.blocked`: request was blocked by rate limiting.
+- `rate_limit.redis_failed`: rate limiter fell back open because Redis failed.
 
 ## Privacy
 

@@ -22,9 +22,7 @@ async function fetchStakingApys(): Promise<Map<string, number>> {
   const apys = new Map<string, number>();
 
   try {
-    const res = await fetch("https://yields.llama.fi/pools", {
-      next: { revalidate: 300 }, // cache 5 min
-    });
+    const res = await fetch("https://yields.llama.fi/pools");
     const { data } = await res.json();
 
     const monadPools = data.filter(

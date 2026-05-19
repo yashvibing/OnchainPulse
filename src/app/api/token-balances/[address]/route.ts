@@ -7,6 +7,7 @@ import {
   rateLimitResponse,
   withRateLimitHeaders,
 } from "@/lib/rateLimit";
+import { getErrorMessage, logServerEvent, logSlowApi } from "@/lib/serverLog";
 import { serializeTokenBalances } from "@/services/portfolio";
 import { fetchTokenBalances } from "@/services/tokens";
 
@@ -19,6 +20,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "token-balances",
     limit: 60,
@@ -44,7 +46,7 @@ export async function GET(
       TOKEN_BALANCE_STALE_TTL_MS
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         data: result.data,
         meta: {
@@ -67,8 +69,14 @@ export async function GET(
         },
       }
     );
+    logSlowApi("/api/token-balances/[address]", Date.now() - startedAt);
+    return response;
   } catch (error) {
-    console.error("[token-balances] failed", error);
+    logServerEvent("error", "api.failed", {
+      route: "/api/token-balances/[address]",
+      durationMs: Date.now() - startedAt,
+      error: getErrorMessage(error),
+    });
     return NextResponse.json(
       { error: "Failed to load token balances" },
       { status: 502 }

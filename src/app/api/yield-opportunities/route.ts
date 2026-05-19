@@ -4,11 +4,13 @@ import {
   rateLimitResponse,
   withRateLimitHeaders,
 } from "@/lib/rateLimit";
+import { getErrorMessage, logServerEvent, logSlowApi } from "@/lib/serverLog";
 import { fetchCombinedYieldOpportunitiesWithMeta } from "@/services/yields-aggregator";
 
 export const revalidate = 300;
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "yield-opportunities",
     limit: 180,
@@ -18,7 +20,7 @@ export async function GET(request: Request) {
 
   try {
     const result = await fetchCombinedYieldOpportunitiesWithMeta();
-    return NextResponse.json(result.data, {
+    const response = NextResponse.json(result.data, {
       headers: withRateLimitHeaders(
         {
           "Cache-Control": "s-maxage=300, stale-while-revalidate=1800",
@@ -29,8 +31,14 @@ export async function GET(request: Request) {
         rateLimit
       ),
     });
+    logSlowApi("/api/yield-opportunities", Date.now() - startedAt);
+    return response;
   } catch (error) {
-    console.error("[yield-opportunities] failed", error);
+    logServerEvent("error", "api.failed", {
+      route: "/api/yield-opportunities",
+      durationMs: Date.now() - startedAt,
+      error: getErrorMessage(error),
+    });
     return NextResponse.json(
       { error: "Failed to fetch yield opportunities" },
       { status: 502 }
