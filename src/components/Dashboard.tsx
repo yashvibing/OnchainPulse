@@ -85,6 +85,23 @@ function DashboardInner() {
     }, 120);
   }, []);
 
+  function handleExportCsv() {
+    if (!address || portfolio.isLoading || portfolio.isError) return;
+
+    const csv = buildPortfolioCsv(address, portfolio);
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `onchain-pulse-${shortenAddress(address).replace("...", "-")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setCopyFeedback("CSV exported");
+    setTimeout(() => setCopyFeedback(null), 2000);
+  }
+
   return (
     <div className="min-h-screen pb-20 md:pb-0">
       <Header />
@@ -163,6 +180,13 @@ function DashboardInner() {
                 className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
               >
                 Share
+              </button>
+              <button
+                onClick={handleExportCsv}
+                disabled={portfolio.isLoading || portfolio.isError}
+                className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Export CSV
               </button>
               {copyFeedback && (
                 <span className="animate-fade-up text-[11px] font-medium text-[var(--color-positive)]">
@@ -339,6 +363,110 @@ function DashboardInner() {
       )}
     </div>
   );
+}
+
+// ─── CSV export ───
+
+type PortfolioData = ReturnType<typeof usePortfolio>;
+
+function csvCell(value: unknown) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function csvRow(values: unknown[]) {
+  return values.map(csvCell).join(",");
+}
+
+function buildPortfolioCsv(address: string, portfolio: PortfolioData) {
+  const rows: unknown[][] = [
+    ["section", "type", "protocol", "asset", "balance", "value_usd", "rate_percent", "details"],
+    ["summary", "wallet", "", address, "", "", "", `generated_at=${new Date().toISOString()}`],
+    ["summary", "total_value", "", "", "", portfolio.totalValue, "", ""],
+    ["summary", "estimated_daily_amount", "", "", "", portfolio.dailyYield, "", ""],
+    ["summary", "positions", "", "", portfolio.positionCount, "", "", `protocols=${portfolio.protocolCount}`],
+  ];
+
+  for (const holding of portfolio.tokens) {
+    rows.push([
+      "tokens",
+      holding.token.category,
+      "",
+      holding.token.symbol,
+      holding.formatted,
+      holding.valueUsd,
+      "",
+      `name=${holding.token.name}; price_usd=${holding.priceUsd}; change_24h=${holding.change24h ?? ""}`,
+    ]);
+  }
+
+  for (const position of portfolio.staking) {
+    rows.push([
+      "staking",
+      "liquid_staking",
+      position.protocol,
+      position.lstSymbol,
+      position.lstBalance,
+      position.stakedValueUsd,
+      position.apy,
+      `mon_equivalent=${position.monEquivalent}; exchange_rate=${position.exchangeRate}`,
+    ]);
+  }
+
+  for (const position of portfolio.lending) {
+    rows.push([
+      "lending",
+      position.type,
+      position.protocol,
+      position.asset,
+      position.balance,
+      position.valueUsd,
+      position.apy,
+      "",
+    ]);
+  }
+
+  for (const position of portfolio.liquidity) {
+    if (position.kind === "uniswap-v3") {
+      rows.push([
+        "liquidity",
+        "uniswap_v3",
+        position.protocol,
+        `${position.token0Symbol}/${position.token1Symbol}`,
+        `${position.amount0} ${position.token0Symbol}; ${position.amount1} ${position.token1Symbol}`,
+        position.valueUsd,
+        "",
+        `token_id=${position.tokenId}; fee=${position.feeLabel}; in_range=${position.inRange}; fees_usd=${position.feesUsd}`,
+      ]);
+      continue;
+    }
+
+    rows.push([
+      "liquidity",
+      "curve",
+      position.protocol,
+      position.poolLabel,
+      position.lpBalance,
+      position.valueUsd,
+      "",
+      `pool=${position.poolAddress}; share=${position.sharePercent}`,
+    ]);
+  }
+
+  for (const position of portfolio.vaults) {
+    rows.push([
+      "vaults",
+      "vault",
+      position.vaultName,
+      position.underlyingSymbol,
+      position.underlyingBalance,
+      position.valueUsd,
+      position.apy,
+      `shares=${position.sharesBalance}`,
+    ]);
+  }
+
+  return rows.map(csvRow).join("\n");
 }
 
 // ─── Sub-components ───
