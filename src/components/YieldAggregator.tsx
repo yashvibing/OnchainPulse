@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   useTokenBalances,
@@ -45,6 +45,32 @@ const POPULAR_TOKENS = [
 ];
 
 const SUGGESTED_TOKENS = ["USDC", "WETH", "AUSD"];
+const TELEGRAM_CONNECTION_STORAGE_KEY = "onchain-pulse:telegram-alert-connection";
+
+type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market";
+
+const ALERT_KIND_OPTIONS: { value: AlertKind; label: string; description: string }[] = [
+  {
+    value: "apr_above",
+    label: "APR goes above",
+    description: "Message me when the best matching rate crosses a target.",
+  },
+  {
+    value: "apr_below",
+    label: "APR drops below",
+    description: "Message me when a watched rate falls under a floor.",
+  },
+  {
+    value: "best_market_change",
+    label: "Best place changes",
+    description: "Message me when another protocol becomes the top displayed place.",
+  },
+  {
+    value: "new_market",
+    label: "New market appears",
+    description: "Message me when a new matching DeFi rate row is added.",
+  },
+];
 
 function formatUsd(value: number) {
   if (value >= 1_000_000_000) return `$${formatNumber(value / 1_000_000_000, 2)}B`;
@@ -224,7 +250,7 @@ function WalletHoldingsPanel({
           </div>
           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
             Paste a wallet address. For each token it already holds, we show
-            the strongest displayed lending place we can match.
+            the strongest displayed place we can match.
           </p>
         </div>
       </div>
@@ -274,7 +300,7 @@ function WalletHoldingsPanel({
               </div>
               <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
                 We found supported wallet tokens, but none have a displayed
-                lending-rate row right now.
+                rate row right now.
               </div>
             </div>
           ) : (
@@ -285,11 +311,11 @@ function WalletHoldingsPanel({
                     Wallet {shortenAddress(address)}
                   </div>
                   <div className="mt-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-                    Best displayed lending place found for {matches.length} wallet token{matches.length === 1 ? "" : "s"}
+                    Best displayed place found for {matches.length} wallet token{matches.length === 1 ? "" : "s"}
                   </div>
                   <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
                     These are static recommendations from the current market
-                    list. They do not change your lend/borrow filters.
+                    list. They do not change your supply/borrow filters.
                   </div>
                 </div>
               </div>
@@ -358,11 +384,295 @@ function WalletHoldingsPanel({
 
               {unmatchedSymbols.length > 0 && (
                 <div className="mt-3 text-[11px] text-[var(--color-text-dim)]">
-                  Wallet tokens without a displayed lending match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
+                  Wallet tokens without a displayed rate match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AlertPanel({ opportunities }: { opportunities: YieldOpportunity[] }) {
+  const [connection, setConnection] = useState<{ chatId: string; connectedAt: number } | null>(null);
+  const [connectSession, setConnectSession] = useState<{
+    code: string;
+    deepLink: string;
+    expiresAt: number;
+  } | null>(null);
+  const [kind, setKind] = useState<AlertKind>("apr_above");
+  const [tokenSymbol, setTokenSymbol] = useState("USDC");
+  const [protocolKey, setProtocolKey] = useState("all");
+  const [thresholdApr, setThresholdApr] = useState("12");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(TELEGRAM_CONNECTION_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { chatId?: string; connectedAt?: number };
+      if (parsed.chatId) {
+        setConnection({
+          chatId: parsed.chatId,
+          connectedAt: parsed.connectedAt || Date.now(),
+        });
+      }
+    } catch {
+      window.localStorage.removeItem(TELEGRAM_CONNECTION_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (kind !== "new_market" && tokenSymbol === "ANY") {
+      setTokenSymbol("USDC");
+    }
+  }, [kind, tokenSymbol]);
+
+  const needsThreshold = kind === "apr_above" || kind === "apr_below";
+  const tokenChoices = kind === "new_market" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const protocolChoices = useMemo(() => {
+    const token = tokenSymbol.toUpperCase();
+    const map = new Map<string, string>();
+    opportunities.forEach((opp) => {
+      if (opp.action !== "LEND") return;
+      if (token !== "ANY") {
+        const assets = getOpportunityAssetSymbols(opp).map((symbol) => symbol.toUpperCase());
+        if (!assets.includes(token)) return;
+      }
+      const key = protocolFilterKey(opp.protocol);
+      if (!map.has(key)) map.set(key, opp.protocol);
+    });
+    return [...map.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [opportunities, tokenSymbol]);
+
+  async function createConnectionCode() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/alerts/connect", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not create Telegram connection.");
+      setConnectSession(data);
+      setStatus("Open Telegram, tap Start, then come back and confirm.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Telegram setup failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function claimConnection() {
+    if (!connectSession) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/alerts/connect/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: connectSession.code }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not confirm Telegram.");
+
+      const nextConnection = {
+        chatId: String(data.chatId),
+        connectedAt: Number(data.connectedAt || Date.now()),
+      };
+      window.localStorage.setItem(TELEGRAM_CONNECTION_STORAGE_KEY, JSON.stringify(nextConnection));
+      setConnection(nextConnection);
+      setConnectSession(null);
+      setStatus("Telegram connected. You can create alerts now.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Telegram confirmation failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createAlert() {
+    if (!connection) {
+      setStatus("Connect Telegram before creating an alert.");
+      return;
+    }
+
+    const threshold = Number(thresholdApr);
+    if (needsThreshold && !Number.isFinite(threshold)) {
+      setStatus("Enter a valid APR percentage.");
+      return;
+    }
+
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind,
+          chatId: connection.chatId,
+          tokenSymbol,
+          protocolKey,
+          thresholdApr: needsThreshold ? threshold : undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not create alert.");
+      const label = ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.label || "Alert";
+      setStatus(`${label} alert created for ${tokenSymbol}.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Alert creation failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
+            Telegram Alerts
+          </div>
+          <p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+            Watch displayed rates and get a Telegram message when APR crosses a target,
+            a watched rate drops, the best place changes, or a new market appears.
+          </p>
+        </div>
+        {connection ? (
+          <Badge tone="positive">Telegram connected</Badge>
+        ) : (
+          <Badge tone="warning">Setup required</Badge>
+        )}
+      </div>
+
+      {!connection && (
+        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                Connect Telegram once
+              </div>
+              <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
+                The bot needs one Start message so it knows where to send alerts.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={createConnectionCode}
+                disabled={busy}
+                className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:opacity-50"
+              >
+                Create Telegram link
+              </button>
+              {connectSession && (
+                <>
+                  <a
+                    href={connectSession.deepLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-bold text-[#07110C] hover:opacity-90"
+                  >
+                    Open Telegram
+                  </a>
+                  <button
+                    type="button"
+                    onClick={claimConnection}
+                    disabled={busy}
+                    className="rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-positive)] disabled:opacity-50"
+                  >
+                    Confirm
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.7fr_auto] lg:items-end">
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Alert type</span>
+          <select
+            value={kind}
+            onChange={(event) => setKind(event.target.value as AlertKind)}
+            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
+          >
+            {ALERT_KIND_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[10px] text-[var(--color-text-dim)]">
+            {ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.description}
+          </span>
+        </label>
+
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Token</span>
+          <select
+            value={tokenSymbol}
+            onChange={(event) => {
+              setTokenSymbol(event.target.value);
+              setProtocolKey("all");
+            }}
+            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
+          >
+            {tokenChoices.map((symbol) => (
+              <option key={symbol} value={symbol}>
+                {symbol === "ANY" ? "Any token" : symbol}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Protocol</span>
+          <select
+            value={protocolKey}
+            onChange={(event) => setProtocolKey(event.target.value)}
+            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
+          >
+            <option value="all">All protocols</option>
+            {protocolChoices.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
+          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
+          <input
+            value={thresholdApr}
+            onChange={(event) => setThresholdApr(event.target.value)}
+            disabled={!needsThreshold}
+            inputMode="decimal"
+            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
+            placeholder="12"
+          />
+        </label>
+
+        <button
+          type="button"
+          onClick={createAlert}
+          disabled={busy || !connection}
+          className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          Create alert
+        </button>
+      </div>
+
+      {status && (
+        <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] text-[var(--color-text-secondary)]">
+          {status}
         </div>
       )}
     </section>
@@ -397,6 +707,17 @@ function SortButton({
 
 function protocolFilterKey(protocol: string) {
   return protocol.trim().toLowerCase();
+}
+
+function getOpportunityActionBadge(opp: YieldOpportunity): {
+  label: string;
+  tone: "positive" | "blue" | "violet";
+} {
+  if (opp.action === "BORROW") return { label: "Borrow", tone: "blue" };
+  if (opp.opportunityType === "Stake") return { label: "Stake", tone: "positive" };
+  if (opp.opportunityType === "LP") return { label: "LP", tone: "violet" };
+  if (opp.opportunityType === "Vault") return { label: "Vault", tone: "violet" };
+  return { label: "Lend", tone: "positive" };
 }
 
 function preferredProtocolLabel(current: string | undefined, next: string) {
@@ -441,7 +762,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
   const collateralSymbols = getBorrowCollateralSymbols(opp);
   const tokenLabel =
     assetSymbols.length > 0 ? assetSymbols.join(" / ") : opp.tokens.map((token) => token.symbol).join(" / ");
-  const type = opp.opportunityType || (opp.action === "BORROW" ? "Borrow" : "Lending");
+  const actionBadge = getOpportunityActionBadge(opp);
 
   return (
     <a
@@ -458,8 +779,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
               <span className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">
                 {tokenLabel}
               </span>
-              <Badge tone={opp.action === "LEND" ? "positive" : "blue"}>{opp.action === "LEND" ? "Lend" : "Borrow"}</Badge>
-              {!["Lending", "Borrow"].includes(type) && <Badge tone="violet">{type}</Badge>}
+              <Badge tone={actionBadge.tone}>{actionBadge.label}</Badge>
             </div>
             <div className="mt-2 flex min-w-0 items-center gap-2">
               <ProtocolMark opp={opp} />
@@ -474,7 +794,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
             </div>
             {opp.action === "BORROW" && (
               <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
-                Lend/collateral: {collateralSymbols.join(", ")}
+                Supply/collateral: {collateralSymbols.join(", ")}
               </div>
             )}
           </div>
@@ -815,10 +1135,12 @@ export function YieldAggregator() {
         </div>
       )}
 
+      <AlertPanel opportunities={allOpps} />
+
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
-          title="Lend"
-          subtitle="Pick one asset to see available supply rates."
+          title="Supply / Deposit"
+          subtitle="Pick one asset to see lending, staking, LP, and vault opportunities."
           tone="positive"
           tokens={POPULAR_TOKENS}
           selectedTokens={lendTokens}
@@ -852,9 +1174,9 @@ export function YieldAggregator() {
       {!hasLendSelection && !hasBorrowSelection && (
         <div className="grid gap-6 md:grid-cols-2">
           <OpportunitySection
-            title="Lending Markets"
-            subtitle="All supported supply market rows relating to Monad."
-            emptyLabel="No lending markets found."
+            title="Supply / Deposit Opportunities"
+            subtitle="Lending, staking, LP, and vault rows for assets relating to Monad."
+            emptyLabel="No supply or deposit opportunities found."
             opportunities={lendOpps}
             onPickToken={(symbol) => setLendTokens([symbol])}
           />
@@ -870,9 +1192,9 @@ export function YieldAggregator() {
 
       {showSupplyOnly && (
         <OpportunitySection
-          title={`Lending markets for ${lendTokens.join(", ")}`}
-          subtitle="Available supply market rows for this token."
-          emptyLabel="No lending markets found for this token."
+          title={`Supply / deposit opportunities for ${lendTokens.join(", ")}`}
+          subtitle="Matching lending, staking, LP, and vault rows for this token."
+          emptyLabel="No supply or deposit opportunities found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
         />

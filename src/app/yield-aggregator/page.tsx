@@ -5,7 +5,7 @@ import { YieldAggregator } from "@/components/YieldAggregator";
 export const metadata: Metadata = {
   title: "DeFi Rates - Onchain Pulse",
   description:
-    "Compare displayed DeFi rates across lending, borrowing, LP, and vault markets relating to Monad.",
+    "Compare displayed DeFi rates across lending, staking, borrowing, LP, and vault markets relating to Monad.",
 };
 
 export default function YieldAggregatorPage() {
@@ -22,10 +22,10 @@ export default function YieldAggregatorPage() {
             DeFi Rates
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Compare displayed DeFi rates across lending, borrowing, LP, and
-            vault markets relating to Monad. Start broad, or choose a lend
-            token, a borrow token, or both to find matching markets and loop
-            scenarios.
+            Compare displayed DeFi rates across lending, staking, borrowing,
+            LP, and vault markets relating to Monad. Start broad, or choose a
+            supply/deposit token, a borrow token, or both to find matching
+            markets and loop scenarios.
           </p>
         </section>
 

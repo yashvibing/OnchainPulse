@@ -10,7 +10,7 @@ export interface YieldOpportunity {
   id: string;
   action: "LEND" | "BORROW";
   source: "Merkl" | "DefiLlama" | "Both";
-  opportunityType?: "Lending" | "Borrow" | "LP" | "Vault";
+  opportunityType?: "Lending" | "Borrow" | "LP" | "Vault" | "Stake";
   name: string;
   protocol: string;
   protocolIcon: string;
@@ -122,10 +122,51 @@ function splitDefiLlamaSymbols(symbol: string) {
     .filter(Boolean);
 }
 
-function inferDefiLlamaPoolType(symbol: string, tokenSymbols: string[]): "Lending" | "LP" | "Vault" {
+type OpportunityType = NonNullable<YieldOpportunity["opportunityType"]>;
+
+const STAKED_MON_SYMBOLS = new Set(["APRMON", "GMON", "SHMON", "SMON"]);
+const STAKING_PROTOCOL_KEYS = ["apriori", "fastlane", "kintsu", "magma", "shmonad"];
+
+function isStakingOpportunity(protocol: string, name: string, tokenSymbols: string[]) {
+  const protocolKey = normalizeProtocolForKey(protocol);
+  const normalizedName = name.toLowerCase();
+  const hasStakedMonSymbol = tokenSymbols.some((symbol) => STAKED_MON_SYMBOLS.has(symbol.toUpperCase()));
+  const hasStakingProtocol = STAKING_PROTOCOL_KEYS.some((key) => protocolKey.includes(key));
+
+  return (
+    (hasStakedMonSymbol && hasStakingProtocol) ||
+    /\bstak(?:e|ed|ing)\b/u.test(normalizedName) ||
+    /\bliquid\s+staking\b/u.test(normalizedName)
+  );
+}
+
+function getOpportunityNamePrefix(type: OpportunityType) {
+  if (type === "Stake") return "Stake";
+  if (type === "LP") return "LP";
+  if (type === "Vault") return "Vault";
+  if (type === "Borrow") return "Borrow";
+  return "Supply";
+}
+
+function inferPositiveRateOpportunityType(
+  protocol: string,
+  name: string,
+  tokenSymbols: string[]
+): Exclude<OpportunityType, "Borrow"> {
+  if (isStakingOpportunity(protocol, name, tokenSymbols)) return "Stake";
+  return "Lending";
+}
+
+function inferDefiLlamaPoolType(
+  symbol: string,
+  tokenSymbols: string[],
+  protocol: string
+): "Lending" | "LP" | "Vault" | "Stake" {
   if (/[-/,+]/u.test(symbol) && tokenSymbols.length > 1) return "LP";
 
   const normalized = symbol.toUpperCase();
+  if (isStakingOpportunity(protocol, symbol, tokenSymbols)) return "Stake";
+
   if (
     normalized.startsWith("EARN") ||
     normalized.startsWith("HYPER") ||
@@ -202,11 +243,15 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
         }))
       : [];
 
+    const opportunityType = action === "BORROW"
+      ? "Borrow"
+      : inferPositiveRateOpportunityType((protocol?.name as string) || "Unknown", (item.name as string) || "", tokens.map((token) => token.symbol));
+
     return {
       id: (item.identifier as string) || "",
       action: action as "LEND" | "BORROW",
       source: "Merkl",
-      opportunityType: action === "BORROW" ? "Borrow" : "Lending",
+      opportunityType,
       name: (item.name as string) || "",
       protocol: (protocol?.name as string) || "Unknown",
       protocolIcon: (protocol?.icon as string) || "",
@@ -238,7 +283,7 @@ async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
       const protocol = humanizeProjectSlug(project);
       const symbol = (pool.symbol || "UNKNOWN").toUpperCase();
       const displaySymbols = normalizeDefiLlamaDisplaySymbols(symbol);
-      const poolType = inferDefiLlamaPoolType(symbol, displaySymbols);
+      const poolType = inferDefiLlamaPoolType(symbol, displaySymbols, protocol);
       const tokens = displaySymbols.map((tokenSymbol) => ({
         symbol: tokenSymbol,
         address: "",
@@ -254,7 +299,7 @@ async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
         action: "LEND" as const,
         source: "DefiLlama" as const,
         opportunityType: poolType,
-        name: `${poolType === "LP" ? "LP" : poolType === "Vault" ? "Vault" : "Supply"} ${symbol} on ${protocol}`,
+        name: `${getOpportunityNamePrefix(poolType)} ${symbol} on ${protocol}`,
         protocol,
         protocolIcon: `https://icons.llama.fi/${project}.png`,
         protocolUrl: pool.url || `https://defillama.com/yields?project=${encodeURIComponent(project)}`,
