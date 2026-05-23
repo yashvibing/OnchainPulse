@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { type TokenBalance } from "@/services/tokens";
 import { formatUsd, formatNumber } from "@/lib/format";
 
@@ -20,9 +21,12 @@ function TokenIcon({
 
   if (logoURI) {
     return (
-      <img
+      <Image
         src={logoURI}
         alt={symbol}
+        width={28}
+        height={28}
+        unoptimized
         className="h-7 w-7 rounded-full"
         onError={(e) => {
           // Fall back to gradient circle if image fails

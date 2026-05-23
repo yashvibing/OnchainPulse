@@ -1,7 +1,20 @@
 import type { Metadata } from "next";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { Providers } from "./providers";
 import "./globals.css";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3010"),
@@ -36,19 +49,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="bg-radial-glow min-h-screen antialiased">
+      <body className={`${geist.variable} ${jetBrainsMono.variable} bg-radial-glow min-h-screen antialiased`}>
         <Providers>{children}</Providers>
         <DisclaimerModal />
       </body>
