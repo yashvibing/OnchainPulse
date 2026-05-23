@@ -11,7 +11,8 @@ export type AlertKind =
   | "apr_above"
   | "apr_below"
   | "best_market_change"
-  | "new_market";
+  | "new_market"
+  | "daily_digest";
 
 export interface TelegramAlert {
   id: string;
@@ -30,6 +31,7 @@ export interface TelegramAlert {
     lastOpportunityId?: string;
     lastBestOpportunityId?: string;
     knownOpportunityIds?: string[];
+    lastDigestDay?: string;
   };
 }
 
@@ -128,6 +130,23 @@ async function readAlert(id: string): Promise<TelegramAlert | null> {
   return redis.get<TelegramAlert>(alertKey(id));
 }
 
+function publicAlert(alert: TelegramAlert) {
+  return {
+    id: alert.id,
+    kind: alert.kind,
+    tokenSymbol: alert.tokenSymbol,
+    protocolKey: alert.protocolKey,
+    thresholdApr: alert.thresholdApr,
+    status: alert.status,
+    createdAt: alert.createdAt,
+    updatedAt: alert.updatedAt,
+    lastTriggeredAt: alert.lastTriggeredAt,
+    lastApr: alert.state.lastApr,
+  };
+}
+
+type PublicTelegramAlert = ReturnType<typeof publicAlert>;
+
 async function writeAlert(alert: TelegramAlert) {
   memoryAlerts.set(alert.id, alert);
   const redis = getServerRedisClient();
@@ -147,6 +166,45 @@ async function listActiveAlerts() {
   const ids = await listAlertIds();
   const alerts = await Promise.all(ids.map(readAlert));
   return alerts.filter((alert): alert is TelegramAlert => Boolean(alert && alert.status === "active"));
+}
+
+export async function listTelegramAlertsForChat(chatId: string) {
+  const ids = await listAlertIds();
+  const alerts = await Promise.all(ids.map(readAlert));
+  return alerts
+    .filter((alert): alert is TelegramAlert => Boolean(alert && alert.chatId === chatId))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(publicAlert);
+}
+
+export async function updateTelegramAlert(
+  id: string,
+  chatId: string,
+  changes: Partial<Pick<TelegramAlert, "status" | "thresholdApr">>
+) {
+  const alert = await readAlert(id);
+  if (!alert || alert.chatId !== chatId) throw new Error("Alert not found");
+
+  const updated: TelegramAlert = {
+    ...alert,
+    status: changes.status || alert.status,
+    thresholdApr: changes.thresholdApr ?? alert.thresholdApr,
+    updatedAt: Date.now(),
+  };
+  await writeAlert(updated);
+  return publicAlert(updated);
+}
+
+export async function deleteTelegramAlert(id: string, chatId: string) {
+  const alert = await readAlert(id);
+  if (!alert || alert.chatId !== chatId) throw new Error("Alert not found");
+
+  memoryAlerts.delete(id);
+  const redis = getServerRedisClient();
+  if (redis) {
+    await redis.del(alertKey(id));
+    await redis.srem(ALERT_REGISTRY_KEY, id);
+  }
 }
 
 async function writeConnectSession(session: TelegramConnectSession) {
@@ -297,6 +355,12 @@ function buildInitialState(
     };
   }
 
+  if (kind === "daily_digest") {
+    return {
+      lastDigestDay: getDigestDay(),
+    };
+  }
+
   return {
     knownOpportunityIds: relevant.map((opp) => opp.id),
   };
@@ -344,7 +408,44 @@ function alertTitle(alert: TelegramAlert) {
   if (alert.kind === "apr_above") return `${alert.tokenSymbol} APR crossed above ${alert.thresholdApr}%`;
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} APR dropped below ${alert.thresholdApr}%`;
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best market changed`;
+  if (alert.kind === "daily_digest") return alert.tokenSymbol === "ANY" ? "Daily DeFi rates digest" : `Daily ${alert.tokenSymbol} rates digest`;
   return alert.tokenSymbol === "ANY" ? "New DeFi market detected" : `New ${alert.tokenSymbol} market detected`;
+}
+
+function getDigestDateParts() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return {
+    day: `${value("year")}-${value("month")}-${value("day")}`,
+    hour: Number(value("hour") || 0),
+  };
+}
+
+function getDigestDay() {
+  return getDigestDateParts().day;
+}
+
+function buildDigestMessage(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
+  const relevant = relevantOpportunities(opportunities, alert).slice(0, 5);
+  const scope = alert.tokenSymbol === "ANY" ? "watched markets" : alert.tokenSymbol;
+
+  if (relevant.length === 0) {
+    return `${alertTitle(alert)}\nNo matching displayed rates found for ${scope} today.`;
+  }
+
+  const lines = relevant.map((opp, index) => {
+    return `${index + 1}. ${opportunityLabel(opp)} - ${opp.apr.toFixed(2)}% APR`;
+  });
+
+  return `${alertTitle(alert)}\nTop displayed rates for ${scope}:\n${lines.join("\n")}`;
 }
 
 async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
@@ -393,6 +494,15 @@ async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOppor
     nextState.knownOpportunityIds = relevant.map((opp) => opp.id);
   }
 
+  if (alert.kind === "daily_digest") {
+    const { day, hour } = getDigestDateParts();
+    const shouldSend = hour >= 9 && alert.state.lastDigestDay !== day;
+    if (shouldSend) {
+      message = buildDigestMessage(alert, opportunities);
+      nextState.lastDigestDay = day;
+    }
+  }
+
   const updated: TelegramAlert = {
     ...alert,
     updatedAt: Date.now(),
@@ -414,6 +524,12 @@ async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOppor
 }
 
 export async function checkTelegramAlerts() {
+  await processTelegramBotCommands().catch((error) => {
+    logServerEvent("warn", "alerts.commands_failed", {
+      error: getErrorMessage(error),
+    });
+  });
+
   const alerts = await listActiveAlerts();
   if (alerts.length === 0) return { checked: 0, triggered: 0 };
 
@@ -433,4 +549,86 @@ export async function checkTelegramAlerts() {
   }
 
   return { checked: alerts.length, triggered };
+}
+
+async function findAlertForCommand(chatId: string, prefix: string) {
+  const ids = await listAlertIds();
+  const alerts = await Promise.all(ids.map(readAlert));
+  return alerts.find((alert) => alert?.chatId === chatId && alert.id.startsWith(prefix)) || null;
+}
+
+function commandAlertLabel(alert: PublicTelegramAlert) {
+  const suffix = alert.thresholdApr ? ` ${alert.thresholdApr}%` : "";
+  return `${alert.id.slice(0, 8)} - ${alert.kind.replace(/_/g, " ")} ${alert.tokenSymbol}${suffix} (${alert.status})`;
+}
+
+async function handleBotCommand(chatId: string, text: string) {
+  const normalized = text.trim();
+  const [command, arg] = normalized.split(/\s+/u);
+
+  if (command === "/help" || command === "/start") {
+    await sendTelegramMessage(
+      chatId,
+      [
+        "Onchain Pulse alert commands:",
+        "/alerts - list your alerts",
+        "/pause <alert id> - pause an alert",
+        "/resume <alert id> - resume an alert",
+        "/help - show this message",
+      ].join("\n")
+    );
+    return;
+  }
+
+  if (command === "/alerts") {
+    const alerts = await listTelegramAlertsForChat(chatId);
+    if (alerts.length === 0) {
+      await sendTelegramMessage(chatId, "No alerts yet. Create one from Onchain Pulse DeFi Rates.");
+      return;
+    }
+    await sendTelegramMessage(
+      chatId,
+      `Your alerts:\n${alerts.map(commandAlertLabel).join("\n")}`
+    );
+    return;
+  }
+
+  if ((command === "/pause" || command === "/resume") && arg) {
+    const alert = await findAlertForCommand(chatId, arg);
+    if (!alert) {
+      await sendTelegramMessage(chatId, "Alert not found. Use /alerts to see alert IDs.");
+      return;
+    }
+    const status = command === "/pause" ? "paused" : "active";
+    await updateTelegramAlert(alert.id, chatId, { status });
+    await sendTelegramMessage(chatId, `Alert ${alert.id.slice(0, 8)} is now ${status}.`);
+  }
+}
+
+async function processTelegramBotCommands() {
+  if (!getTelegramBotToken()) return;
+
+  const updates = await getTelegramUpdates();
+  for (const update of updates) {
+    const text = update.message?.text?.trim();
+    const chatId = update.message?.chat?.id;
+    if (!text || !chatId) continue;
+
+    const startCode = text.match(/^\/start\s+(ocp_[a-z0-9]+)/iu)?.[1];
+    if (startCode) {
+      const session = await readConnectSession(startCode);
+      if (session && session.expiresAt >= Date.now()) {
+        await writeConnectSession({ ...session, chatId: String(chatId) });
+        await sendTelegramMessage(
+          String(chatId),
+          "Onchain Pulse alerts are connected. Return to the app and press Confirm."
+        );
+      }
+      continue;
+    }
+
+    if (text.startsWith("/")) {
+      await handleBotCommand(String(chatId), text);
+    }
+  }
 }

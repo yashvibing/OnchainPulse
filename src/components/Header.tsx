@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Portfolio" },
   { href: "/yield-aggregator", label: "DeFi Rates" },
+  { href: "/alerts", label: "Alerts" },
   { href: "/startups", label: "Startups" },
 ];
 

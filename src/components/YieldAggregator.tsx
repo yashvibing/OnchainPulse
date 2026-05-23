@@ -28,6 +28,11 @@ import {
   getHeldYieldSymbols,
 } from "@/lib/walletOpportunities";
 import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
+import {
+  readStoredTelegramConnection,
+  saveStoredTelegramConnection,
+  type StoredTelegramConnection,
+} from "@/lib/telegramAlertClient";
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -45,9 +50,17 @@ const POPULAR_TOKENS = [
 ];
 
 const SUGGESTED_TOKENS = ["USDC", "WETH", "AUSD"];
-const TELEGRAM_CONNECTION_STORAGE_KEY = "onchain-pulse:telegram-alert-connection";
 
-type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market";
+type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
+
+interface AlertDraft {
+  kind: AlertKind;
+  tokenSymbol: string;
+  protocolKey: string;
+  thresholdApr?: string;
+  label: string;
+  nonce: number;
+}
 
 const ALERT_KIND_OPTIONS: { value: AlertKind; label: string; description: string }[] = [
   {
@@ -69,6 +82,11 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string; description: string
     value: "new_market",
     label: "New market appears",
     description: "Message me when a new matching DeFi rate row is added.",
+  },
+  {
+    value: "daily_digest",
+    label: "Daily digest",
+    description: "Send a daily Telegram summary of top matching displayed rates.",
   },
 ];
 
@@ -395,8 +413,14 @@ function WalletHoldingsPanel({
   );
 }
 
-function AlertPanel({ opportunities }: { opportunities: YieldOpportunity[] }) {
-  const [connection, setConnection] = useState<{ chatId: string; connectedAt: number } | null>(null);
+function AlertPanel({
+  opportunities,
+  watchDraft,
+}: {
+  opportunities: YieldOpportunity[];
+  watchDraft?: AlertDraft | null;
+}) {
+  const [connection, setConnection] = useState<StoredTelegramConnection | null>(null);
   const [connectSession, setConnectSession] = useState<{
     code: string;
     deepLink: string;
@@ -410,29 +434,26 @@ function AlertPanel({ opportunities }: { opportunities: YieldOpportunity[] }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(TELEGRAM_CONNECTION_STORAGE_KEY);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as { chatId?: string; connectedAt?: number };
-      if (parsed.chatId) {
-        setConnection({
-          chatId: parsed.chatId,
-          connectedAt: parsed.connectedAt || Date.now(),
-        });
-      }
-    } catch {
-      window.localStorage.removeItem(TELEGRAM_CONNECTION_STORAGE_KEY);
-    }
+    setConnection(readStoredTelegramConnection());
   }, []);
 
   useEffect(() => {
-    if (kind !== "new_market" && tokenSymbol === "ANY") {
+    if (kind !== "new_market" && kind !== "daily_digest" && tokenSymbol === "ANY") {
       setTokenSymbol("USDC");
     }
   }, [kind, tokenSymbol]);
 
+  useEffect(() => {
+    if (!watchDraft) return;
+    setKind(watchDraft.kind);
+    setTokenSymbol(watchDraft.tokenSymbol);
+    setProtocolKey(watchDraft.protocolKey);
+    if (watchDraft.thresholdApr) setThresholdApr(watchDraft.thresholdApr);
+    setStatus(`Watch form ready for ${watchDraft.label}.`);
+  }, [watchDraft]);
+
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
-  const tokenChoices = kind === "new_market" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const tokenChoices = kind === "new_market" || kind === "daily_digest" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
   const protocolChoices = useMemo(() => {
     const token = tokenSymbol.toUpperCase();
     const map = new Map<string, string>();
@@ -483,7 +504,7 @@ function AlertPanel({ opportunities }: { opportunities: YieldOpportunity[] }) {
         chatId: String(data.chatId),
         connectedAt: Number(data.connectedAt || Date.now()),
       };
-      window.localStorage.setItem(TELEGRAM_CONNECTION_STORAGE_KEY, JSON.stringify(nextConnection));
+      saveStoredTelegramConnection(nextConnection);
       setConnection(nextConnection);
       setConnectSession(null);
       setStatus("Telegram connected. You can create alerts now.");
@@ -544,7 +565,15 @@ function AlertPanel({ opportunities }: { opportunities: YieldOpportunity[] }) {
           </p>
         </div>
         {connection ? (
-          <Badge tone="positive">Telegram connected</Badge>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/alerts"
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+            >
+              Manage alerts
+            </a>
+            <Badge tone="positive">Telegram connected</Badge>
+          </div>
         ) : (
           <Badge tone="warning">Setup required</Badge>
         )}
@@ -757,7 +786,13 @@ function ProtocolFilter({
   );
 }
 
-function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
+function OpportunityRow({
+  opp,
+  onWatchMarket,
+}: {
+  opp: YieldOpportunity;
+  onWatchMarket?: (opp: YieldOpportunity) => void;
+}) {
   const assetSymbols = getOpportunityAssetSymbols(opp);
   const collateralSymbols = getBorrowCollateralSymbols(opp);
   const tokenLabel =
@@ -765,12 +800,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
   const actionBadge = getOpportunityActionBadge(opp);
 
   return (
-    <a
-      href={opp.depositUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]"
-    >
+    <div className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:items-center">
         <div className="flex min-w-0 gap-3">
           <AssetStack symbols={assetSymbols} />
@@ -800,7 +830,7 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+        <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
           <div>
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
@@ -814,14 +844,33 @@ function OpportunityRow({ opp }: { opp: YieldOpportunity }) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">View</div>
-            <div className="mt-1 text-[15px] text-[var(--color-text-muted)] transition-colors group-hover:text-[var(--color-text-primary)]">
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Alert</div>
+            {opp.action === "LEND" ? (
+              <button
+                type="button"
+                onClick={() => onWatchMarket?.(opp)}
+                className="mt-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-accent-primary)] hover:text-[var(--color-positive)]"
+              >
+                Watch
+              </button>
+            ) : (
+              <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">-</div>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Open</div>
+            <a
+              href={opp.depositUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block text-[15px] text-[var(--color-text-muted)] transition-colors group-hover:text-[var(--color-text-primary)]"
+            >
               &gt;
-            </div>
+            </a>
           </div>
         </div>
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -918,12 +967,14 @@ function OpportunitySection({
   emptyLabel,
   opportunities,
   onPickToken,
+  onWatchMarket,
 }: {
   title: string;
   subtitle: string;
   emptyLabel: string;
   opportunities: YieldOpportunity[];
   onPickToken?: (symbol: string) => void;
+  onWatchMarket?: (opp: YieldOpportunity) => void;
 }) {
   return (
     <section className="flex-1">
@@ -937,7 +988,7 @@ function OpportunitySection({
       <div className="space-y-2 md:max-h-[620px] md:overflow-y-auto md:pr-1">
         {opportunities.slice(0, 30).map((opp, index) => (
           <div key={`${opp.id}-${index}`} style={{ animationDelay: `${index * 25}ms` }} className="animate-fade-up">
-            <OpportunityRow opp={opp} />
+            <OpportunityRow opp={opp} onWatchMarket={onWatchMarket} />
           </div>
         ))}
         {opportunities.length === 0 && (
@@ -1002,6 +1053,7 @@ export function YieldAggregator() {
   const [protocolFilter, setProtocolFilter] = useState("all");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletInput, setWalletInput] = useState("");
+  const [alertDraft, setAlertDraft] = useState<AlertDraft | null>(null);
   const walletBalances = useTokenBalances(walletAddress || null);
 
   useEffect(() => {
@@ -1093,6 +1145,22 @@ export function YieldAggregator() {
     window.history.replaceState(null, "", nextUrl);
   }
 
+  function prefillWatchMarket(opp: YieldOpportunity) {
+    const assets = getOpportunityAssetSymbols(opp);
+    const tokenSymbol = assets[0] || opp.tokens[0]?.symbol || "ANY";
+    const protocolKey = protocolFilterKey(opp.protocol);
+    const threshold = Math.max(0, opp.apr - 1);
+
+    setAlertDraft({
+      kind: "apr_below",
+      tokenSymbol,
+      protocolKey,
+      thresholdApr: threshold.toFixed(2),
+      label: `${tokenSymbol} on ${opp.protocol}`,
+      nonce: Date.now(),
+    });
+  }
+
   if (loading) return <AggregatorSkeleton />;
 
   if (error) {
@@ -1135,7 +1203,7 @@ export function YieldAggregator() {
         </div>
       )}
 
-      <AlertPanel opportunities={allOpps} />
+      <AlertPanel opportunities={allOpps} watchDraft={alertDraft} />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
@@ -1179,6 +1247,7 @@ export function YieldAggregator() {
             emptyLabel="No supply or deposit opportunities found."
             opportunities={lendOpps}
             onPickToken={(symbol) => setLendTokens([symbol])}
+            onWatchMarket={prefillWatchMarket}
           />
           <OpportunitySection
             title="Borrow Markets"
@@ -1186,6 +1255,7 @@ export function YieldAggregator() {
             emptyLabel="No borrow markets found."
             opportunities={borrowOpps}
             onPickToken={(symbol) => setBorrowTokens([symbol])}
+            onWatchMarket={prefillWatchMarket}
           />
         </div>
       )}
@@ -1197,6 +1267,7 @@ export function YieldAggregator() {
           emptyLabel="No supply or deposit opportunities found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
+          onWatchMarket={prefillWatchMarket}
         />
       )}
 
@@ -1207,6 +1278,7 @@ export function YieldAggregator() {
           emptyLabel="No borrow markets found for this token."
           opportunities={borrowOpps}
           onPickToken={(symbol) => setBorrowTokens([symbol])}
+          onWatchMarket={prefillWatchMarket}
         />
       )}
 
