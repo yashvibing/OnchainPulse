@@ -357,7 +357,7 @@ function buildInitialState(
 
   if (kind === "daily_digest") {
     return {
-      lastDigestDay: getDigestDay(),
+      lastDigestDay: getInitialDailyDigestDay(),
     };
   }
 
@@ -412,7 +412,7 @@ function alertTitle(alert: TelegramAlert) {
   return alert.tokenSymbol === "ANY" ? "New DeFi market detected" : `New ${alert.tokenSymbol} market detected`;
 }
 
-function getDigestDateParts() {
+function getDigestDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
@@ -420,7 +420,7 @@ function getDigestDateParts() {
     day: "2-digit",
     hour: "2-digit",
     hour12: false,
-  }).formatToParts(new Date());
+  }).formatToParts(date);
 
   const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
   return {
@@ -429,8 +429,9 @@ function getDigestDateParts() {
   };
 }
 
-function getDigestDay() {
-  return getDigestDateParts().day;
+export function getInitialDailyDigestDay(createdAt = new Date()) {
+  const { day, hour } = getDigestDateParts(createdAt);
+  return hour >= 9 ? day : undefined;
 }
 
 function buildDigestMessage(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
