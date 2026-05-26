@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3010"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://onchainpulse.app"),
   title: "Onchain Pulse - Portfolio & DeFi Rates",
   description:
     "Explore public wallet portfolios and displayed DeFi rates relating to Monad. Onchain Pulse is independent and not affiliated with Monad Foundation.",

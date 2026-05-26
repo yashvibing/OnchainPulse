@@ -15,6 +15,8 @@ function fmtUsd(v: number): string {
   return "$0";
 }
 
+const siteHost = "onchainpulse.app";
+
 function parseData(d: string | null) {
   if (!d || d.length < 42) return null;
 
@@ -49,7 +51,7 @@ export function GET(req: NextRequest) {
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#E8E8FF" }}>Onchain Pulse</div>
           </div>
           <div style={{ fontSize: "22px", color: "#A0A0B8", maxWidth: "600px", lineHeight: 1.6, flex: 1 }}>Explore public wallet portfolios and displayed DeFi rates relating to Monad.</div>
-          <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
+          <div style={{ fontSize: "16px", color: "#3A3A54" }}>{siteHost}</div>
         </div>
       ),
       { width: 1200, height: 630 }
@@ -89,7 +91,7 @@ export function GET(req: NextRequest) {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div style={{ fontSize: "18px", color: "#5A5A74" }}>Monad Wallet View</div>
-          <div style={{ fontSize: "16px", color: "#3A3A54" }}>onchain-pulse.vercel.app</div>
+          <div style={{ fontSize: "16px", color: "#3A3A54" }}>{siteHost}</div>
         </div>
       </div>
     ),
