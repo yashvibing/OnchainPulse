@@ -14,6 +14,7 @@ import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
+import { LatestNewsSection } from "@/components/LatestNewsSection";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 import {
   loadSavedAddresses,
@@ -141,6 +142,7 @@ function DashboardInner() {
                 onSelect={handleSearch}
                 onRemove={handleRemoveSavedAddress}
               />
+              <LatestNewsSection />
             </div>
           </div>
         )}
