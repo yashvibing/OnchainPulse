@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { readStoredTelegramConnection, type StoredTelegramConnection } from "@/lib/telegramAlertClient";
+import { TELEGRAM_CONNECT_REQUEST_EVENT } from "@/lib/telegramEvents";
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
 
@@ -128,6 +129,10 @@ export function AlertManagement() {
     }
   }
 
+  function requestTelegramConnection() {
+    window.dispatchEvent(new Event(TELEGRAM_CONNECT_REQUEST_EVENT));
+  }
+
   if (!connection) {
     return (
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8">
@@ -135,12 +140,13 @@ export function AlertManagement() {
         <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
           Use the alert creator above, tap Start in Telegram, then return here to manage alerts.
         </p>
-        <a
-          href="#create-alert"
+        <button
+          type="button"
+          onClick={requestTelegramConnection}
           className="mt-5 inline-flex rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C]"
         >
           Create Telegram link
-        </a>
+        </button>
       </section>
     );
   }

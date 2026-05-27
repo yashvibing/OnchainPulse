@@ -1,35 +1,30 @@
-import type { Metadata } from "next";
-import { Header } from "@/components/Header";
-import { YieldAggregator } from "@/components/YieldAggregator";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "DeFi Rates - Onchain Pulse",
-  description:
-    "Compare displayed DeFi rates across lending, staking, borrowing, LP, and vault markets relating to Monad.",
+type RedirectPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function YieldAggregatorPage() {
-  return (
-    <div className="min-h-screen">
-      <Header />
+function buildQueryString(params: Record<string, string | string[] | undefined>) {
+  const query = new URLSearchParams();
 
-      <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
-        <section className="mb-8 border-b border-[var(--color-border)] pb-8 pt-2">
-          <div className="label-caps text-[var(--color-accent-primary)]">
-            Market terminal
-          </div>
-          <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-            DeFi Rates
-          </h1>
-          <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Choose what you hold, what you want to borrow, or let Best for me
-            highlight useful starting points. APR and TVL are explained below so
-            the table is easier to read before you open any protocol.
-          </p>
-        </section>
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => query.append(key, item));
+      continue;
+    }
 
-        <YieldAggregator />
-      </main>
-    </div>
-  );
+    if (value) {
+      query.set(key, value);
+    }
+  }
+
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+export default async function YieldAggregatorRedirectPage({
+  searchParams,
+}: RedirectPageProps) {
+  const queryString = buildQueryString((await searchParams) ?? {});
+  redirect(`/defi-rates${queryString}`);
 }

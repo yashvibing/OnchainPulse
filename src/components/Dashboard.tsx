@@ -517,7 +517,7 @@ function WelcomeActionCards() {
     {
       title: "Find DeFi rates",
       description: "Pick a token and compare displayed lending, staking, LP, vault, and borrow markets.",
-      href: "/yield-aggregator",
+      href: "/defi-rates",
       cta: "Compare rates",
     },
     {

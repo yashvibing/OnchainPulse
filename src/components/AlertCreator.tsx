@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   fetchYieldOpportunitiesWithClientMeta,
@@ -12,6 +12,7 @@ import {
   saveStoredTelegramConnection,
   type StoredTelegramConnection,
 } from "@/lib/telegramAlertClient";
+import { TELEGRAM_CONNECT_REQUEST_EVENT } from "@/lib/telegramEvents";
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
 
@@ -99,13 +100,17 @@ export function AlertCreator() {
   const [protocolKey, setProtocolKey] = useState("all");
   const [thresholdApr, setThresholdApr] = useState("12");
   const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState<"info" | "error" | "success">("info");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setConnection(readStoredTelegramConnection());
     fetchYieldOpportunitiesWithClientMeta()
       .then((result) => setOpportunities(result.data))
-      .catch(() => setStatus("Rate data is temporarily unavailable, but you can still create broad alerts."));
+      .catch(() => {
+        setStatusTone("error");
+        setStatus("Rate data is temporarily unavailable, but you can still create broad alerts.");
+      });
   }, []);
 
   useEffect(() => {
@@ -133,26 +138,51 @@ export function AlertCreator() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [opportunities, tokenSymbol]);
 
-  async function createConnectionCode() {
+  const createConnectionCode = useCallback(async () => {
     setBusy(true);
     setStatus("");
+    setStatusTone("info");
     try {
       const response = await fetch("/api/alerts/connect", { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create Telegram connection.");
       setConnectSession(data);
+      setStatusTone("success");
       setStatus("Open Telegram, tap Start, then come back and confirm.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Telegram setup failed.");
+      const message = error instanceof Error ? error.message : "Telegram setup failed.";
+      setStatusTone("error");
+      setStatus(
+        message === "Telegram bot is not configured"
+          ? "Telegram alerts are not configured yet. Add TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME, then redeploy."
+          : message
+      );
     } finally {
       setBusy(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    function handleConnectRequest() {
+      const alertCreatorSection = document.getElementById("create-alert");
+      if (typeof alertCreatorSection?.scrollIntoView === "function") {
+        alertCreatorSection.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+      void createConnectionCode();
+    }
+
+    window.addEventListener(TELEGRAM_CONNECT_REQUEST_EVENT, handleConnectRequest);
+    return () => window.removeEventListener(TELEGRAM_CONNECT_REQUEST_EVENT, handleConnectRequest);
+  }, [createConnectionCode]);
 
   async function claimConnection() {
     if (!connectSession) return;
     setBusy(true);
     setStatus("");
+    setStatusTone("info");
     try {
       const response = await fetch("/api/alerts/connect/claim", {
         method: "POST",
@@ -169,9 +199,11 @@ export function AlertCreator() {
       saveStoredTelegramConnection(nextConnection);
       setConnection(nextConnection);
       setConnectSession(null);
+      setStatusTone("success");
       setStatus("Telegram connected. You can create alerts now.");
       notifyAlertsChanged();
     } catch (error) {
+      setStatusTone("error");
       setStatus(error instanceof Error ? error.message : "Telegram confirmation failed.");
     } finally {
       setBusy(false);
@@ -180,18 +212,21 @@ export function AlertCreator() {
 
   async function createAlert() {
     if (!connection) {
+      setStatusTone("error");
       setStatus("Connect Telegram before creating an alert.");
       return;
     }
 
     const threshold = Number(thresholdApr);
     if (needsThreshold && !Number.isFinite(threshold)) {
+      setStatusTone("error");
       setStatus("Enter a valid APR percentage.");
       return;
     }
 
     setBusy(true);
     setStatus("");
+    setStatusTone("info");
     try {
       const response = await fetch("/api/alerts", {
         method: "POST",
@@ -207,9 +242,11 @@ export function AlertCreator() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create alert.");
       const label = ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.label || "Alert";
+      setStatusTone("success");
       setStatus(`${label} alert created for ${tokenSymbol}.`);
       notifyAlertsChanged();
     } catch (error) {
+      setStatusTone("error");
       setStatus(error instanceof Error ? error.message : "Alert creation failed.");
     } finally {
       setBusy(false);
@@ -222,6 +259,7 @@ export function AlertCreator() {
       setTokenSymbol("USDC");
       setProtocolKey("all");
       setThresholdApr("10");
+      setStatusTone("info");
       setStatus("Preset ready: tell me when USDC APR goes above 10%.");
       return;
     }
@@ -230,6 +268,7 @@ export function AlertCreator() {
       setKind("best_market_change");
       setTokenSymbol("WMON");
       setProtocolKey("all");
+      setStatusTone("info");
       setStatus("Preset ready: tell me when the best WMON market changes.");
       return;
     }
@@ -238,6 +277,7 @@ export function AlertCreator() {
       setKind("daily_digest");
       setTokenSymbol("ANY");
       setProtocolKey("all");
+      setStatusTone("info");
       setStatus("Preset ready: send a daily Telegram summary.");
       return;
     }
@@ -245,6 +285,7 @@ export function AlertCreator() {
     setKind("new_market");
     setTokenSymbol("ANY");
     setProtocolKey("all");
+    setStatusTone("info");
     setStatus("Preset ready: tell me when a new market appears.");
   }
 
@@ -405,7 +446,16 @@ export function AlertCreator() {
       </div>
 
       {status && (
-        <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] text-[var(--color-text-secondary)]">
+        <div
+          role="status"
+          className={`mt-3 rounded-[var(--radius-md)] border px-3 py-2 text-[11px] ${
+            statusTone === "error"
+              ? "border-[rgba(255,184,0,0.45)] bg-[rgba(255,184,0,0.08)] text-[var(--color-warning)]"
+              : statusTone === "success"
+                ? "border-[rgba(0,245,204,0.42)] bg-[rgba(0,245,204,0.08)] text-[var(--color-positive)]"
+                : "border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] text-[var(--color-text-secondary)]"
+          }`}
+        >
           {status}
         </div>
       )}
