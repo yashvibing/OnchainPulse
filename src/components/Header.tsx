@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/app", label: "Portfolio Tracker" },
   { href: "/defi-rates", label: "DeFi Rates" },
   { href: "/alerts", label: "Alerts" },
+  { href: "/news", label: "Latest News" },
   { href: "/startups", label: "Ecosystem" },
 ];
 
