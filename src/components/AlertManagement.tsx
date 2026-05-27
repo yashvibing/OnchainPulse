@@ -76,6 +76,17 @@ export function AlertManagement() {
     void loadAlerts(stored.chatId);
   }, [loadAlerts]);
 
+  useEffect(() => {
+    function handleAlertsChanged() {
+      const stored = readStoredTelegramConnection();
+      setConnection(stored);
+      if (stored) void loadAlerts(stored.chatId);
+    }
+
+    window.addEventListener("onchain-pulse:alerts-changed", handleAlertsChanged);
+    return () => window.removeEventListener("onchain-pulse:alerts-changed", handleAlertsChanged);
+  }, [loadAlerts]);
+
   async function updateAlert(alert: ManagedAlert, nextStatus: "active" | "paused") {
     if (!connection) return;
     setStatus("");
@@ -122,13 +133,13 @@ export function AlertManagement() {
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8">
         <h2 className="text-[22px] font-bold text-[var(--color-text-primary)]">Connect Telegram first</h2>
         <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-          Open DeFi Rates, create a Telegram link, tap Start in the bot, then return here to manage alerts.
+          Use the alert creator above, tap Start in Telegram, then return here to manage alerts.
         </p>
         <a
-          href="/yield-aggregator"
+          href="#create-alert"
           className="mt-5 inline-flex rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C]"
         >
-          Go to DeFi Rates
+          Create Telegram link
         </a>
       </section>
     );
@@ -167,7 +178,7 @@ export function AlertManagement() {
         </div>
       ) : alerts.length === 0 ? (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-6 text-[13px] text-[var(--color-text-muted)]">
-          No alerts yet. Create one from DeFi Rates or use a Watch button on a market row.
+          No alerts yet. Use the alert creator above to make your first watch.
         </div>
       ) : (
         <div className="space-y-3">

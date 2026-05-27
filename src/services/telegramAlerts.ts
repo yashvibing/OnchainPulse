@@ -584,7 +584,7 @@ async function handleBotCommand(chatId: string, text: string) {
   if (command === "/alerts") {
     const alerts = await listTelegramAlertsForChat(chatId);
     if (alerts.length === 0) {
-      await sendTelegramMessage(chatId, "No alerts yet. Create one from Onchain Pulse DeFi Rates.");
+      await sendTelegramMessage(chatId, "No alerts yet. Create one from the Onchain Pulse Alerts page.");
       return;
     }
     await sendTelegramMessage(

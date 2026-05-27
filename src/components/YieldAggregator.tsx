@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   useTokenBalances,
@@ -29,11 +29,6 @@ import {
   getHeldYieldSymbols,
 } from "@/lib/walletOpportunities";
 import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
-import {
-  readStoredTelegramConnection,
-  saveStoredTelegramConnection,
-  type StoredTelegramConnection,
-} from "@/lib/telegramAlertClient";
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -57,45 +52,6 @@ const DEFI_TERMS = [
   ["TVL", "Total value locked. Larger TVL usually means more liquidity in that market."],
   ["Supply", "Deposit an asset into a lending, staking, LP, or vault market."],
   ["Borrow", "Take a loan using collateral. Borrowing can create liquidation risk."],
-];
-
-type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
-
-interface AlertDraft {
-  kind: AlertKind;
-  tokenSymbol: string;
-  protocolKey: string;
-  thresholdApr?: string;
-  label: string;
-  nonce: number;
-}
-
-const ALERT_KIND_OPTIONS: { value: AlertKind; label: string; description: string }[] = [
-  {
-    value: "apr_above",
-    label: "APR goes above",
-    description: "Message me when the best matching rate crosses a target.",
-  },
-  {
-    value: "apr_below",
-    label: "APR drops below",
-    description: "Message me when a watched rate falls under a floor.",
-  },
-  {
-    value: "best_market_change",
-    label: "Best place changes",
-    description: "Message me when another protocol becomes the top displayed place.",
-  },
-  {
-    value: "new_market",
-    label: "New market appears",
-    description: "Message me when a new matching DeFi rate row is added.",
-  },
-  {
-    value: "daily_digest",
-    label: "Daily digest",
-    description: "Send a daily Telegram summary of top matching displayed rates.",
-  },
 ];
 
 function formatUsd(value: number) {
@@ -273,8 +229,8 @@ function RateExplainerStrip() {
           How to read this page
         </div>
         <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-          Start with the token you already hold. Compare displayed APR with TVL, then set
-          an alert if you want Telegram to watch the market for you.
+          Start with the token you already hold. Compare displayed APR with TVL,
+          then open a protocol only after doing your own checks.
         </p>
       </div>
       <div className="grid gap-2 md:grid-cols-4">
@@ -304,109 +260,6 @@ function WhyThisMatters({ title, body }: { title: string; body: string }) {
         {body}
       </p>
     </div>
-  );
-}
-
-function getPrimaryAssetSymbol(opp: YieldOpportunity) {
-  return getOpportunityAssetSymbols(opp)[0] || opp.tokens[0]?.symbol || "";
-}
-
-function BestForMePanel({
-  opportunities,
-  onPickLend,
-  onPickBorrow,
-  onWatchMarket,
-}: {
-  opportunities: YieldOpportunity[];
-  onPickLend: (symbol: string) => void;
-  onPickBorrow: (symbol: string) => void;
-  onWatchMarket: (opp: YieldOpportunity) => void;
-}) {
-  const lendOpps = opportunities.filter((opp) => opp.action === "LEND");
-  const borrowOpps = opportunities.filter((opp) => opp.action === "BORROW");
-  const highestApr = [...lendOpps].sort((a, b) => b.apr - a.apr)[0];
-  const deepestLiquidity = [...lendOpps].sort((a, b) => b.tvl - a.tvl)[0];
-  const borrowMarket = [...borrowOpps].sort((a, b) => b.tvl - a.tvl)[0];
-  const cards = [
-    highestApr && {
-      label: "Highest displayed APR",
-      title: `${getPrimaryAssetSymbol(highestApr)} on ${highestApr.protocol}`,
-      metric: formatRateLabel(highestApr.apr),
-      helper: "Use this when you care most about displayed yield.",
-      action: () => onPickLend(getPrimaryAssetSymbol(highestApr)),
-      watch: () => onWatchMarket(highestApr),
-    },
-    deepestLiquidity && {
-      label: "Deepest liquidity",
-      title: `${getPrimaryAssetSymbol(deepestLiquidity)} on ${deepestLiquidity.protocol}`,
-      metric: formatUsd(deepestLiquidity.tvl),
-      helper: "Use this when you want a larger, more established market.",
-      action: () => onPickLend(getPrimaryAssetSymbol(deepestLiquidity)),
-      watch: () => onWatchMarket(deepestLiquidity),
-    },
-    borrowMarket && {
-      label: "Borrow market to inspect",
-      title: `${getPrimaryAssetSymbol(borrowMarket)} on ${borrowMarket.protocol}`,
-      metric: formatUsd(borrowMarket.tvl),
-      helper: "Use this when you are comparing borrowing options and collateral needs.",
-      action: () => onPickBorrow(getPrimaryAssetSymbol(borrowMarket)),
-      watch: null,
-    },
-  ].filter((card): card is NonNullable<typeof card> => Boolean(card));
-
-  if (cards.length === 0) return null;
-
-  return (
-    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-      <div className="mb-3">
-        <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
-          Best for me
-        </div>
-        <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-          Not sure where to start? These shortcuts translate the market table into
-          three common user goals.
-        </p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {cards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3"
-          >
-            <div className="text-[10px] font-bold uppercase text-[var(--color-text-dim)]">
-              {card.label}
-            </div>
-            <div className="mt-2 text-[14px] font-bold text-[var(--color-text-primary)]">
-              {card.title}
-            </div>
-            <div className="mt-1 text-[15px] font-bold text-[var(--color-positive)]">
-              {card.metric}
-            </div>
-            <p className="mt-2 min-h-[42px] text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-              {card.helper}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={card.action}
-                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-accent-primary)] hover:text-[var(--color-positive)]"
-              >
-                Filter table
-              </button>
-              {card.watch && (
-                <button
-                  type="button"
-                  onClick={card.watch}
-                  className="rounded-[var(--radius-sm)] bg-[rgba(0,245,204,0.12)] px-2 py-1 text-[10px] font-bold text-[var(--color-positive)] hover:opacity-80"
-                >
-                  Watch it
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -588,354 +441,6 @@ function WalletHoldingsPanel({
   );
 }
 
-function AlertPanel({
-  opportunities,
-  watchDraft,
-}: {
-  opportunities: YieldOpportunity[];
-  watchDraft?: AlertDraft | null;
-}) {
-  const [connection, setConnection] = useState<StoredTelegramConnection | null>(null);
-  const [connectSession, setConnectSession] = useState<{
-    code: string;
-    deepLink: string;
-    expiresAt: number;
-  } | null>(null);
-  const [kind, setKind] = useState<AlertKind>("apr_above");
-  const [tokenSymbol, setTokenSymbol] = useState("USDC");
-  const [protocolKey, setProtocolKey] = useState("all");
-  const [thresholdApr, setThresholdApr] = useState("12");
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setConnection(readStoredTelegramConnection());
-  }, []);
-
-  useEffect(() => {
-    if (kind !== "new_market" && kind !== "daily_digest" && tokenSymbol === "ANY") {
-      setTokenSymbol("USDC");
-    }
-  }, [kind, tokenSymbol]);
-
-  useEffect(() => {
-    if (!watchDraft) return;
-    setKind(watchDraft.kind);
-    setTokenSymbol(watchDraft.tokenSymbol);
-    setProtocolKey(watchDraft.protocolKey);
-    if (watchDraft.thresholdApr) setThresholdApr(watchDraft.thresholdApr);
-    setStatus(`Watch form ready for ${watchDraft.label}.`);
-  }, [watchDraft]);
-
-  const needsThreshold = kind === "apr_above" || kind === "apr_below";
-  const tokenChoices = kind === "new_market" || kind === "daily_digest" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
-  const protocolChoices = useMemo(() => {
-    const token = tokenSymbol.toUpperCase();
-    const map = new Map<string, string>();
-    opportunities.forEach((opp) => {
-      if (opp.action !== "LEND") return;
-      if (token !== "ANY") {
-        const assets = getOpportunityAssetSymbols(opp).map((symbol) => symbol.toUpperCase());
-        if (!assets.includes(token)) return;
-      }
-      const key = protocolFilterKey(opp.protocol);
-      if (!map.has(key)) map.set(key, opp.protocol);
-    });
-    return [...map.entries()]
-      .map(([key, label]) => ({ key, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [opportunities, tokenSymbol]);
-
-  async function createConnectionCode() {
-    setBusy(true);
-    setStatus("");
-    try {
-      const response = await fetch("/api/alerts/connect", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not create Telegram connection.");
-      setConnectSession(data);
-      setStatus("Open Telegram, tap Start, then come back and confirm.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Telegram setup failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function claimConnection() {
-    if (!connectSession) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      const response = await fetch("/api/alerts/connect/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: connectSession.code }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not confirm Telegram.");
-
-      const nextConnection = {
-        chatId: String(data.chatId),
-        connectedAt: Number(data.connectedAt || Date.now()),
-      };
-      saveStoredTelegramConnection(nextConnection);
-      setConnection(nextConnection);
-      setConnectSession(null);
-      setStatus("Telegram connected. You can create alerts now.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Telegram confirmation failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createAlert() {
-    if (!connection) {
-      setStatus("Connect Telegram before creating an alert.");
-      return;
-    }
-
-    const threshold = Number(thresholdApr);
-    if (needsThreshold && !Number.isFinite(threshold)) {
-      setStatus("Enter a valid APR percentage.");
-      return;
-    }
-
-    setBusy(true);
-    setStatus("");
-    try {
-      const response = await fetch("/api/alerts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          chatId: connection.chatId,
-          tokenSymbol,
-          protocolKey,
-          thresholdApr: needsThreshold ? threshold : undefined,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not create alert.");
-      const label = ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.label || "Alert";
-      setStatus(`${label} alert created for ${tokenSymbol}.`);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Alert creation failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function applyPreset(preset: "usdc-apr" | "wmon-best" | "daily" | "new-market") {
-    if (preset === "usdc-apr") {
-      setKind("apr_above");
-      setTokenSymbol("USDC");
-      setProtocolKey("all");
-      setThresholdApr("10");
-      setStatus("Preset ready: tell me when USDC APR goes above 10%.");
-      return;
-    }
-
-    if (preset === "wmon-best") {
-      setKind("best_market_change");
-      setTokenSymbol("WMON");
-      setProtocolKey("all");
-      setStatus("Preset ready: tell me when the best WMON market changes.");
-      return;
-    }
-
-    if (preset === "daily") {
-      setKind("daily_digest");
-      setTokenSymbol("ANY");
-      setProtocolKey("all");
-      setStatus("Preset ready: send a daily Telegram summary.");
-      return;
-    }
-
-    setKind("new_market");
-    setTokenSymbol("ANY");
-    setProtocolKey("all");
-    setStatus("Preset ready: tell me when a new market appears.");
-  }
-
-  return (
-    <section id="alerts" className="mb-6 scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
-            Telegram Alerts
-          </div>
-          <p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            Watch displayed rates and get a Telegram message when APR crosses a target,
-            a watched rate drops, the best place changes, or a new market appears.
-          </p>
-        </div>
-        {connection ? (
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="/alerts"
-              className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
-            >
-              Manage alerts
-            </a>
-            <Badge tone="positive">Telegram connected</Badge>
-          </div>
-        ) : (
-          <Badge tone="warning">Setup required</Badge>
-        )}
-      </div>
-
-      <div className="mb-4 grid gap-2 md:grid-cols-4">
-        {[
-          ["USDC above 10%", "Tell me when USDC APR gets interesting.", "usdc-apr"],
-          ["WMON best place", "Tell me when the leading WMON market changes.", "wmon-best"],
-          ["Daily summary", "Send a daily snapshot of top displayed rates.", "daily"],
-          ["New market", "Tell me when a new displayed rate row appears.", "new-market"],
-        ].map(([title, description, preset]) => (
-          <button
-            key={title}
-            type="button"
-            onClick={() => applyPreset(preset as "usdc-apr" | "wmon-best" | "daily" | "new-market")}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 text-left transition-colors hover:border-[var(--color-accent-primary)]"
-          >
-            <span className="block text-[12px] font-bold text-[var(--color-text-primary)]">{title}</span>
-            <span className="mt-1 block text-[10px] leading-relaxed text-[var(--color-text-muted)]">
-              {description}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {!connection && (
-        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-[12px] font-semibold text-[var(--color-text-primary)]">
-                Connect Telegram once
-              </div>
-              <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                The bot needs one Start message so it knows where to send alerts.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={createConnectionCode}
-                disabled={busy}
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:opacity-50"
-              >
-                Create Telegram link
-              </button>
-              {connectSession && (
-                <>
-                  <a
-                    href={connectSession.deepLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-bold text-[#07110C] hover:opacity-90"
-                  >
-                    Open Telegram
-                  </a>
-                  <button
-                    type="button"
-                    onClick={claimConnection}
-                    disabled={busy}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-positive)] disabled:opacity-50"
-                  >
-                    Confirm
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.7fr_auto] lg:items-end">
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Alert type</span>
-          <select
-            value={kind}
-            onChange={(event) => setKind(event.target.value as AlertKind)}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            {ALERT_KIND_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-[10px] text-[var(--color-text-dim)]">
-            {ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.description}
-          </span>
-        </label>
-
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Token</span>
-          <select
-            value={tokenSymbol}
-            onChange={(event) => {
-              setTokenSymbol(event.target.value);
-              setProtocolKey("all");
-            }}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            {tokenChoices.map((symbol) => (
-              <option key={symbol} value={symbol}>
-                {symbol === "ANY" ? "Any token" : symbol}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Protocol</span>
-          <select
-            value={protocolKey}
-            onChange={(event) => setProtocolKey(event.target.value)}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            <option value="all">All protocols</option>
-            {protocolChoices.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
-          <input
-            value={thresholdApr}
-            onChange={(event) => setThresholdApr(event.target.value)}
-            disabled={!needsThreshold}
-            inputMode="decimal"
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-            placeholder="12"
-          />
-        </label>
-
-        <button
-          type="button"
-          onClick={createAlert}
-          disabled={busy || !connection}
-          className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          Create alert
-        </button>
-      </div>
-
-      {status && (
-        <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] text-[var(--color-text-secondary)]">
-          {status}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function SortButton({
   label,
   field,
@@ -1016,10 +521,8 @@ function ProtocolFilter({
 
 function OpportunityRow({
   opp,
-  onWatchMarket,
 }: {
   opp: YieldOpportunity;
-  onWatchMarket?: (opp: YieldOpportunity) => void;
 }) {
   const assetSymbols = getOpportunityAssetSymbols(opp);
   const collateralSymbols = getBorrowCollateralSymbols(opp);
@@ -1058,7 +561,7 @@ function OpportunityRow({
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+        <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
           <div>
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
@@ -1070,20 +573,6 @@ function OpportunityRow({
             <div className="mt-1 font-mono text-[13px] font-semibold text-[var(--color-text-secondary)]">
               {formatUsd(opp.tvl)}
             </div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Alert</div>
-            {opp.action === "LEND" ? (
-              <button
-                type="button"
-                onClick={() => onWatchMarket?.(opp)}
-                className="mt-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-accent-primary)] hover:text-[var(--color-positive)]"
-              >
-                Watch
-              </button>
-            ) : (
-              <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">-</div>
-            )}
           </div>
           <div className="text-right">
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Open</div>
@@ -1195,14 +684,12 @@ function OpportunitySection({
   emptyLabel,
   opportunities,
   onPickToken,
-  onWatchMarket,
 }: {
   title: string;
   subtitle: string;
   emptyLabel: string;
   opportunities: YieldOpportunity[];
   onPickToken?: (symbol: string) => void;
-  onWatchMarket?: (opp: YieldOpportunity) => void;
 }) {
   return (
     <section className="flex-1">
@@ -1216,7 +703,7 @@ function OpportunitySection({
       <div className="space-y-2 md:max-h-[620px] md:overflow-y-auto md:pr-1">
         {opportunities.slice(0, 30).map((opp, index) => (
           <div key={`${opp.id}-${index}`} style={{ animationDelay: `${index * 25}ms` }} className="animate-fade-up">
-            <OpportunityRow opp={opp} onWatchMarket={onWatchMarket} />
+            <OpportunityRow opp={opp} />
           </div>
         ))}
         {opportunities.length === 0 && (
@@ -1281,7 +768,6 @@ export function YieldAggregator() {
   const [protocolFilter, setProtocolFilter] = useState("all");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletInput, setWalletInput] = useState("");
-  const [alertDraft, setAlertDraft] = useState<AlertDraft | null>(null);
   const walletBalances = useTokenBalances(walletAddress || null);
 
   useEffect(() => {
@@ -1373,22 +859,6 @@ export function YieldAggregator() {
     window.history.replaceState(null, "", nextUrl);
   }
 
-  function prefillWatchMarket(opp: YieldOpportunity) {
-    const assets = getOpportunityAssetSymbols(opp);
-    const tokenSymbol = assets[0] || opp.tokens[0]?.symbol || "ANY";
-    const protocolKey = protocolFilterKey(opp.protocol);
-    const threshold = Math.max(0, opp.apr - 1);
-
-    setAlertDraft({
-      kind: "apr_below",
-      tokenSymbol,
-      protocolKey,
-      thresholdApr: threshold.toFixed(2),
-      label: `${tokenSymbol} on ${opp.protocol}`,
-      nonce: Date.now(),
-    });
-  }
-
   if (loading) return <AggregatorSkeleton />;
 
   if (error) {
@@ -1409,12 +879,6 @@ export function YieldAggregator() {
         body="Different protocols can offer very different displayed APR and liquidity for the same asset. This page helps you shortlist markets before doing deeper due diligence."
       />
       <RateExplainerStrip />
-      <BestForMePanel
-        opportunities={allOpps}
-        onPickLend={(symbol) => setLendTokens([symbol])}
-        onPickBorrow={(symbol) => setBorrowTokens([symbol])}
-        onWatchMarket={prefillWatchMarket}
-      />
 
       <WalletHoldingsPanel
         address={walletAddress}
@@ -1442,12 +906,6 @@ export function YieldAggregator() {
           )}
         </div>
       )}
-
-      <WhyThisMatters
-        title="Why set alerts?"
-        body="Rates move while you are away. Alerts turn the table into a watchlist so you can react when an APR threshold, best market, or new opportunity changes."
-      />
-      <AlertPanel opportunities={allOpps} watchDraft={alertDraft} />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
@@ -1491,7 +949,6 @@ export function YieldAggregator() {
             emptyLabel="No supply or deposit opportunities found."
             opportunities={lendOpps}
             onPickToken={(symbol) => setLendTokens([symbol])}
-            onWatchMarket={prefillWatchMarket}
           />
           <OpportunitySection
             title="Borrow Markets"
@@ -1499,7 +956,6 @@ export function YieldAggregator() {
             emptyLabel="No borrow markets found."
             opportunities={borrowOpps}
             onPickToken={(symbol) => setBorrowTokens([symbol])}
-            onWatchMarket={prefillWatchMarket}
           />
         </div>
       )}
@@ -1511,7 +967,6 @@ export function YieldAggregator() {
           emptyLabel="No supply or deposit opportunities found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
-          onWatchMarket={prefillWatchMarket}
         />
       )}
 
@@ -1522,7 +977,6 @@ export function YieldAggregator() {
           emptyLabel="No borrow markets found for this token."
           opportunities={borrowOpps}
           onPickToken={(symbol) => setBorrowTokens([symbol])}
-          onWatchMarket={prefillWatchMarket}
         />
       )}
 

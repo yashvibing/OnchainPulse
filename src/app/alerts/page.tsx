@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AlertCreator } from "@/components/AlertCreator";
 import { AlertManagement } from "@/components/AlertManagement";
 import { Header } from "@/components/Header";
 
@@ -45,6 +46,7 @@ export default function AlertsPage() {
           </div>
         </section>
 
+        <AlertCreator />
         <AlertManagement />
       </main>
     </div>

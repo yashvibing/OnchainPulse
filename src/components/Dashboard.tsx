@@ -130,12 +130,12 @@ function DashboardInner() {
                 Monad command center
               </div>
               <h1 className="mx-auto mt-3 max-w-[760px] text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[56px]">
-                Track wallets, compare DeFi rates, and get alerts when markets move.
+                Track wallets, compare DeFi rates, and understand Monad activity.
               </h1>
               <p className="mx-auto mb-6 mt-3 max-w-[720px] text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Onchain Pulse turns public Monad wallet and market data into three simple actions:
-                see what a wallet holds, find where assets can earn, and set Telegram alerts
-                when opportunities change.
+                Onchain Pulse turns public Monad wallet and market data into simple actions:
+                see what a wallet holds, find where assets can earn, and read the context
+                behind protocol activity.
               </p>
               <WelcomeActionCards />
 
@@ -521,10 +521,10 @@ function WelcomeActionCards() {
       cta: "Compare rates",
     },
     {
-      title: "Set an alert",
-      description: "Get Telegram messages when APRs cross a target or better markets appear.",
-      href: "/yield-aggregator#alerts",
-      cta: "Create alert",
+      title: "Explore ecosystem",
+      description: "Browse builders, market context, and public signals around Monad activity.",
+      href: "/startups",
+      cta: "View ecosystem",
     },
   ];
 
