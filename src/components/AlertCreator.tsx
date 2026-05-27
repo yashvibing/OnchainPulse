@@ -30,31 +30,26 @@ const POPULAR_TOKENS = [
   "USD1",
 ];
 
-const ALERT_KIND_OPTIONS: { value: AlertKind; label: string; description: string }[] = [
+const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
   {
     value: "apr_above",
     label: "APR goes above",
-    description: "Message me when the best matching rate crosses a target.",
   },
   {
     value: "apr_below",
     label: "APR drops below",
-    description: "Message me when a watched rate falls under a floor.",
   },
   {
     value: "best_market_change",
     label: "Best place changes",
-    description: "Message me when another protocol becomes the top displayed place.",
   },
   {
     value: "new_market",
     label: "New market appears",
-    description: "Message me when a new matching DeFi rate row is added.",
   },
   {
     value: "daily_digest",
     label: "Daily digest",
-    description: "Send a daily Telegram summary of top matching displayed rates.",
   },
 ];
 
@@ -101,6 +96,7 @@ export function AlertCreator() {
   const [status, setStatus] = useState("");
   const [statusTone, setStatusTone] = useState<"info" | "error" | "success">("info");
   const [busy, setBusy] = useState(false);
+  const [telegramOpened, setTelegramOpened] = useState(false);
 
   useEffect(() => {
     setConnection(readStoredTelegramConnection());
@@ -147,8 +143,9 @@ export function AlertCreator() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create Telegram connection.");
       setConnectSession(data);
+      setTelegramOpened(false);
       setStatusTone("success");
-      setStatus("Open Telegram, tap Start, then come back and confirm.");
+      setStatus("Telegram link created. Open Telegram, tap Start, then confirm here.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Telegram setup failed.";
       setStatusTone("error");
@@ -183,6 +180,7 @@ export function AlertCreator() {
       saveStoredTelegramConnection(nextConnection);
       setConnection(nextConnection);
       setConnectSession(null);
+      setTelegramOpened(false);
       setStatusTone("success");
       setStatus("Telegram connected. You can create alerts now.");
       notifyAlertsChanged();
@@ -237,6 +235,15 @@ export function AlertCreator() {
     }
   }
 
+  function setupButtonClass(active: boolean, completed = false) {
+    return [
+      "rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-45",
+      active || completed
+        ? "bg-[var(--color-accent-primary)] text-[#07110C] hover:opacity-90"
+        : "border border-[var(--color-border)] text-[var(--color-text-muted)]",
+    ].join(" ");
+  }
+
   return (
     <section id="create-alert" className="mb-6 scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -273,31 +280,37 @@ export function AlertCreator() {
                 <button
                   type="button"
                   onClick={createConnectionCode}
-                  disabled={busy}
-                  className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] hover:opacity-90 disabled:opacity-50"
+                  disabled={busy || Boolean(connectSession)}
+                  className={setupButtonClass(!connectSession, Boolean(connectSession))}
                 >
                   Create Telegram link
                 </button>
               )}
-              {connectSession && !connection && (
-                <>
+              {!connection &&
+                (connectSession ? (
                   <a
                     href={connectSession.deepLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[var(--color-positive)] hover:bg-[rgba(0,245,204,0.08)]"
+                    onClick={() => setTelegramOpened(true)}
+                    className={setupButtonClass(!telegramOpened, telegramOpened)}
                   >
                     Open Telegram
                   </a>
-                  <button
-                    type="button"
-                    onClick={claimConnection}
-                    disabled={busy}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:opacity-50"
-                  >
-                    I tapped Start
+                ) : (
+                  <button type="button" disabled className={setupButtonClass(false)}>
+                    Open Telegram
                   </button>
-                </>
+                ))}
+              {!connection && (
+                <button
+                  type="button"
+                  onClick={claimConnection}
+                  disabled={busy || !telegramOpened}
+                  className={setupButtonClass(telegramOpened)}
+                >
+                  I tapped Start
+                </button>
               )}
             </div>
           </div>
@@ -352,9 +365,6 @@ export function AlertCreator() {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[10px] text-[var(--color-text-dim)]">
-                {ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.description}
-              </span>
             </label>
 
             <label className="block">
