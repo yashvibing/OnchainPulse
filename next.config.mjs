@@ -13,6 +13,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "icons.llama.fi",
       },
+      {
+        protocol: "https",
+        hostname: "icons.llamao.fi",
+      },
     ],
   },
 };
