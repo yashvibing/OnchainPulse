@@ -58,6 +58,7 @@ function decodeXmlEntities(input: string) {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
     .replace(/&#39;/g, "'")
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) =>
