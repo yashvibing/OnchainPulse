@@ -31,7 +31,7 @@ const FEATURE_CARDS = [
     href: "/app",
   },
   {
-    title: "Compare DeFi Rates",
+    title: "DeFi Rates",
     body: "Browse displayed lending, staking, LP, vault, and borrow markets without connecting a wallet.",
     href: "/defi-rates",
   },
