@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   fetchYieldOpportunitiesWithClientMeta,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/telegramAlertClient";
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
+type SelectOption = { value: string; label: string };
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -81,6 +82,92 @@ function notifyAlertsChanged() {
   window.dispatchEvent(new Event("onchain-pulse:alerts-changed"));
 }
 
+function AlertSelect({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: SelectOption[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value) || options[0];
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="mt-1 flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-left text-[12px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-hover)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+      >
+        <span className="truncate">{selected?.label}</span>
+        <span className={`text-[14px] text-[var(--color-text-secondary)] transition-transform ${open ? "rotate-180" : ""}`}>
+          v
+        </span>
+      </button>
+
+      {open && !disabled && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[280px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[var(--color-bg-surface-solid)] p-1 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+        >
+          {options.map((option) => {
+            const active = option.value === value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-3 py-2 text-left text-[12px] font-semibold transition-colors ${
+                  active
+                    ? "bg-[var(--color-accent-primary)] text-[#07110C]"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-card-hover)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                <span className="truncate">{option.label}</span>
+                {active && <span className="text-[10px]">Selected</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AlertCreator() {
   const [opportunities, setOpportunities] = useState<YieldOpportunity[]>([]);
   const [connection, setConnection] = useState<StoredTelegramConnection | null>(null);
@@ -117,6 +204,14 @@ export function AlertCreator() {
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
   const formDisabled = busy || !connection;
   const tokenChoices = kind === "new_market" || kind === "daily_digest" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const tokenOptions = tokenChoices.map((symbol) => ({
+    value: symbol,
+    label: symbol === "ANY" ? "Any token" : symbol,
+  }));
+  const alertKindOptions = ALERT_KIND_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+  }));
   const protocolChoices = useMemo(() => {
     const token = tokenSymbol.toUpperCase();
     const map = new Map<string, string>();
@@ -133,6 +228,10 @@ export function AlertCreator() {
       .map(([key, label]) => ({ key, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [opportunities, tokenSymbol]);
+  const protocolOptions = [
+    { value: "all", label: "All protocols" },
+    ...protocolChoices.map((option) => ({ value: option.key, label: option.label })),
+  ];
 
   const createConnectionCode = useCallback(async () => {
     setBusy(true);
@@ -332,57 +431,38 @@ export function AlertCreator() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr_0.9fr_0.7fr_auto] lg:items-end">
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Token</span>
-              <select
+            <div className="block">
+              <AlertSelect
+                label="Token"
                 value={tokenSymbol}
                 disabled={formDisabled}
-                onChange={(event) => {
-                  setTokenSymbol(event.target.value);
+                options={tokenOptions}
+                onChange={(nextValue) => {
+                  setTokenSymbol(nextValue);
                   setProtocolKey("all");
                 }}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-              >
-                {tokenChoices.map((symbol) => (
-                  <option key={symbol} value={symbol}>
-                    {symbol === "ANY" ? "Any token" : symbol}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
 
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Alert me when</span>
-              <select
+            <div className="block">
+              <AlertSelect
+                label="Alert me when"
                 value={kind}
                 disabled={formDisabled}
-                onChange={(event) => setKind(event.target.value as AlertKind)}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-              >
-                {ALERT_KIND_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={alertKindOptions}
+                onChange={(nextValue) => setKind(nextValue as AlertKind)}
+              />
+            </div>
 
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Protocol</span>
-              <select
+            <div className="block">
+              <AlertSelect
+                label="Protocol"
                 value={protocolKey}
                 disabled={formDisabled}
-                onChange={(event) => setProtocolKey(event.target.value)}
-                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-              >
-                <option value="all">All protocols</option>
-                {protocolChoices.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={protocolOptions}
+                onChange={setProtocolKey}
+              />
+            </div>
 
             <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
               <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
