@@ -125,6 +125,28 @@ function relevantOpportunities(
     .sort((a, b) => b.apr - a.apr);
 }
 
+function findAlreadyMetThresholdAlert(
+  opportunities: YieldOpportunity[],
+  kind: AlertKind,
+  tokenSymbol: string,
+  protocolKey: string | undefined,
+  thresholdApr?: number
+) {
+  if ((kind !== "apr_above" && kind !== "apr_below") || typeof thresholdApr !== "number") {
+    return undefined;
+  }
+
+  const relevant = relevantOpportunities(opportunities, { tokenSymbol, protocolKey });
+
+  if (kind === "apr_above") {
+    return relevant.find((opp) => opp.apr >= thresholdApr);
+  }
+
+  return relevant
+    .filter((opp) => opp.apr <= thresholdApr)
+    .sort((a, b) => a.apr - b.apr)[0];
+}
+
 async function readAlert(id: string): Promise<TelegramAlert | null> {
   const redis = getServerRedisClient();
   if (!redis) return memoryAlerts.get(id) || null;
@@ -384,6 +406,19 @@ export async function createTelegramAlert(input: {
   const opportunities = await fetchCombinedYieldOpportunities();
   const tokenSymbol = normalizeTokenSymbol(input.tokenSymbol || "ANY");
   const protocolKey = input.protocolKey && input.protocolKey !== "all" ? normalizeProtocolKey(input.protocolKey) : undefined;
+  const alreadyMet = findAlreadyMetThresholdAlert(
+    opportunities,
+    input.kind,
+    tokenSymbol,
+    protocolKey,
+    input.thresholdApr
+  );
+  if (alreadyMet) {
+    throw new Error(
+      `Alert condition already exists: ${opportunityLabel(alreadyMet)} is ${alreadyMet.apr.toFixed(2)}% APR.`
+    );
+  }
+
   const now = Date.now();
   const alert: TelegramAlert = {
     id: randomUUID(),

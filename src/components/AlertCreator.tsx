@@ -15,6 +15,14 @@ import {
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market";
 type SelectOption = { value: string; label: string };
+type ExistingRateMatch = {
+  tokenSymbol: string;
+  condition: "above" | "below";
+  thresholdApr: number;
+  protocolScope: string;
+  protocol: string;
+  apr: number;
+};
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -76,6 +84,42 @@ function Badge({
 
 function notifyAlertsChanged() {
   window.dispatchEvent(new Event("onchain-pulse:alerts-changed"));
+}
+
+function matchesAlertToken(opp: YieldOpportunity, tokenSymbol: string) {
+  if (tokenSymbol === "ANY") return true;
+  const selected = tokenSymbol.toUpperCase();
+  return getOpportunityAssetSymbols(opp).some((symbol) => symbol.toUpperCase() === selected);
+}
+
+function matchesAlertProtocol(opp: YieldOpportunity, protocolKey: string) {
+  return protocolKey === "all" || protocolFilterKey(opp.protocol) === protocolKey;
+}
+
+function findExistingThresholdMatch(
+  opportunities: YieldOpportunity[],
+  kind: AlertKind,
+  tokenSymbol: string,
+  protocolKey: string,
+  thresholdApr: number
+) {
+  if (kind !== "apr_above" && kind !== "apr_below") return undefined;
+
+  const matches = opportunities
+    .filter((opp) => opp.action === "LEND")
+    .filter((opp) => matchesAlertToken(opp, tokenSymbol))
+    .filter((opp) => matchesAlertProtocol(opp, protocolKey))
+    .filter((opp) => opp.apr > 0);
+
+  if (kind === "apr_above") {
+    return matches
+      .filter((opp) => opp.apr >= thresholdApr)
+      .sort((a, b) => b.apr - a.apr)[0];
+  }
+
+  return matches
+    .filter((opp) => opp.apr <= thresholdApr)
+    .sort((a, b) => a.apr - b.apr)[0];
 }
 
 function AlertSelect({
@@ -180,6 +224,7 @@ export function AlertCreator() {
   const [statusTone, setStatusTone] = useState<"info" | "error" | "success">("info");
   const [busy, setBusy] = useState(false);
   const [telegramOpened, setTelegramOpened] = useState(false);
+  const [existingRateMatch, setExistingRateMatch] = useState<ExistingRateMatch | null>(null);
 
   useEffect(() => {
     setConnection(readStoredTelegramConnection());
@@ -195,10 +240,14 @@ export function AlertCreator() {
     if (kind !== "new_market" && tokenSymbol === "ANY") {
       setTokenSymbol("USDC");
     }
-  }, [kind, tokenSymbol]);
+    if (kind === "best_market_change" && protocolKey !== "all") {
+      setProtocolKey("all");
+    }
+  }, [kind, protocolKey, tokenSymbol]);
 
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
   const formDisabled = busy || !connection;
+  const protocolDisabled = formDisabled || kind === "best_market_change";
   const tokenChoices = kind === "new_market" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
   const tokenOptions = tokenChoices.map((symbol) => ({
     value: symbol,
@@ -226,7 +275,9 @@ export function AlertCreator() {
   }, [opportunities, tokenSymbol]);
   const protocolOptions = [
     { value: "all", label: "All protocols" },
-    ...protocolChoices.map((option) => ({ value: option.key, label: option.label })),
+    ...(kind === "best_market_change"
+      ? []
+      : protocolChoices.map((option) => ({ value: option.key, label: option.label }))),
   ];
 
   const createConnectionCode = useCallback(async () => {
@@ -301,11 +352,26 @@ export function AlertCreator() {
       return;
     }
 
+    const selectedProtocol = protocolOptions.find((option) => option.value === protocolKey);
+    const existingMatch = findExistingThresholdMatch(opportunities, kind, tokenSymbol, protocolKey, threshold);
+    if (existingMatch) {
+      setExistingRateMatch({
+        tokenSymbol,
+        condition: kind === "apr_below" ? "below" : "above",
+        thresholdApr: threshold,
+        protocolScope: selectedProtocol?.label || "All protocols",
+        protocol: existingMatch.protocol,
+        apr: existingMatch.apr,
+      });
+      setStatusTone("error");
+      setStatus("Alert not created because that condition is already true.");
+      return;
+    }
+
     setBusy(true);
     setStatus("");
     setStatusTone("info");
     try {
-      const selectedProtocol = protocolOptions.find((option) => option.value === protocolKey);
       const response = await fetch("/api/alerts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -448,7 +514,11 @@ export function AlertCreator() {
                 value={kind}
                 disabled={formDisabled}
                 options={alertKindOptions}
-                onChange={(nextValue) => setKind(nextValue as AlertKind)}
+                onChange={(nextValue) => {
+                  const nextKind = nextValue as AlertKind;
+                  setKind(nextKind);
+                  if (nextKind === "best_market_change") setProtocolKey("all");
+                }}
               />
             </div>
 
@@ -456,10 +526,15 @@ export function AlertCreator() {
               <AlertSelect
                 label="Protocol"
                 value={protocolKey}
-                disabled={formDisabled}
+                disabled={protocolDisabled}
                 options={protocolOptions}
                 onChange={setProtocolKey}
               />
+              {kind === "best_market_change" && (
+                <p className="mt-1 text-[10px] leading-relaxed text-[var(--color-text-dim)]">
+                  Best-place alerts compare every protocol for this token.
+                </p>
+              )}
             </div>
 
             <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
@@ -498,6 +573,47 @@ export function AlertCreator() {
           }`}
         >
           {status}
+        </div>
+      )}
+
+      {existingRateMatch && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 py-6">
+          <div className="w-full max-w-[520px] rounded-[var(--radius-lg)] border border-[var(--color-border-elevated)] bg-[var(--color-bg-surface-solid)] px-5 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
+            <div className="text-[11px] font-bold uppercase text-[var(--color-warning)]">
+              Alert already active
+            </div>
+            <h3 className="mt-2 text-[22px] font-bold text-[var(--color-text-primary)]">
+              This condition is already true
+            </h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+              You selected {existingRateMatch.tokenSymbol} {existingRateMatch.condition}{" "}
+              {existingRateMatch.thresholdApr}% APR on {existingRateMatch.protocolScope}, but an opportunity
+              already exists on {existingRateMatch.protocol}.
+            </p>
+            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3">
+              <div className="text-[10px] font-bold uppercase text-[var(--color-text-dim)]">
+                Current displayed APR
+              </div>
+              <div className="mt-1 text-[24px] font-bold text-[var(--color-accent-primary)]">
+                {existingRateMatch.apr.toFixed(2)}% APR
+              </div>
+              <div className="mt-1 text-[12px] text-[var(--color-text-muted)]">
+                {existingRateMatch.tokenSymbol} on {existingRateMatch.protocol}
+              </div>
+            </div>
+            <p className="mt-4 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+              Pick a different protocol or set a target that is not already met.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setExistingRateMatch(null)}
+                className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] hover:opacity-90"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
