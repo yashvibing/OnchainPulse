@@ -240,7 +240,7 @@ export function AlertCreator() {
       setConnectSession(data);
       setTelegramOpened(false);
       setStatusTone("success");
-      setStatus("Telegram link created. Open Telegram, tap Start, then confirm here.");
+      setStatus("Telegram link created. Use the bot link button, tap Start in Telegram, then confirm here.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Telegram setup failed.";
       setStatusTone("error");
@@ -369,7 +369,7 @@ export function AlertCreator() {
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
                 {connection
                   ? "Alerts will be sent to your connected Telegram chat."
-                  : "Create a link, tap Start in Telegram, then return here and confirm."}
+                  : "Create a link, use the bot link button, tap Start in Telegram, then return here and confirm."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -392,11 +392,11 @@ export function AlertCreator() {
                     onClick={() => setTelegramOpened(true)}
                     className={setupButtonClass(!telegramOpened, telegramOpened)}
                   >
-                    Open Telegram
+                    Launch bot link
                   </a>
                 ) : (
                   <button type="button" disabled className={setupButtonClass(false)}>
-                    Open Telegram
+                    Launch bot link
                   </button>
                 ))}
               {!connection && (
