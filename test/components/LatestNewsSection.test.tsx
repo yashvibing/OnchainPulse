@@ -32,9 +32,10 @@ describe("LatestNewsSection", () => {
   it("renders a news card from the API response", async () => {
     render(<LatestNewsSection />);
 
-    expect(screen.getByText("Latest news")).toBeInTheDocument();
+    expect(screen.getByText("Monad Market Updates")).toBeInTheDocument();
     expect(await screen.findByText("Monad lands new DeFi partnership")).toBeInTheDocument();
-    expect(screen.getByText("The Block")).toBeInTheDocument();
+    expect(screen.getByText(/The Block/)).toBeInTheDocument();
+    expect(screen.getByText(/Why it matters:/)).toBeInTheDocument();
     expect(screen.getByText("Open full feed")).toBeInTheDocument();
   });
 });
