@@ -45,8 +45,8 @@ function formatMessageStatus(value?: number) {
   return value ? `Sent ${formatDate(value)}` : "Waiting for trigger";
 }
 
-function formatProtocolKey(key?: string) {
-  if (!key || key === "all") return "All protocols";
+function formatProtocolKey(key?: string, broadLabel = "All protocols") {
+  if (!key || key === "all") return broadLabel;
   return key
     .replace(/([a-z])([0-9])/gu, "$1 $2")
     .replace(/([a-z])([A-Z])/gu, "$1 $2")
@@ -56,12 +56,12 @@ function formatProtocolKey(key?: string) {
     .replace(/\b\w/gu, (char) => char.toUpperCase()) || "Selected protocol";
 }
 
-function protocolScope(alert: ManagedAlert) {
-  return alert.protocolLabel || formatProtocolKey(alert.protocolKey);
+function protocolTitleScope(alert: ManagedAlert) {
+  return alert.protocolLabel || formatProtocolKey(alert.protocolKey, "any protocol");
 }
 
 function describeAlert(alert: ManagedAlert) {
-  const scope = protocolScope(alert);
+  const scope = protocolTitleScope(alert);
   if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR on ${scope}`;
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR on ${scope}`;
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
@@ -70,11 +70,7 @@ function describeAlert(alert: ManagedAlert) {
 }
 
 function alertConditionTitle(alert: ManagedAlert) {
-  if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR`;
-  if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR`;
-  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best place changes`;
-  if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All markets" : alert.tokenSymbol} rate digest`;
-  return alert.tokenSymbol === "ANY" ? "Any new market" : `New ${alert.tokenSymbol} market`;
+  return describeAlert(alert);
 }
 
 export function AlertManagement() {
@@ -233,9 +229,6 @@ export function AlertManagement() {
                     {alertConditionTitle(alert)}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <span className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.06)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                      Scope: {protocolScope(alert)}
-                    </span>
                     <span className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
                       ID {alert.id.slice(0, 8)}
                     </span>
@@ -285,9 +278,6 @@ export function AlertManagement() {
                     Delete
                   </button>
                 </div>
-              </div>
-              <div className="mt-3 border-t border-[var(--color-border)] pt-3 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-                {describeAlert(alert)}
               </div>
             </div>
           ))}
