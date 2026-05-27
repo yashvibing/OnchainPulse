@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Track Wallet" },
+  { href: "/app", label: "Portfolio Tracker" },
   { href: "/defi-rates", label: "DeFi Rates" },
   { href: "/alerts", label: "Alerts" },
   { href: "/startups", label: "Ecosystem" },
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
 
 export function Header() {
   const pathname = usePathname();
+  const showAppNav = pathname !== "/";
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)]">
@@ -33,28 +34,27 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1 sm:gap-4">
-          {NAV_ITEMS.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+        {showAppNav && (
+          <nav className="flex items-center gap-1 sm:gap-4">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname.startsWith(item.href);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`border-b-2 px-2 py-2 text-[12px] font-semibold transition-colors sm:text-[14px] ${
-                  active
-                    ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
-                    : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-accent-primary)]"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`border-b-2 px-2 py-2 text-[12px] font-semibold transition-colors sm:text-[14px] ${
+                    active
+                      ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
+                      : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-accent-primary)]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
     </header>
   );

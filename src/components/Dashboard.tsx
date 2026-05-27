@@ -130,7 +130,7 @@ function DashboardInner() {
                 Monad command center
               </div>
               <h1 className="mx-auto mt-3 max-w-[760px] text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[56px]">
-                Track wallets, compare DeFi rates, and understand Monad activity.
+                Portfolio Tracker, DeFi rates, and Monad activity.
               </h1>
               <p className="mx-auto mb-6 mt-3 max-w-[720px] text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
                 Onchain Pulse turns public Monad wallet and market data into simple actions:
@@ -141,8 +141,8 @@ function DashboardInner() {
 
               <div id="track-wallet" className="mx-auto mt-8 max-w-[620px] scroll-mt-24">
                 <WhyThisMatters
-                  title="Why track a wallet?"
-                  body="A wallet scan gives you a quick map of tokens, staking, lending, liquidity, and vault exposure before you decide what to inspect next."
+                  title="Why use Portfolio Tracker?"
+                  body="A portfolio scan gives you a quick map of tokens, staking, lending, liquidity, and vault exposure before you decide what to inspect next."
                 />
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
                 <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -200,7 +200,7 @@ function DashboardInner() {
                   const v = Math.round(portfolio.totalValue);
                   const y = Math.round(portfolio.dailyYield * 100) / 100;
                   const d = `${address}|${v}|${y}|${portfolio.positionCount}|${portfolio.protocolCount}`;
-                  const url = `${window.location.origin}?address=${address}&d=${encodeURIComponent(d)}`;
+                  const url = `${window.location.origin}/app?address=${address}&d=${encodeURIComponent(d)}`;
                   navigator.clipboard.writeText(url).then(() => {
                     setCopyFeedback("Card link copied!");
                     setTimeout(() => setCopyFeedback(null), 2000);
@@ -503,7 +503,7 @@ function buildPortfolioCsv(address: string, portfolio: PortfolioData) {
 function WelcomeActionCards() {
   const cards = [
     {
-      title: "Track a wallet",
+      title: "Portfolio Tracker",
       description: "Paste an address to see holdings, staking, lending, liquidity, and vault positions.",
       href: "#track-wallet",
       cta: "Start here",
