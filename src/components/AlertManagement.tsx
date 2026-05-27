@@ -28,13 +28,21 @@ const KIND_LABELS: Record<AlertKind, string> = {
 };
 
 function formatDate(value?: number) {
-  if (!value) return "Never";
+  if (!value) return "Not yet";
   return new Date(value).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatApr(value?: number) {
+  return typeof value === "number" ? `${value.toFixed(2)}% APR` : "Checking soon";
+}
+
+function formatMessageStatus(value?: number) {
+  return value ? `Sent ${formatDate(value)}` : "Waiting for trigger";
 }
 
 function formatProtocolKey(key?: string) {
@@ -59,6 +67,14 @@ function describeAlert(alert: ManagedAlert) {
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
   if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All watched markets" : alert.tokenSymbol} daily top rates on ${scope}`;
   return alert.tokenSymbol === "ANY" ? `Any new displayed market on ${scope}` : `New ${alert.tokenSymbol} market on ${scope}`;
+}
+
+function alertConditionTitle(alert: ManagedAlert) {
+  if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR`;
+  if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR`;
+  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best place changes`;
+  if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All markets" : alert.tokenSymbol} rate digest`;
+  return alert.tokenSymbol === "ANY" ? "Any new market" : `New ${alert.tokenSymbol} market`;
 }
 
 export function AlertManagement() {
@@ -201,27 +217,59 @@ export function AlertManagement() {
               key={alert.id}
               className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4"
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14px] font-bold text-[var(--color-text-primary)]">{KIND_LABELS[alert.kind]}</span>
-                    <span className={`rounded-[var(--radius-sm)] px-2 py-1 text-[9px] font-bold uppercase ${
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px_auto] xl:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase text-[var(--color-text-dim)]">
+                    <span>{KIND_LABELS[alert.kind]}</span>
+                    <span className={`rounded-[var(--radius-sm)] px-2 py-1 ${
                       alert.status === "active"
                         ? "bg-[rgba(0,245,204,0.1)] text-[var(--color-positive)]"
                         : "bg-[rgba(255,255,255,0.06)] text-[var(--color-text-dim)]"
                     }`}>
-                      {alert.status}
+                      {alert.status === "active" ? "Active" : "Paused"}
                     </span>
                   </div>
-                  <div className="mt-1 text-[12px] text-[var(--color-text-secondary)]">{describeAlert(alert)}</div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-[var(--color-text-dim)]">
-                    <span>ID {alert.id.slice(0, 8)}</span>
-                    <span>Created {formatDate(alert.createdAt)}</span>
-                    <span>Last sent {formatDate(alert.lastTriggeredAt)}</span>
-                    {typeof alert.lastApr === "number" && <span>Last seen {alert.lastApr.toFixed(2)}% APR</span>}
+                  <div className="mt-2 truncate text-[18px] font-bold text-[var(--color-text-primary)]">
+                    {alertConditionTitle(alert)}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.06)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                      Scope: {protocolScope(alert)}
+                    </span>
+                    <span className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                      ID {alert.id.slice(0, 8)}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                    <div className="text-[9px] font-bold uppercase text-[var(--color-text-dim)]">
+                      Current best
+                    </div>
+                    <div className="mt-1 text-[14px] font-bold text-[var(--color-accent-primary)]">
+                      {formatApr(alert.lastApr)}
+                    </div>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                    <div className="text-[9px] font-bold uppercase text-[var(--color-text-dim)]">
+                      Message status
+                    </div>
+                    <div className="mt-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+                      {formatMessageStatus(alert.lastTriggeredAt)}
+                    </div>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                    <div className="text-[9px] font-bold uppercase text-[var(--color-text-dim)]">
+                      Created
+                    </div>
+                    <div className="mt-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+                      {formatDate(alert.createdAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 xl:justify-end">
                   <button
                     type="button"
                     onClick={() => updateAlert(alert, alert.status === "active" ? "paused" : "active")}
@@ -237,6 +285,9 @@ export function AlertManagement() {
                     Delete
                   </button>
                 </div>
+              </div>
+              <div className="mt-3 border-t border-[var(--color-border)] pt-3 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                {describeAlert(alert)}
               </div>
             </div>
           ))}
