@@ -102,6 +102,18 @@ function formatRateLabel(apr: number) {
   return `${apr.toFixed(2)}% APR`;
 }
 
+function getDisplayProtocolIcon(iconUrl?: string) {
+  if (!iconUrl) return null;
+
+  try {
+    const url = new URL(iconUrl);
+    if (url.hostname === "icons.llama.fi") return null;
+    return iconUrl;
+  } catch {
+    return null;
+  }
+}
+
 function Badge({
   children,
   tone = "neutral",
@@ -127,6 +139,7 @@ function Badge({
 
 function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
   const [iconFailed, setIconFailed] = useState(false);
+  const iconUrl = getDisplayProtocolIcon(opp.protocolIcon);
   const initials = opp.protocol
     .split(/\s+/)
     .slice(0, 2)
@@ -139,10 +152,10 @@ function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
       className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.06)]"
       aria-hidden="true"
     >
-      {opp.protocolIcon && !iconFailed ? (
+      {iconUrl && !iconFailed ? (
         // Third-party icon CDNs can be blocked by browser response sniffing; fall back cleanly.
         <Image
-          src={opp.protocolIcon}
+          src={iconUrl}
           alt=""
           width={32}
           height={32}
