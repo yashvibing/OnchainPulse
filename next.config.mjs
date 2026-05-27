@@ -7,6 +7,14 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: rootDir,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "icons.llama.fi",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

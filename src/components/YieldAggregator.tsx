@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -125,6 +126,7 @@ function Badge({
 }
 
 function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
+  const [iconFailed, setIconFailed] = useState(false);
   const initials = opp.protocol
     .split(/\s+/)
     .slice(0, 2)
@@ -134,14 +136,22 @@ function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
 
   return (
     <div
-      className="h-8 w-8 shrink-0 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.06)] bg-cover bg-center"
-      style={opp.protocolIcon ? { backgroundImage: `url(${opp.protocolIcon})` } : undefined}
+      className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.06)]"
       aria-hidden="true"
     >
-      {!opp.protocolIcon && (
-        <div className="flex h-full w-full items-center justify-center text-[9px] font-bold text-[var(--color-text-secondary)]">
-          {initials || "P"}
-        </div>
+      {opp.protocolIcon && !iconFailed ? (
+        // Third-party icon CDNs can be blocked by browser response sniffing; fall back cleanly.
+        <Image
+          src={opp.protocolIcon}
+          alt=""
+          width={32}
+          height={32}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setIconFailed(true)}
+        />
+      ) : (
+        <span className="text-[9px] font-bold text-[var(--color-text-secondary)]">{initials || "P"}</span>
       )}
     </div>
   );
