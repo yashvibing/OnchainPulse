@@ -13,7 +13,7 @@ import {
   type StoredTelegramConnection,
 } from "@/lib/telegramAlertClient";
 
-type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
+type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market";
 type SelectOption = { value: string; label: string };
 
 const POPULAR_TOKENS = [
@@ -48,14 +48,10 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
     value: "new_market",
     label: "New market appears",
   },
-  {
-    value: "daily_digest",
-    label: "Daily digest",
-  },
 ];
 
 function protocolFilterKey(protocol: string) {
-  return protocol.trim().toLowerCase();
+  return protocol.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function Badge({
@@ -196,14 +192,14 @@ export function AlertCreator() {
   }, []);
 
   useEffect(() => {
-    if (kind !== "new_market" && kind !== "daily_digest" && tokenSymbol === "ANY") {
+    if (kind !== "new_market" && tokenSymbol === "ANY") {
       setTokenSymbol("USDC");
     }
   }, [kind, tokenSymbol]);
 
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
   const formDisabled = busy || !connection;
-  const tokenChoices = kind === "new_market" || kind === "daily_digest" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const tokenChoices = kind === "new_market" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
   const tokenOptions = tokenChoices.map((symbol) => ({
     value: symbol,
     label: symbol === "ANY" ? "Any token" : symbol,
@@ -309,6 +305,7 @@ export function AlertCreator() {
     setStatus("");
     setStatusTone("info");
     try {
+      const selectedProtocol = protocolOptions.find((option) => option.value === protocolKey);
       const response = await fetch("/api/alerts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -317,6 +314,7 @@ export function AlertCreator() {
           chatId: connection.chatId,
           tokenSymbol,
           protocolKey,
+          protocolLabel: selectedProtocol?.label,
           thresholdApr: needsThreshold ? threshold : undefined,
         }),
       });

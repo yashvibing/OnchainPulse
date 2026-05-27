@@ -79,6 +79,7 @@ export async function POST(request: Request) {
       chatId: String(body.chatId || ""),
       tokenSymbol: String(body.tokenSymbol || "ANY"),
       protocolKey: body.protocolKey ? String(body.protocolKey) : undefined,
+      protocolLabel: body.protocolLabel ? String(body.protocolLabel) : undefined,
       thresholdApr,
     });
 
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
         kind: alert.kind,
         tokenSymbol: alert.tokenSymbol,
         protocolKey: alert.protocolKey,
+        protocolLabel: alert.protocolLabel,
         thresholdApr: alert.thresholdApr,
         createdAt: alert.createdAt,
       },

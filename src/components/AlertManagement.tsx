@@ -10,6 +10,7 @@ interface ManagedAlert {
   kind: AlertKind;
   tokenSymbol: string;
   protocolKey?: string;
+  protocolLabel?: string;
   thresholdApr?: number;
   status: "active" | "paused";
   createdAt: number;
@@ -36,12 +37,28 @@ function formatDate(value?: number) {
   });
 }
 
+function formatProtocolKey(key?: string) {
+  if (!key || key === "all") return "All protocols";
+  return key
+    .replace(/([a-z])([0-9])/gu, "$1 $2")
+    .replace(/([a-z])([A-Z])/gu, "$1 $2")
+    .replace(/[-_]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/\b\w/gu, (char) => char.toUpperCase()) || "Selected protocol";
+}
+
+function protocolScope(alert: ManagedAlert) {
+  return alert.protocolLabel || formatProtocolKey(alert.protocolKey);
+}
+
 function describeAlert(alert: ManagedAlert) {
-  if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR`;
-  if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR`;
-  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes`;
-  if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All watched markets" : alert.tokenSymbol} daily top rates`;
-  return alert.tokenSymbol === "ANY" ? "Any new displayed market" : `New ${alert.tokenSymbol} market`;
+  const scope = protocolScope(alert);
+  if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR on ${scope}`;
+  if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR on ${scope}`;
+  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
+  if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All watched markets" : alert.tokenSymbol} daily top rates on ${scope}`;
+  return alert.tokenSymbol === "ANY" ? `Any new displayed market on ${scope}` : `New ${alert.tokenSymbol} market on ${scope}`;
 }
 
 export function AlertManagement() {

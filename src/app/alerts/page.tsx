@@ -22,14 +22,14 @@ export default function AlertsPage() {
             Alerts
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Manage APR thresholds, best-place watches, new-market alerts, and
-            daily Telegram digests for displayed DeFi rates.
+            Manage APR thresholds, best-place watches, and new-market alerts
+            for displayed DeFi rates.
           </p>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {[
               ["APR threshold", "Know when a token rate moves above or below your target."],
               ["Best place changes", "Watch when another protocol becomes the leading displayed market."],
-              ["Daily digest", "Receive a compact Telegram summary instead of checking manually."],
+              ["New market appears", "Know when a new matching displayed rate row is added."],
             ].map(([title, description]) => (
               <div
                 key={title}

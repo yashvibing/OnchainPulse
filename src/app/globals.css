@@ -83,6 +83,22 @@
   [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
   }
+
+  select {
+    color-scheme: dark;
+    background-color: var(--color-bg-surface-solid);
+    color: var(--color-text-primary);
+  }
+
+  select option {
+    background-color: var(--color-bg-surface-solid);
+    color: var(--color-text-primary);
+  }
+
+  select option:checked {
+    background-color: var(--color-accent-primary);
+    color: #07110c;
+  }
 }
 
 @layer utilities {

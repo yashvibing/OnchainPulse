@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   useTokenBalances,
@@ -498,24 +498,88 @@ function ProtocolFilter({
   selected: string;
   onSelect: (key: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const selectedOption =
+    selected === "all"
+      ? { key: "all", label: "All protocols", count: 0 }
+      : options.find((option) => option.key === selected);
+  const protocolOptions = [{ key: "all", label: "All protocols", count: 0 }, ...options];
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
-    <label className="flex min-w-[220px] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 py-2">
+    <div
+      ref={ref}
+      className="relative flex min-w-[220px] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 py-2"
+    >
       <span className="text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
         Protocol
       </span>
-      <select
-        value={selected}
-        onChange={(event) => onSelect(event.target.value)}
-        className="min-w-0 flex-1 bg-transparent text-[12px] font-semibold text-[var(--color-text-secondary)] outline-none"
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-[12px] font-semibold text-[var(--color-text-secondary)] outline-none transition-colors hover:text-[var(--color-text-primary)] focus:text-[var(--color-text-primary)]"
       >
-        <option value="all">All protocols</option>
-        {options.map((option) => (
-          <option key={option.key} value={option.key}>
-            {option.label} ({option.count})
-          </option>
-        ))}
-      </select>
-    </label>
+        <span className="truncate">
+          {selectedOption?.label || "All protocols"}
+          {selectedOption && selectedOption.key !== "all" ? ` (${selectedOption.count})` : ""}
+        </span>
+        <span className={`text-[14px] text-[var(--color-text-secondary)] transition-transform ${open ? "rotate-180" : ""}`}>
+          v
+        </span>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[300px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[var(--color-bg-surface-solid)] p-1 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+        >
+          {protocolOptions.map((option) => {
+            const active = option.key === selected;
+            const label = option.key === "all" ? option.label : `${option.label} (${option.count})`;
+
+            return (
+              <button
+                key={option.key}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onSelect(option.key);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-3 py-2 text-left text-[12px] font-semibold transition-colors ${
+                  active
+                    ? "bg-[var(--color-accent-primary)] text-[#07110C]"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-card-hover)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                <span className="truncate">{label}</span>
+                {active && <span className="text-[10px]">Selected</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

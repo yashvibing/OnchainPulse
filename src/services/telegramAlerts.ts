@@ -20,6 +20,7 @@ export interface TelegramAlert {
   chatId: string;
   tokenSymbol: string;
   protocolKey?: string;
+  protocolLabel?: string;
   thresholdApr?: number;
   status: "active" | "paused";
   createdAt: number;
@@ -136,6 +137,7 @@ function publicAlert(alert: TelegramAlert) {
     kind: alert.kind,
     tokenSymbol: alert.tokenSymbol,
     protocolKey: alert.protocolKey,
+    protocolLabel: alert.protocolLabel,
     thresholdApr: alert.thresholdApr,
     status: alert.status,
     createdAt: alert.createdAt,
@@ -371,6 +373,7 @@ export async function createTelegramAlert(input: {
   chatId: string;
   tokenSymbol?: string;
   protocolKey?: string;
+  protocolLabel?: string;
   thresholdApr?: number;
 }) {
   if (!input.chatId) throw new Error("Telegram is not connected");
@@ -380,18 +383,20 @@ export async function createTelegramAlert(input: {
 
   const opportunities = await fetchCombinedYieldOpportunities();
   const tokenSymbol = normalizeTokenSymbol(input.tokenSymbol || "ANY");
+  const protocolKey = input.protocolKey && input.protocolKey !== "all" ? normalizeProtocolKey(input.protocolKey) : undefined;
   const now = Date.now();
   const alert: TelegramAlert = {
     id: randomUUID(),
     kind: input.kind,
     chatId: input.chatId,
     tokenSymbol,
-    protocolKey: input.protocolKey && input.protocolKey !== "all" ? input.protocolKey : undefined,
+    protocolKey,
+    protocolLabel: protocolKey ? input.protocolLabel : undefined,
     thresholdApr: input.thresholdApr,
     status: "active",
     createdAt: now,
     updatedAt: now,
-    state: buildInitialState(input.kind, opportunities, tokenSymbol, input.protocolKey, input.thresholdApr),
+    state: buildInitialState(input.kind, opportunities, tokenSymbol, protocolKey, input.thresholdApr),
   };
 
   await writeAlert(alert);
