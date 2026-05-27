@@ -21,6 +21,7 @@ export function DisclaimerModal() {
   const [ready, setReady] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [showFullText, setShowFullText] = useState(false);
 
   useEffect(() => {
     setAccepted(window.localStorage.getItem(STORAGE_KEY) === "accepted");
@@ -46,26 +47,66 @@ export function DisclaimerModal() {
         <div className="pointer-events-none absolute -left-px -top-px h-8 w-8 border-l-2 border-t-2 border-[var(--color-text-primary)]" />
         <div className="pointer-events-none absolute -right-px -bottom-px h-8 w-8 border-b-2 border-r-2 border-[var(--color-text-primary)]" />
 
-        <h2
-          id="disclaimer-title"
-          className="text-[28px] font-bold text-[var(--color-text-primary)] sm:text-[34px]"
-        >
-          Disclaimer
-        </h2>
+        <div>
+          <div className="label-caps text-[var(--color-accent-primary)]">
+            Before you continue
+          </div>
+          <h2
+            id="disclaimer-title"
+            className="mt-2 text-[28px] font-bold text-[var(--color-text-primary)] sm:text-[34px]"
+          >
+            Onchain Pulse is read-only market data
+          </h2>
+          <p className="mt-3 max-w-[720px] text-[15px] leading-relaxed text-[var(--color-text-secondary)] sm:text-[17px]">
+            We do not custody assets, execute transactions, or provide financial advice.
+            Data can be delayed or incomplete, so use it as research context before
+            making your own decisions.
+          </p>
+        </div>
 
-        <div className="mt-6 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.045)] px-4 py-4 sm:px-6 sm:py-5">
-          <ul className="space-y-4">
-            {DISCLAIMER_ITEMS.map((item) => (
-              <li key={item} className="flex gap-3 text-[16px] leading-relaxed text-[var(--color-text-primary)] sm:text-[20px]">
-                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--color-accent-violet)]" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {[
+            ["Read-only", "No wallet connection or transaction signing is required."],
+            ["Independent", "Not affiliated with Monad Foundation or any protocol."],
+            ["Informational", "Rates and holdings are snapshots, not recommendations."],
+          ].map(([title, description]) => (
+            <div
+              key={title}
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3"
+            >
+              <div className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                {title}
+              </div>
+              <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                {description}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.045)] px-4 py-4 sm:px-6 sm:py-5">
+          <button
+            type="button"
+            onClick={() => setShowFullText((value) => !value)}
+            className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)] hover:opacity-80"
+          >
+            {showFullText ? "Hide full disclaimer" : "Read full disclaimer"}
+          </button>
+
+          {showFullText && (
+            <ul className="mt-4 space-y-3">
+              {DISCLAIMER_ITEMS.map((item) => (
+                <li key={item} className="flex gap-3 text-[13px] leading-relaxed text-[var(--color-text-primary)] sm:text-[15px]">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent-violet)]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex cursor-pointer items-center gap-3 text-[16px] text-[var(--color-text-primary)] sm:text-[20px]">
+          <label className="flex cursor-pointer items-center gap-3 text-[15px] text-[var(--color-text-primary)] sm:text-[17px]">
             <input
               type="checkbox"
               checked={checked}

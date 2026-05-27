@@ -3,9 +3,9 @@ import { Header } from "@/components/Header";
 import { StartupDirectory } from "@/components/StartupDirectory";
 
 export const metadata: Metadata = {
-  title: "Startup Feedback - Onchain Pulse",
+  title: "Ecosystem Feedback - Onchain Pulse",
   description:
-    "Browse public DeltaV startup listings and continue to DeltaV to give feedback.",
+    "Browse public DeltaV ecosystem listings and continue to DeltaV to give feedback.",
 };
 
 export default function StartupsPage() {

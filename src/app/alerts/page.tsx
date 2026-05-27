@@ -24,6 +24,25 @@ export default function AlertsPage() {
             Manage APR thresholds, best-place watches, new-market alerts, and
             daily Telegram digests for displayed DeFi rates.
           </p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {[
+              ["APR threshold", "Know when a token rate moves above or below your target."],
+              ["Best place changes", "Watch when another protocol becomes the leading displayed market."],
+              ["Daily digest", "Receive a compact Telegram summary instead of checking manually."],
+            ].map(([title, description]) => (
+              <div
+                key={title}
+                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3"
+              >
+                <div className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                  {title}
+                </div>
+                <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                  {description}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <AlertManagement />

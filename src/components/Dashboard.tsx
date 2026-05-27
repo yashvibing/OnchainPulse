@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
@@ -124,25 +125,57 @@ function DashboardInner() {
 
         {!address && (
           <div className="mt-10">
-            <div className="mx-auto max-w-[620px]">
+            <div className="mx-auto max-w-[860px]">
               <div className="label-caps text-center text-[var(--color-accent-primary)]">
-                Portfolio terminal
+                Monad command center
               </div>
-              <h1 className="mt-3 text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                Track a Monad wallet
+              <h1 className="mx-auto mt-3 max-w-[760px] text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[56px]">
+                Track wallets, compare DeFi rates, and get alerts when markets move.
               </h1>
-              <p className="mb-6 mt-3 text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Enter any address to view token holdings, staking, lending,
-                liquidity, and vaults.
+              <p className="mx-auto mb-6 mt-3 max-w-[720px] text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
+                Onchain Pulse turns public Monad wallet and market data into three simple actions:
+                see what a wallet holds, find where assets can earn, and set Telegram alerts
+                when opportunities change.
               </p>
-              <AddressInput onSubmit={handleSearch} initialAddress={address} />
+              <WelcomeActionCards />
+
+              <div id="track-wallet" className="mx-auto mt-8 max-w-[620px] scroll-mt-24">
+                <WhyThisMatters
+                  title="Why track a wallet?"
+                  body="A wallet scan gives you a quick map of tokens, staking, lending, liquidity, and vault exposure before you decide what to inspect next."
+                />
+                <AddressInput onSubmit={handleSearch} initialAddress={address} />
+                <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ["Paste any wallet", "Use any public 0x Monad/EVM address."],
+                    ["Try a demo", "Load a sample wallet if you just want to explore."],
+                    ["Then compare", "Jump from holdings into matching DeFi rates."],
+                  ].map(([title, description]) => (
+                    <div
+                      key={title}
+                      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3"
+                    >
+                      <div className="text-[12px] font-bold text-[var(--color-text-primary)]">{title}</div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                        {description}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <SavedAddressBar
                 addresses={savedAddresses}
                 activeAddress={address}
                 onSelect={handleSearch}
                 onRemove={handleRemoveSavedAddress}
               />
-              <LatestNewsSection />
+              <div className="mx-auto max-w-[620px]">
+                <WhyThisMatters
+                  title="Why watch news?"
+                  body="Headlines can explain why rates, protocol activity, or user attention shift. Treat them as context, not trading advice."
+                />
+                <LatestNewsSection />
+              </div>
             </div>
           </div>
         )}
@@ -472,6 +505,64 @@ function buildPortfolioCsv(address: string, portfolio: PortfolioData) {
 }
 
 // ─── Sub-components ───
+
+function WelcomeActionCards() {
+  const cards = [
+    {
+      title: "Track a wallet",
+      description: "Paste an address to see holdings, staking, lending, liquidity, and vault positions.",
+      href: "#track-wallet",
+      cta: "Start here",
+    },
+    {
+      title: "Find DeFi rates",
+      description: "Pick a token and compare displayed lending, staking, LP, vault, and borrow markets.",
+      href: "/yield-aggregator",
+      cta: "Compare rates",
+    },
+    {
+      title: "Set an alert",
+      description: "Get Telegram messages when APRs cross a target or better markets appear.",
+      href: "/yield-aggregator#alerts",
+      cta: "Create alert",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {cards.map((card) => (
+        <Link
+          key={card.title}
+          href={card.href}
+          className="group rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-accent-primary)] hover:bg-[var(--color-bg-card-hover)]"
+        >
+          <div className="text-[14px] font-bold text-[var(--color-text-primary)]">
+            {card.title}
+          </div>
+          <p className="mt-2 min-h-[54px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+            {card.description}
+          </p>
+          <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
+            {card.cta} <span className="transition-transform group-hover:inline-block group-hover:translate-x-1">-&gt;</span>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function WhyThisMatters({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.045)] px-4 py-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
+        {title}
+      </div>
+      <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
+        {body}
+      </p>
+    </div>
+  );
+}
 
 function SectionTitle({ icon, title, count }: { icon: string; title: string; count?: number }) {
   return (

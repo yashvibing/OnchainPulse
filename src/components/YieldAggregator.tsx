@@ -52,6 +52,13 @@ const POPULAR_TOKENS = [
 
 const SUGGESTED_TOKENS = ["USDC", "WETH", "AUSD"];
 
+const DEFI_TERMS = [
+  ["APR", "Estimated yearly return from rewards or rate data. It can change quickly."],
+  ["TVL", "Total value locked. Larger TVL usually means more liquidity in that market."],
+  ["Supply", "Deposit an asset into a lending, staking, LP, or vault market."],
+  ["Borrow", "Take a loan using collateral. Borrowing can create liquidation risk."],
+];
+
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
 
 interface AlertDraft {
@@ -252,6 +259,151 @@ function TokenSelectorPanel({
             selected={selectedTokens.includes(symbol)}
             onClick={() => onSelect(symbol)}
           />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RateExplainerStrip() {
+  return (
+    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.04)] px-4 py-4">
+      <div className="mb-3">
+        <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
+          How to read this page
+        </div>
+        <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
+          Start with the token you already hold. Compare displayed APR with TVL, then set
+          an alert if you want Telegram to watch the market for you.
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-4">
+        {DEFI_TERMS.map(([term, description]) => (
+          <div
+            key={term}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3"
+          >
+            <div className="text-[12px] font-bold text-[var(--color-text-primary)]">{term}</div>
+            <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+              {description}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WhyThisMatters({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
+        {title}
+      </div>
+      <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
+        {body}
+      </p>
+    </div>
+  );
+}
+
+function getPrimaryAssetSymbol(opp: YieldOpportunity) {
+  return getOpportunityAssetSymbols(opp)[0] || opp.tokens[0]?.symbol || "";
+}
+
+function BestForMePanel({
+  opportunities,
+  onPickLend,
+  onPickBorrow,
+  onWatchMarket,
+}: {
+  opportunities: YieldOpportunity[];
+  onPickLend: (symbol: string) => void;
+  onPickBorrow: (symbol: string) => void;
+  onWatchMarket: (opp: YieldOpportunity) => void;
+}) {
+  const lendOpps = opportunities.filter((opp) => opp.action === "LEND");
+  const borrowOpps = opportunities.filter((opp) => opp.action === "BORROW");
+  const highestApr = [...lendOpps].sort((a, b) => b.apr - a.apr)[0];
+  const deepestLiquidity = [...lendOpps].sort((a, b) => b.tvl - a.tvl)[0];
+  const borrowMarket = [...borrowOpps].sort((a, b) => b.tvl - a.tvl)[0];
+  const cards = [
+    highestApr && {
+      label: "Highest displayed APR",
+      title: `${getPrimaryAssetSymbol(highestApr)} on ${highestApr.protocol}`,
+      metric: formatRateLabel(highestApr.apr),
+      helper: "Use this when you care most about displayed yield.",
+      action: () => onPickLend(getPrimaryAssetSymbol(highestApr)),
+      watch: () => onWatchMarket(highestApr),
+    },
+    deepestLiquidity && {
+      label: "Deepest liquidity",
+      title: `${getPrimaryAssetSymbol(deepestLiquidity)} on ${deepestLiquidity.protocol}`,
+      metric: formatUsd(deepestLiquidity.tvl),
+      helper: "Use this when you want a larger, more established market.",
+      action: () => onPickLend(getPrimaryAssetSymbol(deepestLiquidity)),
+      watch: () => onWatchMarket(deepestLiquidity),
+    },
+    borrowMarket && {
+      label: "Borrow market to inspect",
+      title: `${getPrimaryAssetSymbol(borrowMarket)} on ${borrowMarket.protocol}`,
+      metric: formatUsd(borrowMarket.tvl),
+      helper: "Use this when you are comparing borrowing options and collateral needs.",
+      action: () => onPickBorrow(getPrimaryAssetSymbol(borrowMarket)),
+      watch: null,
+    },
+  ].filter((card): card is NonNullable<typeof card> => Boolean(card));
+
+  if (cards.length === 0) return null;
+
+  return (
+    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+      <div className="mb-3">
+        <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
+          Best for me
+        </div>
+        <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+          Not sure where to start? These shortcuts translate the market table into
+          three common user goals.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {cards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3"
+          >
+            <div className="text-[10px] font-bold uppercase text-[var(--color-text-dim)]">
+              {card.label}
+            </div>
+            <div className="mt-2 text-[14px] font-bold text-[var(--color-text-primary)]">
+              {card.title}
+            </div>
+            <div className="mt-1 text-[15px] font-bold text-[var(--color-positive)]">
+              {card.metric}
+            </div>
+            <p className="mt-2 min-h-[42px] text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+              {card.helper}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={card.action}
+                className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-accent-primary)] hover:text-[var(--color-positive)]"
+              >
+                Filter table
+              </button>
+              {card.watch && (
+                <button
+                  type="button"
+                  onClick={card.watch}
+                  className="rounded-[var(--radius-sm)] bg-[rgba(0,245,204,0.12)] px-2 py-1 text-[10px] font-bold text-[var(--color-positive)] hover:opacity-80"
+                >
+                  Watch it
+                </button>
+              )}
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -575,8 +727,40 @@ function AlertPanel({
     }
   }
 
+  function applyPreset(preset: "usdc-apr" | "wmon-best" | "daily" | "new-market") {
+    if (preset === "usdc-apr") {
+      setKind("apr_above");
+      setTokenSymbol("USDC");
+      setProtocolKey("all");
+      setThresholdApr("10");
+      setStatus("Preset ready: tell me when USDC APR goes above 10%.");
+      return;
+    }
+
+    if (preset === "wmon-best") {
+      setKind("best_market_change");
+      setTokenSymbol("WMON");
+      setProtocolKey("all");
+      setStatus("Preset ready: tell me when the best WMON market changes.");
+      return;
+    }
+
+    if (preset === "daily") {
+      setKind("daily_digest");
+      setTokenSymbol("ANY");
+      setProtocolKey("all");
+      setStatus("Preset ready: send a daily Telegram summary.");
+      return;
+    }
+
+    setKind("new_market");
+    setTokenSymbol("ANY");
+    setProtocolKey("all");
+    setStatus("Preset ready: tell me when a new market appears.");
+  }
+
   return (
-    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
+    <section id="alerts" className="mb-6 scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
@@ -600,6 +784,27 @@ function AlertPanel({
         ) : (
           <Badge tone="warning">Setup required</Badge>
         )}
+      </div>
+
+      <div className="mb-4 grid gap-2 md:grid-cols-4">
+        {[
+          ["USDC above 10%", "Tell me when USDC APR gets interesting.", "usdc-apr"],
+          ["WMON best place", "Tell me when the leading WMON market changes.", "wmon-best"],
+          ["Daily summary", "Send a daily snapshot of top displayed rates.", "daily"],
+          ["New market", "Tell me when a new displayed rate row appears.", "new-market"],
+        ].map(([title, description, preset]) => (
+          <button
+            key={title}
+            type="button"
+            onClick={() => applyPreset(preset as "usdc-apr" | "wmon-best" | "daily" | "new-market")}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 text-left transition-colors hover:border-[var(--color-accent-primary)]"
+          >
+            <span className="block text-[12px] font-bold text-[var(--color-text-primary)]">{title}</span>
+            <span className="mt-1 block text-[10px] leading-relaxed text-[var(--color-text-muted)]">
+              {description}
+            </span>
+          </button>
+        ))}
       </div>
 
       {!connection && (
@@ -1199,6 +1404,18 @@ export function YieldAggregator() {
 
   return (
     <div>
+      <WhyThisMatters
+        title="Why compare rates?"
+        body="Different protocols can offer very different displayed APR and liquidity for the same asset. This page helps you shortlist markets before doing deeper due diligence."
+      />
+      <RateExplainerStrip />
+      <BestForMePanel
+        opportunities={allOpps}
+        onPickLend={(symbol) => setLendTokens([symbol])}
+        onPickBorrow={(symbol) => setBorrowTokens([symbol])}
+        onWatchMarket={prefillWatchMarket}
+      />
+
       <WalletHoldingsPanel
         address={walletAddress}
         input={walletInput}
@@ -1226,6 +1443,10 @@ export function YieldAggregator() {
         </div>
       )}
 
+      <WhyThisMatters
+        title="Why set alerts?"
+        body="Rates move while you are away. Alerts turn the table into a watchlist so you can react when an APR threshold, best market, or new opportunity changes."
+      />
       <AlertPanel opportunities={allOpps} watchDraft={alertDraft} />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">

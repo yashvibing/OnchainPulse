@@ -127,11 +127,11 @@ export function StartupDirectory() {
           DeltaV public listings
         </div>
         <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-          Startup Feedback
+          Ecosystem Feedback
         </h1>
         <p className="mt-3 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-          Browse public DeltaV startup listings. Each feedback link opens the
-          relevant DeltaV feedback page for that startup.
+          Browse public DeltaV startup listings, understand who is building in the
+          ecosystem, and open the relevant DeltaV page when you want to leave feedback.
         </p>
       </div>
 

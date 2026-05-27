@@ -75,6 +75,10 @@ export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
           Load demo wallet
         </button>
       </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-dim)]">
+        You only need a public wallet address. Onchain Pulse will not ask you to connect,
+        sign, or move funds.
+      </p>
     </div>
   );
 }

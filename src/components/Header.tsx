@@ -5,10 +5,10 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Portfolio" },
+  { href: "/", label: "Track Wallet" },
   { href: "/yield-aggregator", label: "DeFi Rates" },
   { href: "/alerts", label: "Alerts" },
-  { href: "/startups", label: "Startups" },
+  { href: "/startups", label: "Ecosystem" },
 ];
 
 export function Header() {
