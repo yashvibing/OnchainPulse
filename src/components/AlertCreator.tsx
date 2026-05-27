@@ -416,7 +416,7 @@ export function AlertCreator() {
           </div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Set up rate alerts</h2>
           <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Connect Telegram once, then choose the rate movement you want Onchain Pulse to watch.
+            Connect Telegram, then create a watch.
           </p>
         </div>
         {connection ? <Badge tone="positive">Telegram connected</Badge> : <Badge tone="warning">Setup required</Badge>}
@@ -434,8 +434,8 @@ export function AlertCreator() {
               </div>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
                 {connection
-                  ? "Alerts will be sent to your connected Telegram chat."
-                  : "Create a link, use the bot link button, tap Start in Telegram, then return here and confirm."}
+                  ? "Alerts go to your connected chat."
+                  : "Create a link, launch the bot, tap Start, then confirm."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -485,11 +485,11 @@ export function AlertCreator() {
               2. Create alert
             </div>
             <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
-              Alert me when a displayed rate changes
+              Create a watch
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
               {connection
-                ? "Choose a token, alert type, protocol scope, and target APR when needed."
+                ? "Choose the token, condition, protocol, and APR target."
                 : "Connect Telegram first to unlock alert creation."}
             </p>
           </div>
@@ -602,7 +602,7 @@ export function AlertCreator() {
               </div>
             </div>
             <p className="mt-4 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-              Pick a different protocol or set a target that is not already met.
+              Pick another protocol or target.
             </p>
             <div className="mt-5 flex justify-end">
               <button

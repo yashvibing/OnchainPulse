@@ -22,9 +22,7 @@ export default function DefiRatesPage() {
             DeFi Rates
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Choose what you hold, what you want to borrow, or let Best for me
-            highlight useful starting points. APR and TVL are explained below so
-            the table is easier to read before you open any protocol.
+            Compare lending, staking, LP, vault, and borrow markets.
           </p>
         </section>
 

@@ -165,7 +165,7 @@ export function AlertManagement() {
         </div>
         <h2 className="mt-2 text-[22px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
         <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-5 text-[13px] text-[var(--color-text-muted)]">
-          Connect Telegram above to see, pause, resume, or delete your alerts here.
+          Connect Telegram to manage alerts.
         </div>
       </section>
     );
@@ -177,9 +177,6 @@ export function AlertManagement() {
         <div>
           <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">3. Manage alerts</div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
-          <p className="mt-1 max-w-[700px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Pause alerts when you do not need messages, resume them later, or remove old watches completely.
-          </p>
         </div>
         <button
           type="button"
@@ -204,7 +201,7 @@ export function AlertManagement() {
         </div>
       ) : alerts.length === 0 ? (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-6 text-[13px] text-[var(--color-text-muted)]">
-          No alerts yet. Use the alert creator above to make your first watch.
+          No alerts yet.
         </div>
       ) : (
         <div className="space-y-3">

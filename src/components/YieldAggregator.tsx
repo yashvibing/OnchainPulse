@@ -48,10 +48,10 @@ const POPULAR_TOKENS = [
 const SUGGESTED_TOKENS = ["USDC", "WETH", "AUSD"];
 
 const DEFI_TERMS = [
-  ["APR", "Estimated yearly return from rewards or rate data. It can change quickly."],
-  ["TVL", "Total value locked. Larger TVL usually means more liquidity in that market."],
-  ["Supply", "Deposit an asset into a lending, staking, LP, or vault market."],
-  ["Borrow", "Take a loan using collateral. Borrowing can create liquidation risk."],
+  ["APR", "Displayed yearly rate."],
+  ["TVL", "Capital in the market."],
+  ["Supply", "Lend, stake, LP, or vault."],
+  ["Borrow", "Debt against collateral."],
 ];
 
 function formatUsd(value: number) {
@@ -224,15 +224,6 @@ function TokenSelectorPanel({
 function RateExplainerStrip() {
   return (
     <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.04)] px-4 py-4">
-      <div className="mb-3">
-        <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
-          How to read this page
-        </div>
-        <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-          Start with the token you already hold. Compare displayed APR with TVL,
-          then open a protocol only after doing your own checks.
-        </p>
-      </div>
       <div className="grid gap-2 md:grid-cols-4">
         {DEFI_TERMS.map(([term, description]) => (
           <div
@@ -247,19 +238,6 @@ function RateExplainerStrip() {
         ))}
       </div>
     </section>
-  );
-}
-
-function WhyThisMatters({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
-      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
-        {title}
-      </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-        {body}
-      </p>
-    </div>
   );
 }
 
@@ -295,8 +273,7 @@ function WalletHoldingsPanel({
             Best Places For Wallet Tokens
           </div>
           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            Paste a wallet address. For each token it already holds, we show
-            the strongest displayed place we can match.
+            Match wallet tokens to displayed rates.
           </p>
         </div>
       </div>
@@ -360,8 +337,7 @@ function WalletHoldingsPanel({
                     Best displayed place found for {matches.length} wallet token{matches.length === 1 ? "" : "s"}
                   </div>
                   <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                    These are static recommendations from the current market
-                    list. They do not change your supply/borrow filters.
+                    Static matches from the current market list.
                   </div>
                 </div>
               </div>
@@ -938,10 +914,6 @@ export function YieldAggregator() {
 
   return (
     <div>
-      <WhyThisMatters
-        title="Why compare rates?"
-        body="Different protocols can offer very different displayed APR and liquidity for the same asset. This page helps you shortlist markets before doing deeper due diligence."
-      />
       <RateExplainerStrip />
 
       <WalletHoldingsPanel
@@ -974,7 +946,7 @@ export function YieldAggregator() {
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
           title="Supply / Deposit"
-          subtitle="Pick one asset to see lending, staking, LP, and vault opportunities."
+          subtitle="Lending, staking, LP, and vaults."
           tone="positive"
           tokens={POPULAR_TOKENS}
           selectedTokens={lendTokens}
@@ -982,7 +954,7 @@ export function YieldAggregator() {
         />
         <TokenSelectorPanel
           title="Borrow"
-          subtitle="Pick one asset to see borrow markets and required collateral."
+          subtitle="Borrow markets and collateral hints."
           tone="blue"
           tokens={POPULAR_TOKENS}
           selectedTokens={borrowTokens}
@@ -1009,7 +981,7 @@ export function YieldAggregator() {
         <div className="grid gap-6 md:grid-cols-2">
           <OpportunitySection
             title="Supply / Deposit Opportunities"
-            subtitle="Lending, staking, LP, and vault rows for assets relating to Monad."
+            subtitle="Lending, staking, LP, and vault rows."
             emptyLabel="No supply or deposit opportunities found."
             opportunities={lendOpps}
             onPickToken={(symbol) => setLendTokens([symbol])}
@@ -1027,7 +999,7 @@ export function YieldAggregator() {
       {showSupplyOnly && (
         <OpportunitySection
           title={`Supply / deposit opportunities for ${lendTokens.join(", ")}`}
-          subtitle="Matching lending, staking, LP, and vault rows for this token."
+          subtitle="Matching supply and deposit rows."
           emptyLabel="No supply or deposit opportunities found for this token."
           opportunities={lendOpps}
           onPickToken={(symbol) => setLendTokens([symbol])}
@@ -1037,7 +1009,7 @@ export function YieldAggregator() {
       {showBorrowOnly && (
         <OpportunitySection
           title={`Borrow markets for ${borrowTokens.join(", ")}`}
-          subtitle="Borrow market rows show collateral hints where available."
+          subtitle="Collateral hints shown where available."
           emptyLabel="No borrow markets found for this token."
           opportunities={borrowOpps}
           onPickToken={(symbol) => setBorrowTokens([symbol])}
@@ -1052,7 +1024,7 @@ export function YieldAggregator() {
                 Loop Scenarios
               </h2>
               <p className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                Scenario using {lendTokens.join(", ")} as supply and {borrowTokens.join(", ")} as borrow. Displayed APR does not include unknown base borrow cost.
+                {lendTokens.join(", ")} supplied, {borrowTokens.join(", ")} borrowed.
               </p>
             </div>
             <Badge tone="positive">{loopStrategies.length}</Badge>

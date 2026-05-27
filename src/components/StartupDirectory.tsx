@@ -130,8 +130,7 @@ export function StartupDirectory() {
           Ecosystem Feedback
         </h1>
         <p className="mt-3 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-          Browse public DeltaV startup listings, understand who is building in the
-          ecosystem, and open the relevant DeltaV page when you want to leave feedback.
+          Browse DeltaV listings and open DeltaV to leave feedback.
         </p>
       </div>
 

@@ -27,23 +27,23 @@ export const metadata: Metadata = {
 const FEATURE_CARDS = [
   {
     title: "Portfolio Tracker",
-    body: "Paste any public wallet address to inspect tokens, staking, lending, liquidity, and vault exposure.",
+    body: "Inspect public wallet positions.",
     href: "/app",
   },
   {
     title: "DeFi Rates",
-    body: "Browse displayed lending, staking, LP, vault, and borrow markets without connecting a wallet.",
+    body: "Compare displayed market rates.",
     href: "/defi-rates",
   },
   {
-    title: "Set Alerts",
-    body: "Use Telegram alerts for APR targets, best-place changes, new markets, and daily rate digests.",
-    href: "/alerts",
+    title: "Read Ecosystem Signals",
+    body: "Browse builders and market updates.",
+    href: "/startups",
   },
   {
-    title: "Read Ecosystem Signals",
-    body: "Browse DeltaV startup listings and compact Monad market updates for extra context.",
-    href: "/startups",
+    title: "Set Alerts",
+    body: "Get Telegram watches for rate changes.",
+    href: "/alerts",
   },
 ];
 
@@ -79,9 +79,8 @@ export default async function HomePage({ searchParams }: PageProps) {
                 Portfolio tracking and DeFi rates in one place.
               </h1>
               <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Onchain Pulse helps you inspect public wallet activity, compare
-                displayed DeFi rates, set Telegram alerts, and follow ecosystem
-                context without asking you to connect a wallet.
+                Inspect public wallets, compare displayed rates, and set Telegram
+                alerts without connecting a wallet.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -118,7 +117,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               Product areas
             </div>
             <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">
-              Choose what you want to inspect
+              Choose an area
             </h2>
           </div>
 
@@ -132,7 +131,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                 <div className="text-[15px] font-bold text-[var(--color-text-primary)]">
                   {feature.title}
                 </div>
-                <p className="mt-2 min-h-[66px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+                <p className="mt-2 min-h-[36px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
                   {feature.body}
                 </p>
                 <div className="mt-4 text-[12px] font-bold text-[var(--color-accent-primary)]">

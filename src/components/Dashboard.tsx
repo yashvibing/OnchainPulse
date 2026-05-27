@@ -132,35 +132,12 @@ function DashboardInner() {
                 Portfolio Tracker, DeFi rates, and Monad activity.
               </h1>
               <p className="mx-auto mb-6 mt-3 max-w-[720px] text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Onchain Pulse turns public Monad wallet and market data into simple actions:
-                see what a wallet holds, find where assets can earn, and read the context
-                behind protocol activity.
+                Paste a public wallet, inspect positions, and jump into matching rates.
               </p>
               <WelcomeActionCards />
 
               <div id="track-wallet" className="mx-auto mt-8 max-w-[620px] scroll-mt-24">
-                <WhyThisMatters
-                  title="Why use Portfolio Tracker?"
-                  body="A portfolio scan gives you a quick map of tokens, staking, lending, liquidity, and vault exposure before you decide what to inspect next."
-                />
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
-                <div className="mb-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    ["Paste any wallet", "Use any public 0x Monad/EVM address."],
-                    ["Try a demo", "Load a sample wallet if you just want to explore."],
-                    ["Then compare", "Jump from holdings into matching DeFi rates."],
-                  ].map(([title, description]) => (
-                    <div
-                      key={title}
-                      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3"
-                    >
-                      <div className="text-[12px] font-bold text-[var(--color-text-primary)]">{title}</div>
-                      <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-                        {description}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
               <SavedAddressBar
                 addresses={savedAddresses}
@@ -502,19 +479,19 @@ function WelcomeActionCards() {
   const cards = [
     {
       title: "Portfolio Tracker",
-      description: "Paste an address to see holdings, staking, lending, liquidity, and vault positions.",
+      description: "Inspect a public wallet.",
       href: "#track-wallet",
       cta: "Start here",
     },
     {
       title: "Find DeFi rates",
-      description: "Pick a token and compare displayed lending, staking, LP, vault, and borrow markets.",
+      description: "Compare displayed rates.",
       href: "/defi-rates",
       cta: "Compare rates",
     },
     {
       title: "Explore ecosystem",
-      description: "Browse builders, market context, and public signals around Monad activity.",
+      description: "Browse builders and updates.",
       href: "/startups",
       cta: "View ecosystem",
     },
@@ -531,7 +508,7 @@ function WelcomeActionCards() {
           <div className="text-[14px] font-bold text-[var(--color-text-primary)]">
             {card.title}
           </div>
-          <p className="mt-2 min-h-[54px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+          <p className="mt-2 min-h-[34px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
             {card.description}
           </p>
           <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
@@ -539,19 +516,6 @@ function WelcomeActionCards() {
           </div>
         </Link>
       ))}
-    </div>
-  );
-}
-
-function WhyThisMatters({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.045)] px-4 py-3">
-      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
-        {title}
-      </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-secondary)]">
-        {body}
-      </p>
     </div>
   );
 }
