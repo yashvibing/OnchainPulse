@@ -169,13 +169,7 @@ function DashboardInner() {
                 onSelect={handleSearch}
                 onRemove={handleRemoveSavedAddress}
               />
-              <div className="mx-auto max-w-[620px]">
-                <WhyThisMatters
-                  title="Why watch news?"
-                  body="Headlines can explain why rates, protocol activity, or user attention shift. Treat them as context, not trading advice."
-                />
-                <LatestNewsSection />
-              </div>
+              <LatestNewsSection />
             </div>
           </div>
         )}

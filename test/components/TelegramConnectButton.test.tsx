@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 describe("Telegram connection CTA", () => {
-  it("starts Telegram link creation from the empty management state", async () => {
+  it("starts Telegram link creation from the connection step", async () => {
     render(
       <>
         <AlertCreator />
@@ -28,11 +28,11 @@ describe("Telegram connection CTA", () => {
       </>
     );
 
-    const buttons = await screen.findAllByRole("button", {
+    const button = await screen.findByRole("button", {
       name: "Create Telegram link",
     });
 
-    fireEvent.click(buttons[buttons.length - 1]);
+    fireEvent.click(button);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith("/api/alerts/connect", {
@@ -40,7 +40,7 @@ describe("Telegram connection CTA", () => {
       });
     });
     expect(
-      await screen.findByText(/Telegram alerts are not configured yet/i)
+      await screen.findByText(/Admin setup needed/i)
     ).toBeInTheDocument();
   });
 });

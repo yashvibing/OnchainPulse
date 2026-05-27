@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { readStoredTelegramConnection, type StoredTelegramConnection } from "@/lib/telegramAlertClient";
-import { TELEGRAM_CONNECT_REQUEST_EVENT } from "@/lib/telegramEvents";
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
 
@@ -129,24 +128,16 @@ export function AlertManagement() {
     }
   }
 
-  function requestTelegramConnection() {
-    window.dispatchEvent(new Event(TELEGRAM_CONNECT_REQUEST_EVENT));
-  }
-
   if (!connection) {
     return (
-      <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8">
-        <h2 className="text-[22px] font-bold text-[var(--color-text-primary)]">Connect Telegram first</h2>
-        <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-          Use the alert creator above, tap Start in Telegram, then return here to manage alerts.
-        </p>
-        <button
-          type="button"
-          onClick={requestTelegramConnection}
-          className="mt-5 inline-flex rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C]"
-        >
-          Create Telegram link
-        </button>
+      <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
+        <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+          3. Manage alerts
+        </div>
+        <h2 className="mt-2 text-[22px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
+        <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-5 text-[13px] text-[var(--color-text-muted)]">
+          Connect Telegram above to see, pause, resume, or delete your alerts here.
+        </div>
       </section>
     );
   }
@@ -155,7 +146,7 @@ export function AlertManagement() {
     <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">Telegram Alert Management</div>
+          <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">3. Manage alerts</div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
           <p className="mt-1 max-w-[700px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
             Pause alerts when you do not need messages, resume them later, or remove old watches completely.

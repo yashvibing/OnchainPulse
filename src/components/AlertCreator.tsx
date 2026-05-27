@@ -12,7 +12,6 @@ import {
   saveStoredTelegramConnection,
   type StoredTelegramConnection,
 } from "@/lib/telegramAlertClient";
-import { TELEGRAM_CONNECT_REQUEST_EVENT } from "@/lib/telegramEvents";
 
 type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
 
@@ -120,6 +119,7 @@ export function AlertCreator() {
   }, [kind, tokenSymbol]);
 
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
+  const formDisabled = busy || !connection;
   const tokenChoices = kind === "new_market" || kind === "daily_digest" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
   const protocolChoices = useMemo(() => {
     const token = tokenSymbol.toUpperCase();
@@ -154,29 +154,13 @@ export function AlertCreator() {
       setStatusTone("error");
       setStatus(
         message === "Telegram bot is not configured"
-          ? "Telegram alerts are not configured yet. Add TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME, then redeploy."
+          ? "Admin setup needed: add TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME, then redeploy."
           : message
       );
     } finally {
       setBusy(false);
     }
   }, []);
-
-  useEffect(() => {
-    function handleConnectRequest() {
-      const alertCreatorSection = document.getElementById("create-alert");
-      if (typeof alertCreatorSection?.scrollIntoView === "function") {
-        alertCreatorSection.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-      void createConnectionCode();
-    }
-
-    window.addEventListener(TELEGRAM_CONNECT_REQUEST_EVENT, handleConnectRequest);
-    return () => window.removeEventListener(TELEGRAM_CONNECT_REQUEST_EVENT, handleConnectRequest);
-  }, [createConnectionCode]);
 
   async function claimConnection() {
     if (!connectSession) return;
@@ -253,105 +237,55 @@ export function AlertCreator() {
     }
   }
 
-  function applyPreset(preset: "usdc-apr" | "wmon-best" | "daily" | "new-market") {
-    if (preset === "usdc-apr") {
-      setKind("apr_above");
-      setTokenSymbol("USDC");
-      setProtocolKey("all");
-      setThresholdApr("10");
-      setStatusTone("info");
-      setStatus("Preset ready: tell me when USDC APR goes above 10%.");
-      return;
-    }
-
-    if (preset === "wmon-best") {
-      setKind("best_market_change");
-      setTokenSymbol("WMON");
-      setProtocolKey("all");
-      setStatusTone("info");
-      setStatus("Preset ready: tell me when the best WMON market changes.");
-      return;
-    }
-
-    if (preset === "daily") {
-      setKind("daily_digest");
-      setTokenSymbol("ANY");
-      setProtocolKey("all");
-      setStatusTone("info");
-      setStatus("Preset ready: send a daily Telegram summary.");
-      return;
-    }
-
-    setKind("new_market");
-    setTokenSymbol("ANY");
-    setProtocolKey("all");
-    setStatusTone("info");
-    setStatus("Preset ready: tell me when a new market appears.");
-  }
-
   return (
     <section id="create-alert" className="mb-6 scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
-            Create Telegram Alert
+            Telegram alerts
           </div>
-          <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Build a watch</h2>
+          <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Set up rate alerts</h2>
           <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Pick the condition, token, protocol scope, and optional APR target. Alerts are based on displayed DeFi rates.
+            Connect Telegram once, then choose the rate movement you want Onchain Pulse to watch.
           </p>
         </div>
         {connection ? <Badge tone="positive">Telegram connected</Badge> : <Badge tone="warning">Setup required</Badge>}
       </div>
 
-      <div className="mb-4 grid gap-2 md:grid-cols-4">
-        {[
-          ["USDC above 10%", "Tell me when USDC APR gets interesting.", "usdc-apr"],
-          ["WMON best place", "Tell me when the leading WMON market changes.", "wmon-best"],
-          ["Daily summary", "Send a daily snapshot of top displayed rates.", "daily"],
-          ["New market", "Tell me when a new displayed rate row appears.", "new-market"],
-        ].map(([title, description, preset]) => (
-          <button
-            key={title}
-            type="button"
-            onClick={() => applyPreset(preset as "usdc-apr" | "wmon-best" | "daily" | "new-market")}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 text-left transition-colors hover:border-[var(--color-accent-primary)]"
-          >
-            <span className="block text-[12px] font-bold text-[var(--color-text-primary)]">{title}</span>
-            <span className="mt-1 block text-[10px] leading-relaxed text-[var(--color-text-muted)]">
-              {description}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {!connection && (
-        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-[12px] font-semibold text-[var(--color-text-primary)]">
-                Connect Telegram once
+      <div className="space-y-4">
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-[760px]">
+              <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+                1. Connect Telegram
               </div>
-              <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                The bot needs one Start message so it knows where to send alerts.
+              <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+                {connection ? "Telegram is ready" : "Send alerts to Telegram"}
               </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+                {connection
+                  ? "Alerts will be sent to your connected Telegram chat."
+                  : "Create a link, tap Start in Telegram, then return here and confirm."}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={createConnectionCode}
-                disabled={busy}
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:opacity-50"
-              >
-                Create Telegram link
-              </button>
-              {connectSession && (
+              {!connection && (
+                <button
+                  type="button"
+                  onClick={createConnectionCode}
+                  disabled={busy}
+                  className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] hover:opacity-90 disabled:opacity-50"
+                >
+                  Create Telegram link
+                </button>
+              )}
+              {connectSession && !connection && (
                 <>
                   <a
                     href={connectSession.deepLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-bold text-[#07110C] hover:opacity-90"
+                    className="rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[var(--color-positive)] hover:bg-[rgba(0,245,204,0.08)]"
                   >
                     Open Telegram
                   </a>
@@ -359,90 +293,109 @@ export function AlertCreator() {
                     type="button"
                     onClick={claimConnection}
                     disabled={busy}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-positive)] disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:opacity-50"
                   >
-                    Confirm
+                    I tapped Start
                   </button>
                 </>
               )}
             </div>
           </div>
         </div>
-      )}
 
-      <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.7fr_auto] lg:items-end">
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Alert type</span>
-          <select
-            value={kind}
-            onChange={(event) => setKind(event.target.value as AlertKind)}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            {ALERT_KIND_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-[10px] text-[var(--color-text-dim)]">
-            {ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.description}
-          </span>
-        </label>
+        <div className={`rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4 ${connection ? "" : "opacity-70"}`}>
+          <div className="mb-4">
+            <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+              2. Create alert
+            </div>
+            <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+              Alert me when a displayed rate changes
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+              {connection
+                ? "Choose a token, alert type, protocol scope, and target APR when needed."
+                : "Connect Telegram first to unlock alert creation."}
+            </p>
+          </div>
 
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Token</span>
-          <select
-            value={tokenSymbol}
-            onChange={(event) => {
-              setTokenSymbol(event.target.value);
-              setProtocolKey("all");
-            }}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            {tokenChoices.map((symbol) => (
-              <option key={symbol} value={symbol}>
-                {symbol === "ANY" ? "Any token" : symbol}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr_0.9fr_0.7fr_auto] lg:items-end">
+            <label className="block">
+              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Token</span>
+              <select
+                value={tokenSymbol}
+                disabled={formDisabled}
+                onChange={(event) => {
+                  setTokenSymbol(event.target.value);
+                  setProtocolKey("all");
+                }}
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
+              >
+                {tokenChoices.map((symbol) => (
+                  <option key={symbol} value={symbol}>
+                    {symbol === "ANY" ? "Any token" : symbol}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <label className="block">
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Protocol</span>
-          <select
-            value={protocolKey}
-            onChange={(event) => setProtocolKey(event.target.value)}
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)]"
-          >
-            <option value="all">All protocols</option>
-            {protocolChoices.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <label className="block">
+              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Alert me when</span>
+              <select
+                value={kind}
+                disabled={formDisabled}
+                onChange={(event) => setKind(event.target.value as AlertKind)}
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
+              >
+                {ALERT_KIND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[10px] text-[var(--color-text-dim)]">
+                {ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.description}
+              </span>
+            </label>
 
-        <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
-          <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
-          <input
-            value={thresholdApr}
-            onChange={(event) => setThresholdApr(event.target.value)}
-            disabled={!needsThreshold}
-            inputMode="decimal"
-            className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-            placeholder="12"
-          />
-        </label>
+            <label className="block">
+              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">Protocol</span>
+              <select
+                value={protocolKey}
+                disabled={formDisabled}
+                onChange={(event) => setProtocolKey(event.target.value)}
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
+              >
+                <option value="all">All protocols</option>
+                {protocolChoices.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <button
-          type="button"
-          onClick={createAlert}
-          disabled={busy || !connection}
-          className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          Create alert
-        </button>
+            <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
+              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
+              <input
+                value={thresholdApr}
+                onChange={(event) => setThresholdApr(event.target.value)}
+                disabled={formDisabled || !needsThreshold}
+                inputMode="decimal"
+                className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
+                placeholder="12"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={createAlert}
+              disabled={formDisabled}
+              className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {connection ? "Create alert" : "Connect first"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {status && (
