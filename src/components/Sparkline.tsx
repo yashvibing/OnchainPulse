@@ -12,28 +12,48 @@ interface ChartPoint {
   value: number;
 }
 
-async function fetchPriceHistory(): Promise<ChartPoint[]> {
+interface ChartRanges {
+  day: ChartPoint[];
+  week: ChartPoint[];
+  month: ChartPoint[];
+}
+
+async function fetchPriceHistory(): Promise<ChartRanges | null> {
   try {
     const res = await fetch("/api/mon-price-history");
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const data = await res.json();
-    return Array.isArray(data.data) ? data.data : [];
+    if (data.ranges) {
+      return {
+        day: Array.isArray(data.ranges.day) ? data.ranges.day : [],
+        week: Array.isArray(data.ranges.week) ? data.ranges.week : [],
+        month: Array.isArray(data.ranges.month) ? data.ranges.month : [],
+      };
+    }
+    const week = Array.isArray(data.data) ? data.data : [];
+    return { day: week.slice(-24), week, month: week };
   } catch {
-    return [];
+    return null;
   }
 }
 
 export function PortfolioSparkline({ holdings }: SparklineProps) {
-  const [points, setPoints] = useState<ChartPoint[]>([]);
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [chartRanges, setChartRanges] = useState<ChartRanges | null>(null);
 
   useEffect(() => {
-    fetchPriceHistory().then((history) => {
-      if (history.length === 0) return;
+    fetchPriceHistory().then((historyRanges) => {
+      if (!historyRanges) return;
 
       // Calculate total MON-denominated holdings
       // For simplicity, we scale the MON price curve by the portfolio's MON exposure
-      const currentMonPrice = history[history.length - 1]?.value || 1;
+      const allPoints = [
+        ...historyRanges.day,
+        ...historyRanges.week,
+        ...historyRanges.month,
+      ];
+      if (allPoints.length === 0) return;
+
+      const currentMonPrice = allPoints[allPoints.length - 1]?.value || 1;
       const monHoldings = (holdings.get("MON") || 0) + (holdings.get("WMON") || 0);
       const lstHoldings =
         (holdings.get("aprMON") || 0) +
@@ -51,14 +71,41 @@ export function PortfolioSparkline({ holdings }: SparklineProps) {
       // Stable value (doesn't scale)
       const monUnits = monCorrelated / currentMonPrice;
 
-      const scaled = history.map((p) => ({
-        timestamp: p.timestamp,
-        value: monUnits * p.value + stableHoldings,
-      }));
+      function scale(points: ChartPoint[]) {
+        return points.map((p) => ({
+          timestamp: p.timestamp,
+          value: monUnits * p.value + stableHoldings,
+        }));
+      }
 
-      setPoints(scaled);
+      setChartRanges({
+        day: scale(historyRanges.day),
+        week: scale(historyRanges.week),
+        month: scale(historyRanges.month),
+      });
     });
   }, [holdings]);
+
+  const ranges = [
+    { label: "24H TREND", points: chartRanges?.day || [] },
+    { label: "7-DAY TREND", points: chartRanges?.week || [] },
+    { label: "30-DAY TREND", points: chartRanges?.month || [] },
+  ];
+
+  if (ranges.every((range) => range.points.length < 2)) return null;
+
+  return (
+    <div className="mb-5 grid gap-3 lg:grid-cols-3">
+      {ranges.map((range) => (
+        <TrendChart key={range.label} label={range.label} points={range.points} />
+      ))}
+    </div>
+  );
+}
+
+function TrendChart({ label, points }: { label: string; points: ChartPoint[] }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const gradientId = `spark-fill-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   if (points.length < 2) return null;
 
@@ -88,10 +135,10 @@ export function PortfolioSparkline({ holdings }: SparklineProps) {
   const displayPoint = hoverIndex !== null ? points[hoverIndex] : null;
 
   return (
-    <div className="card mb-5 px-5 py-4">
+    <div className="card px-4 py-4">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-[11px] tracking-[0.6px] text-[var(--color-text-muted)]">
-          7-DAY TREND
+          {label}
         </div>
         <div className="flex items-center gap-2">
           {displayPoint && (
@@ -117,7 +164,7 @@ export function PortfolioSparkline({ holdings }: SparklineProps) {
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="w-full"
-        style={{ height: 60 }}
+        style={{ height: 70 }}
         preserveAspectRatio="none"
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
@@ -128,12 +175,12 @@ export function PortfolioSparkline({ holdings }: SparklineProps) {
         onMouseLeave={() => setHoverIndex(null)}
       >
         <defs>
-          <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.15" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <path d={areaPath} fill="url(#sparkFill)" />
+        <path d={areaPath} fill={`url(#${gradientId})`} />
         <path d={linePath} fill="none" stroke={color} strokeWidth="0.5" />
         {hoverIndex !== null && (
           <circle

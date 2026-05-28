@@ -20,11 +20,9 @@ interface DefiLlamaChartResponse {
 
 const PRICE_HISTORY_TTL_MS = 5 * 60_000;
 
-async function fetchPriceHistory() {
-  const now = Math.floor(Date.now() / 1000);
-  const weekAgo = now - 7 * 86400;
+async function fetchPriceHistoryRange(start: number, span: number, period: string) {
   const data = await fetchJsonWithRetry<DefiLlamaChartResponse>(
-    `https://coins.llama.fi/chart/coingecko:monad?start=${weekAgo}&span=168&period=1h`,
+    `https://coins.llama.fi/chart/coingecko:monad?start=${start}&span=${span}&period=${period}`,
     { next: { revalidate: 300 }, retries: 1 }
   );
   const prices = data.coins?.["coingecko:monad"]?.prices;
@@ -34,6 +32,24 @@ async function fetchPriceHistory() {
     timestamp: point.timestamp,
     value: point.price,
   }));
+}
+
+async function fetchPriceHistory() {
+  const now = Math.floor(Date.now() / 1000);
+  const [day, week, month] = await Promise.all([
+    fetchPriceHistoryRange(now - 24 * 60 * 60, 24, "1h"),
+    fetchPriceHistoryRange(now - 7 * 86400, 168, "1h"),
+    fetchPriceHistoryRange(now - 30 * 86400, 120, "6h"),
+  ]);
+
+  return {
+    data: week,
+    ranges: {
+      day,
+      week,
+      month,
+    },
+  };
 }
 
 export async function GET(request: Request) {
@@ -55,7 +71,8 @@ export async function GET(request: Request) {
 
     const response = NextResponse.json(
       {
-        data: result.data,
+        data: result.data.data,
+        ranges: result.data.ranges,
         meta: {
           cacheStatus: result.status,
           cacheAgeMs: result.ageMs,
