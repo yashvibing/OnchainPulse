@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { Header } from "@/components/Header";
@@ -126,15 +125,14 @@ function DashboardInner() {
           <div className="mt-10">
             <div className="mx-auto max-w-[860px]">
               <div className="label-caps text-center text-[var(--color-accent-primary)]">
-                Monad command center
+                Portfolio tracker
               </div>
               <h1 className="mx-auto mt-3 max-w-[760px] text-center text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[56px]">
-                Portfolio Tracker, DeFi rates, and Monad activity.
+                Portfolio Tracker
               </h1>
               <p className="mx-auto mb-6 mt-3 max-w-[720px] text-center text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Paste a public wallet, inspect positions, and jump into matching rates.
+                Paste a public wallet to view holdings, positions, and rate matches.
               </p>
-              <WelcomeActionCards />
 
               <div id="track-wallet" className="mx-auto mt-8 max-w-[620px] scroll-mt-24">
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
@@ -474,51 +472,6 @@ function buildPortfolioCsv(address: string, portfolio: PortfolioData) {
 }
 
 // ─── Sub-components ───
-
-function WelcomeActionCards() {
-  const cards = [
-    {
-      title: "Portfolio Tracker",
-      description: "Inspect a public wallet.",
-      href: "#track-wallet",
-      cta: "Start here",
-    },
-    {
-      title: "Find DeFi rates",
-      description: "Compare displayed rates.",
-      href: "/defi-rates",
-      cta: "Compare rates",
-    },
-    {
-      title: "Explore ecosystem",
-      description: "Browse builders and updates.",
-      href: "/startups",
-      cta: "View ecosystem",
-    },
-  ];
-
-  return (
-    <div className="grid gap-3 md:grid-cols-3">
-      {cards.map((card) => (
-        <Link
-          key={card.title}
-          href={card.href}
-          className="group rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-accent-primary)] hover:bg-[var(--color-bg-card-hover)]"
-        >
-          <div className="text-[14px] font-bold text-[var(--color-text-primary)]">
-            {card.title}
-          </div>
-          <p className="mt-2 min-h-[34px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            {card.description}
-          </p>
-          <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
-            {card.cta} <span className="transition-transform group-hover:inline-block group-hover:translate-x-1">-&gt;</span>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
 
 function SectionTitle({ icon, title, count }: { icon: string; title: string; count?: number }) {
   return (
