@@ -20,6 +20,7 @@ const ALERT_KINDS = new Set<AlertKind>([
   "best_market_change",
   "new_market",
   "daily_digest",
+  "daily_news_brief",
 ]);
 
 export async function GET(request: Request) {

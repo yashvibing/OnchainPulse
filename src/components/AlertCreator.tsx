@@ -13,7 +13,13 @@ import {
   type StoredTelegramConnection,
 } from "@/lib/telegramAlertClient";
 
-type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market";
+type AlertKind =
+  | "apr_above"
+  | "apr_below"
+  | "best_market_change"
+  | "new_market"
+  | "daily_digest"
+  | "daily_news_brief";
 type SelectOption = { value: string; label: string };
 type ExistingRateMatch = {
   tokenSymbol: string;
@@ -55,6 +61,14 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
   {
     value: "new_market",
     label: "New market appears",
+  },
+  {
+    value: "daily_digest",
+    label: "Daily DeFi rates digest",
+  },
+  {
+    value: "daily_news_brief",
+    label: "Daily latest news brief",
   },
 ];
 
@@ -237,18 +251,21 @@ export function AlertCreator() {
   }, []);
 
   useEffect(() => {
-    if (kind !== "new_market" && tokenSymbol === "ANY") {
+    if (kind !== "new_market" && kind !== "daily_digest" && kind !== "daily_news_brief" && tokenSymbol === "ANY") {
       setTokenSymbol("USDC");
     }
-    if (kind === "best_market_change" && protocolKey !== "all") {
+    if ((kind === "best_market_change" || kind === "daily_digest" || kind === "daily_news_brief") && protocolKey !== "all") {
       setProtocolKey("all");
     }
   }, [kind, protocolKey, tokenSymbol]);
 
   const needsThreshold = kind === "apr_above" || kind === "apr_below";
+  const isRatesDigest = kind === "daily_digest";
+  const isNewsBrief = kind === "daily_news_brief";
+  const isDigestStyle = isRatesDigest || isNewsBrief;
   const formDisabled = busy || !connection;
-  const protocolDisabled = formDisabled || kind === "best_market_change";
-  const tokenChoices = kind === "new_market" ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const protocolDisabled = formDisabled || kind === "best_market_change" || isDigestStyle;
+  const tokenChoices = kind === "new_market" || isDigestStyle ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
   const tokenOptions = tokenChoices.map((symbol) => ({
     value: symbol,
     label: symbol === "ANY" ? "Any token" : symbol,
@@ -378,7 +395,7 @@ export function AlertCreator() {
         body: JSON.stringify({
           kind,
           chatId: connection.chatId,
-          tokenSymbol,
+          tokenSymbol: isDigestStyle ? "ANY" : tokenSymbol,
           protocolKey,
           protocolLabel: selectedProtocol?.label,
           thresholdApr: needsThreshold ? threshold : undefined,
@@ -388,7 +405,13 @@ export function AlertCreator() {
       if (!response.ok) throw new Error(data.error || "Could not create alert.");
       const label = ALERT_KIND_OPTIONS.find((option) => option.value === kind)?.label || "Alert";
       setStatusTone("success");
-      setStatus(`${label} alert created for ${tokenSymbol}.`);
+      setStatus(
+        isNewsBrief
+          ? "Daily latest news brief enabled for 11 PM IST."
+          : isRatesDigest
+            ? "Daily DeFi rates digest enabled for 11 AM IST."
+            : `${label} alert created for ${tokenSymbol}.`
+      );
       notifyAlertsChanged();
     } catch (error) {
       setStatusTone("error");
@@ -495,17 +518,21 @@ export function AlertCreator() {
               2. Create alert
             </div>
             <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
-              Create a watch
+              {isNewsBrief ? "Enable daily news brief" : isRatesDigest ? "Enable daily rates digest" : "Create a watch"}
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-              {connection
-                ? "Choose the token, condition, protocol, and APR target."
-                : "Connect Telegram first to unlock alert creation."}
+              {connection && isNewsBrief
+                ? "Receive one Telegram message at 11 PM IST with curated news titles, summaries, and source links."
+                : connection && isRatesDigest
+                  ? "Receive one Telegram message at 11 AM IST with the top displayed DeFi rates."
+                : connection
+                  ? "Choose the token, condition, protocol, and APR target."
+                  : "Connect Telegram first to unlock alert creation."}
             </p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr_0.9fr_0.7fr_auto] lg:items-end">
-            <div className="block">
+            <div className={isDigestStyle ? "hidden" : "block"}>
               <AlertSelect
                 label="Token"
                 value={tokenSymbol}
@@ -518,7 +545,7 @@ export function AlertCreator() {
               />
             </div>
 
-            <div className="block">
+            <div className={isDigestStyle ? "lg:col-span-2" : "block"}>
               <AlertSelect
                 label="Alert me when"
                 value={kind}
@@ -527,12 +554,14 @@ export function AlertCreator() {
                 onChange={(nextValue) => {
                   const nextKind = nextValue as AlertKind;
                   setKind(nextKind);
-                  if (nextKind === "best_market_change") setProtocolKey("all");
+                  if (nextKind === "best_market_change" || nextKind === "daily_digest" || nextKind === "daily_news_brief") {
+                    setProtocolKey("all");
+                  }
                 }}
               />
             </div>
 
-            <div className="block">
+            <div className={isDigestStyle ? "hidden" : "block"}>
               <AlertSelect
                 label="Protocol"
                 value={protocolKey}
@@ -547,7 +576,7 @@ export function AlertCreator() {
               )}
             </div>
 
-            <label className={`block ${needsThreshold ? "" : "opacity-45"}`}>
+            <label className={`block ${isDigestStyle ? "hidden" : needsThreshold ? "" : "opacity-45"}`}>
               <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
               <input
                 value={thresholdApr}
@@ -565,7 +594,7 @@ export function AlertCreator() {
               disabled={formDisabled}
               className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {connection ? "Create alert" : "Connect first"}
+              {connection ? (isNewsBrief ? "Enable brief" : isRatesDigest ? "Enable digest" : "Create alert") : "Connect first"}
             </button>
           </div>
         </div>

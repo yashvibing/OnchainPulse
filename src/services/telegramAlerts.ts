@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getServerRedisClient } from "@/lib/serverCache";
+import { loadLatestNews } from "@/lib/news";
 import { getErrorMessage, logServerEvent, shortHash } from "@/lib/serverLog";
 import {
   fetchCombinedYieldOpportunities,
@@ -12,7 +13,8 @@ export type AlertKind =
   | "apr_below"
   | "best_market_change"
   | "new_market"
-  | "daily_digest";
+  | "daily_digest"
+  | "daily_news_brief";
 
 export interface TelegramAlert {
   id: string;
@@ -58,6 +60,8 @@ const ALERT_ITEM_PREFIX = "onchain-pulse:alerts:item:";
 const CONNECT_PREFIX = "onchain-pulse:telegram-connect:";
 const TELEGRAM_OFFSET_KEY = "onchain-pulse:telegram:update-offset";
 const CONNECT_TTL_SECONDS = 15 * 60;
+const DAILY_RATES_DIGEST_HOUR_IST = 11;
+const DAILY_NEWS_BRIEF_HOUR_IST = 23;
 
 const memoryAlerts = new Map<string, TelegramAlert>();
 const memoryConnectSessions = new Map<string, TelegramConnectSession>();
@@ -379,9 +383,11 @@ function buildInitialState(
     };
   }
 
-  if (kind === "daily_digest") {
+  if (kind === "daily_digest" || kind === "daily_news_brief") {
+    const sendHour =
+      kind === "daily_news_brief" ? DAILY_NEWS_BRIEF_HOUR_IST : DAILY_RATES_DIGEST_HOUR_IST;
     return {
-      lastDigestDay: getInitialDailyDigestDay(),
+      lastDigestDay: getInitialDailyDigestDay(undefined, sendHour),
     };
   }
 
@@ -403,7 +409,8 @@ export async function createTelegramAlert(input: {
     throw new Error("APR threshold is required");
   }
 
-  const opportunities = await fetchCombinedYieldOpportunities();
+  const needsOpportunities = input.kind !== "daily_digest" && input.kind !== "daily_news_brief";
+  const opportunities = needsOpportunities ? await fetchCombinedYieldOpportunities() : [];
   const tokenSymbol = normalizeTokenSymbol(input.tokenSymbol || "ANY");
   const protocolKey = input.protocolKey && input.protocolKey !== "all" ? normalizeProtocolKey(input.protocolKey) : undefined;
   const alreadyMet = findAlreadyMetThresholdAlert(
@@ -449,6 +456,7 @@ function alertTitle(alert: TelegramAlert) {
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} APR dropped below ${alert.thresholdApr}%`;
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best market changed`;
   if (alert.kind === "daily_digest") return alert.tokenSymbol === "ANY" ? "Daily DeFi rates digest" : `Daily ${alert.tokenSymbol} rates digest`;
+  if (alert.kind === "daily_news_brief") return "Daily latest news brief";
   return alert.tokenSymbol === "ANY" ? "New DeFi market detected" : `New ${alert.tokenSymbol} market detected`;
 }
 
@@ -469,9 +477,9 @@ function getDigestDateParts(date = new Date()) {
   };
 }
 
-export function getInitialDailyDigestDay(createdAt = new Date()) {
+export function getInitialDailyDigestDay(createdAt = new Date(), sendHour = DAILY_RATES_DIGEST_HOUR_IST) {
   const { day, hour } = getDigestDateParts(createdAt);
-  return hour >= 9 ? day : undefined;
+  return hour >= sendHour ? day : undefined;
 }
 
 function buildDigestMessage(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
@@ -487,6 +495,27 @@ function buildDigestMessage(alert: TelegramAlert, opportunities: YieldOpportunit
   });
 
   return `${alertTitle(alert)}\nTop displayed rates for ${scope}:\n${lines.join("\n")}`;
+}
+
+async function buildLatestNewsBriefMessage() {
+  const news = await loadLatestNews();
+  const items = news.items.slice(0, 5);
+
+  if (items.length === 0) {
+    return "Daily latest news brief\nNo curated news has been added yet.";
+  }
+
+  const lines = items.map((item, index) => {
+    const summary = item.summary.trim();
+    const link = item.link.trim();
+    return [
+      `${index + 1}. ${item.title}`,
+      summary ? `Summary: ${summary}` : "",
+      link ? `Source: ${link}` : "",
+    ].filter(Boolean).join("\n");
+  });
+
+  return `Daily latest news brief\n${lines.join("\n\n")}`;
 }
 
 async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
@@ -537,9 +566,18 @@ async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOppor
 
   if (alert.kind === "daily_digest") {
     const { day, hour } = getDigestDateParts();
-    const shouldSend = hour >= 9 && alert.state.lastDigestDay !== day;
+    const shouldSend = hour >= DAILY_RATES_DIGEST_HOUR_IST && alert.state.lastDigestDay !== day;
     if (shouldSend) {
       message = buildDigestMessage(alert, opportunities);
+      nextState.lastDigestDay = day;
+    }
+  }
+
+  if (alert.kind === "daily_news_brief") {
+    const { day, hour } = getDigestDateParts();
+    const shouldSend = hour >= DAILY_NEWS_BRIEF_HOUR_IST && alert.state.lastDigestDay !== day;
+    if (shouldSend) {
+      message = await buildLatestNewsBriefMessage();
       nextState.lastDigestDay = day;
     }
   }
@@ -574,10 +612,27 @@ export async function checkTelegramAlerts() {
   const alerts = await listActiveAlerts();
   if (alerts.length === 0) return { checked: 0, triggered: 0 };
 
-  const opportunities = await fetchCombinedYieldOpportunities();
+  const hasMarketAlerts = alerts.some((alert) => alert.kind !== "daily_news_brief");
+  let opportunities: YieldOpportunity[] = [];
+  let alertsToCheck = alerts;
+
+  if (hasMarketAlerts) {
+    try {
+      opportunities = await fetchCombinedYieldOpportunities();
+    } catch (error) {
+      const newsOnlyAlerts = alerts.filter((alert) => alert.kind === "daily_news_brief");
+      if (newsOnlyAlerts.length === 0) throw error;
+
+      alertsToCheck = newsOnlyAlerts;
+      logServerEvent("warn", "alerts.market_fetch_failed_news_continues", {
+        error: getErrorMessage(error),
+      });
+    }
+  }
+
   let triggered = 0;
 
-  for (const alert of alerts) {
+  for (const alert of alertsToCheck) {
     try {
       if (await maybeTriggerAlert(alert, opportunities)) triggered += 1;
     } catch (error) {

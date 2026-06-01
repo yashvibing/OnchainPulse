@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { readStoredTelegramConnection, type StoredTelegramConnection } from "@/lib/telegramAlertClient";
 
-type AlertKind = "apr_above" | "apr_below" | "best_market_change" | "new_market" | "daily_digest";
+type AlertKind =
+  | "apr_above"
+  | "apr_below"
+  | "best_market_change"
+  | "new_market"
+  | "daily_digest"
+  | "daily_news_brief";
 
 interface ManagedAlert {
   id: string;
@@ -24,7 +30,8 @@ const KIND_LABELS: Record<AlertKind, string> = {
   apr_below: "APR drops below",
   best_market_change: "Best place changes",
   new_market: "New market appears",
-  daily_digest: "Daily digest",
+  daily_digest: "DeFi rates digest",
+  daily_news_brief: "Latest news brief",
 };
 
 function formatDate(value?: number) {
@@ -65,7 +72,8 @@ function describeAlert(alert: ManagedAlert) {
   if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR on ${scope}`;
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR on ${scope}`;
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
-  if (alert.kind === "daily_digest") return `${alert.tokenSymbol === "ANY" ? "All watched markets" : alert.tokenSymbol} daily top rates on ${scope}`;
+  if (alert.kind === "daily_digest") return "Daily DeFi rates digest";
+  if (alert.kind === "daily_news_brief") return "Daily latest news brief";
   return alert.tokenSymbol === "ANY" ? `Any new displayed market on ${scope}` : `New ${alert.tokenSymbol} market on ${scope}`;
 }
 
