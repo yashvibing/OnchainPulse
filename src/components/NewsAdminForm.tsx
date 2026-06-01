@@ -1,11 +1,21 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { NewsArticle } from "@/lib/news";
 
 interface SubmitResponse {
   ok: boolean;
   item?: NewsArticle;
+  error?: string;
+}
+
+interface WeeklyEcosystemResponse {
+  ok: boolean;
+  update?: {
+    title: string;
+    twitterUrl: string;
+    updatedAt: number;
+  } | null;
   error?: string;
 }
 
@@ -16,6 +26,11 @@ const emptyForm = {
   topic: "Monad",
   source: "",
   publishedAt: "",
+};
+
+const emptyWeeklyForm = {
+  title: "This week's ecosystem updates are out",
+  twitterUrl: "",
 };
 
 function cleanPayload(form: typeof emptyForm) {
@@ -37,6 +52,10 @@ export function NewsAdminForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastItem, setLastItem] = useState<NewsArticle | null>(null);
+  const [weeklyForm, setWeeklyForm] = useState(emptyWeeklyForm);
+  const [weeklySubmitting, setWeeklySubmitting] = useState(false);
+  const [weeklyMessage, setWeeklyMessage] = useState<string | null>(null);
+  const [weeklyError, setWeeklyError] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => {
     const hasContent =
@@ -45,6 +64,22 @@ export function NewsAdminForm() {
       form.summary.trim().length > 0;
     return hasContent && !submitting;
   }, [form, submitting]);
+  const canSubmitWeekly =
+    weeklyForm.twitterUrl.trim().length > 0 && !weeklySubmitting;
+
+  useEffect(() => {
+    fetch("/api/news/weekly-ecosystem", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as WeeklyEcosystemResponse;
+        if (!data.update) return;
+        setWeeklyForm({
+          title: data.update.title || emptyWeeklyForm.title,
+          twitterUrl: data.update.twitterUrl || "",
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   function updateField(name: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -86,8 +121,43 @@ export function NewsAdminForm() {
     }
   }
 
+  async function handleWeeklySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmitWeekly) return;
+
+    setWeeklySubmitting(true);
+    setWeeklyMessage(null);
+    setWeeklyError(null);
+
+    try {
+      const response = await fetch("/api/news/weekly-ecosystem", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(weeklyForm),
+      });
+      const data = (await response.json()) as WeeklyEcosystemResponse;
+      if (!response.ok || !data.ok || !data.update) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setWeeklyForm({
+        title: data.update.title,
+        twitterUrl: data.update.twitterUrl,
+      });
+      setWeeklyMessage("Weekly ecosystem update saved. Connected Telegram users will receive it once this week.");
+    } catch (err) {
+      setWeeklyError(err instanceof Error ? err.message : "Failed to save weekly ecosystem update.");
+    } finally {
+      setWeeklySubmitting(false);
+    }
+  }
+
   return (
-    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
+    <section className="grid gap-5">
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
       <div className="mb-5">
         <div className="label-caps text-[var(--color-accent-primary)]">News Admin</div>
         <h2 className="mt-2 text-[24px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
@@ -211,6 +281,60 @@ export function NewsAdminForm() {
           </div>
         </div>
       )}
+    </div>
+
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
+      <div className="mb-5">
+        <div className="label-caps text-[var(--color-accent-primary)]">Telegram Broadcast</div>
+        <h2 className="mt-2 text-[24px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
+          Weekly ecosystem update
+        </h2>
+        <p className="mt-2 max-w-[760px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+          Save the weekly Twitter/X link. Every connected Telegram user receives
+          this once per week by default.
+        </p>
+      </div>
+
+      <form className="grid gap-4" onSubmit={handleWeeklySubmit}>
+        <label className="grid gap-2">
+          <span className="label-caps text-[var(--color-text-muted)]">Twitter/X link</span>
+          <input
+            type="url"
+            value={weeklyForm.twitterUrl}
+            onChange={(event) =>
+              setWeeklyForm((current) => ({ ...current, twitterUrl: event.target.value }))
+            }
+            placeholder="https://x.com/..."
+            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+          />
+        </label>
+
+        {weeklyError && (
+          <div className="rounded-[var(--radius-md)] border border-[rgba(255,88,88,0.35)] bg-[rgba(255,88,88,0.08)] px-3 py-2 text-[12px] font-semibold text-[var(--color-danger)]">
+            {weeklyError}
+          </div>
+        )}
+
+        {weeklyMessage && (
+          <div className="rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.35)] bg-[rgba(0,245,204,0.08)] px-3 py-2 text-[12px] font-semibold text-[var(--color-positive)]">
+            {weeklyMessage}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={!canSubmitWeekly}
+            className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {weeklySubmitting ? "Saving..." : "Save weekly update"}
+          </button>
+          <div className="text-[12px] font-medium text-[var(--color-text-dim)]">
+            Telegram message: {emptyWeeklyForm.title}
+          </div>
+        </div>
+      </form>
+    </div>
     </section>
   );
 }

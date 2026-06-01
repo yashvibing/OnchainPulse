@@ -58,14 +58,27 @@ interface TelegramUpdate {
 const ALERT_REGISTRY_KEY = "onchain-pulse:alerts:registry";
 const ALERT_ITEM_PREFIX = "onchain-pulse:alerts:item:";
 const CONNECT_PREFIX = "onchain-pulse:telegram-connect:";
+const CONNECTED_CHATS_KEY = "onchain-pulse:telegram:connected-chats";
 const TELEGRAM_OFFSET_KEY = "onchain-pulse:telegram:update-offset";
+const WEEKLY_ECOSYSTEM_UPDATE_KEY = "onchain-pulse:telegram:weekly-ecosystem-update";
+const WEEKLY_ECOSYSTEM_SENT_PREFIX = "onchain-pulse:telegram:weekly-ecosystem-sent:";
 const CONNECT_TTL_SECONDS = 15 * 60;
 const DAILY_RATES_DIGEST_HOUR_IST = 11;
 const DAILY_NEWS_BRIEF_HOUR_IST = 23;
+const WEEKLY_ECOSYSTEM_TITLE = "This week's ecosystem updates are out";
 
 const memoryAlerts = new Map<string, TelegramAlert>();
 const memoryConnectSessions = new Map<string, TelegramConnectSession>();
+const memoryConnectedChats = new Set<string>();
+let memoryWeeklyEcosystemUpdate: WeeklyEcosystemUpdate | null = null;
+const memoryWeeklyEcosystemSent = new Set<string>();
 let memoryTelegramOffset = 0;
+
+export interface WeeklyEcosystemUpdate {
+  title: string;
+  twitterUrl: string;
+  updatedAt: number;
+}
 
 function alertKey(id: string) {
   return `${ALERT_ITEM_PREFIX}${id}`;
@@ -196,6 +209,28 @@ async function listActiveAlerts() {
   return alerts.filter((alert): alert is TelegramAlert => Boolean(alert && alert.status === "active"));
 }
 
+async function registerTelegramChat(chatId: string) {
+  if (!chatId) return;
+  memoryConnectedChats.add(chatId);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.sadd(CONNECTED_CHATS_KEY, chatId);
+}
+
+async function listConnectedTelegramChatIds() {
+  const redis = getServerRedisClient();
+  const connected = redis
+    ? (await redis.smembers(CONNECTED_CHATS_KEY)).map(String)
+    : [...memoryConnectedChats];
+  const ids = await listAlertIds();
+  const alerts = await Promise.all(ids.map(readAlert));
+  const fromAlerts = alerts
+    .filter((alert): alert is TelegramAlert => Boolean(alert?.chatId))
+    .map((alert) => alert.chatId);
+
+  return [...new Set([...connected, ...fromAlerts])];
+}
+
 export async function listTelegramAlertsForChat(chatId: string) {
   const ids = await listAlertIds();
   const alerts = await Promise.all(ids.map(readAlert));
@@ -322,6 +357,7 @@ export async function claimTelegramConnectSession(code: string) {
 
   const connected = { ...session, chatId: String(chatId) };
   await writeConnectSession(connected);
+  await registerTelegramChat(String(chatId));
   await sendTelegramMessage(
     String(chatId),
     "Onchain Pulse alerts are connected. You can now create DeFi rate alerts from the app."
@@ -348,6 +384,110 @@ export async function sendTelegramMessage(chatId: string, text: string) {
     const body = await response.text().catch(() => "");
     throw new Error(`Telegram sendMessage failed with ${response.status}: ${body.slice(0, 180)}`);
   }
+}
+
+function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export async function getWeeklyEcosystemUpdate() {
+  const redis = getServerRedisClient();
+  if (!redis) return memoryWeeklyEcosystemUpdate;
+  const update = await redis.get<WeeklyEcosystemUpdate>(WEEKLY_ECOSYSTEM_UPDATE_KEY);
+  memoryWeeklyEcosystemUpdate = update || null;
+  return memoryWeeklyEcosystemUpdate;
+}
+
+export async function setWeeklyEcosystemUpdate(input: {
+  twitterUrl: string;
+  title?: string;
+}) {
+  const twitterUrl = input.twitterUrl.trim();
+  if (!isValidHttpUrl(twitterUrl)) {
+    throw new Error("Add a valid Twitter/X URL.");
+  }
+
+  const update: WeeklyEcosystemUpdate = {
+    title: input.title?.trim() || WEEKLY_ECOSYSTEM_TITLE,
+    twitterUrl,
+    updatedAt: Date.now(),
+  };
+
+  memoryWeeklyEcosystemUpdate = update;
+  const redis = getServerRedisClient();
+  if (redis) await redis.set(WEEKLY_ECOSYSTEM_UPDATE_KEY, update);
+  return update;
+}
+
+function getIstWeekKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  const istDateUtc = Date.UTC(value("year"), value("month") - 1, value("day"));
+  const dayIndex = (new Date(istDateUtc).getUTCDay() + 6) % 7;
+  const weekStartUtc = istDateUtc - dayIndex * 86_400_000;
+  return new Date(weekStartUtc).toISOString().slice(0, 10);
+}
+
+export function getWeeklyEcosystemWeekKeyForTest(date: Date) {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("getWeeklyEcosystemWeekKeyForTest is only available in tests");
+  }
+
+  return getIstWeekKey(date);
+}
+
+function weeklyEcosystemSentKey(chatId: string, weekKey: string) {
+  return `${WEEKLY_ECOSYSTEM_SENT_PREFIX}${weekKey}:${shortHash(chatId)}`;
+}
+
+async function hasSentWeeklyEcosystemUpdate(chatId: string, weekKey: string) {
+  const key = weeklyEcosystemSentKey(chatId, weekKey);
+  const redis = getServerRedisClient();
+  if (!redis) return memoryWeeklyEcosystemSent.has(key);
+  return Boolean(await redis.get(key));
+}
+
+async function markWeeklyEcosystemUpdateSent(chatId: string, weekKey: string) {
+  const key = weeklyEcosystemSentKey(chatId, weekKey);
+  memoryWeeklyEcosystemSent.add(key);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.set(key, "1", { ex: 60 * 60 * 24 * 21 });
+}
+
+export async function sendWeeklyEcosystemUpdateIfNeeded() {
+  const update = await getWeeklyEcosystemUpdate();
+  if (!update?.twitterUrl) return { checked: 0, sent: 0 };
+
+  const chatIds = await listConnectedTelegramChatIds();
+  const weekKey = getIstWeekKey();
+  let sent = 0;
+
+  for (const chatId of chatIds) {
+    try {
+      if (await hasSentWeeklyEcosystemUpdate(chatId, weekKey)) continue;
+      await sendTelegramMessage(chatId, `${update.title}\n${update.twitterUrl}`);
+      await markWeeklyEcosystemUpdateSent(chatId, weekKey);
+      sent += 1;
+    } catch (error) {
+      logServerEvent("warn", "alerts.weekly_ecosystem_failed", {
+        chatId: shortHash(chatId),
+        error: getErrorMessage(error),
+      });
+    }
+  }
+
+  return { checked: chatIds.length, sent };
 }
 
 function buildInitialState(
@@ -442,6 +582,7 @@ export async function createTelegramAlert(input: {
   };
 
   await writeAlert(alert);
+  await registerTelegramChat(alert.chatId);
   logServerEvent("info", "alerts.created", {
     alertId: shortHash(alert.id),
     kind: alert.kind,
@@ -609,8 +750,17 @@ export async function checkTelegramAlerts() {
     });
   });
 
+  const weeklyEcosystem = await sendWeeklyEcosystemUpdateIfNeeded().catch((error) => {
+    logServerEvent("warn", "alerts.weekly_ecosystem_check_failed", {
+      error: getErrorMessage(error),
+    });
+    return { checked: 0, sent: 0 };
+  });
+
   const alerts = await listActiveAlerts();
-  if (alerts.length === 0) return { checked: 0, triggered: 0 };
+  if (alerts.length === 0) {
+    return { checked: 0, triggered: 0, weeklyEcosystem };
+  }
 
   const hasMarketAlerts = alerts.some((alert) => alert.kind !== "daily_news_brief");
   let opportunities: YieldOpportunity[] = [];
@@ -644,7 +794,7 @@ export async function checkTelegramAlerts() {
     }
   }
 
-  return { checked: alerts.length, triggered };
+  return { checked: alerts.length, triggered, weeklyEcosystem };
 }
 
 async function findAlertForCommand(chatId: string, prefix: string) {
@@ -715,6 +865,7 @@ async function processTelegramBotCommands() {
       const session = await readConnectSession(startCode);
       if (session && session.expiresAt >= Date.now()) {
         await writeConnectSession({ ...session, chatId: String(chatId) });
+        await registerTelegramChat(String(chatId));
         await sendTelegramMessage(
           String(chatId),
           "Onchain Pulse alerts are connected. Return to the app and press Confirm."
