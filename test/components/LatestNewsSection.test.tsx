@@ -15,6 +15,7 @@ beforeEach(() => {
         feedCount: 3,
         items: [
           {
+            id: "news-test-1",
             title: "Monad lands new DeFi partnership",
             link: "https://example.com/article",
             source: "The Block",
@@ -32,10 +33,10 @@ describe("LatestNewsSection", () => {
   it("renders a news card from the API response", async () => {
     render(<LatestNewsSection />);
 
-    expect(screen.getByText("Monad Market Updates")).toBeInTheDocument();
+    expect(await screen.findByText("Curated Market Updates")).toBeInTheDocument();
     expect(await screen.findByText("Monad lands new DeFi partnership")).toBeInTheDocument();
     expect(screen.getByText(/The Block/)).toBeInTheDocument();
     expect(screen.getByText(/Why it matters:/)).toBeInTheDocument();
-    expect(screen.getByText("Open full feed")).toBeInTheDocument();
+    expect(screen.queryByText("Add news")).not.toBeInTheDocument();
   });
 });

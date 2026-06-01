@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit, rateLimitResponse, withRateLimitHeaders } from "@/lib/rateLimit";
 import { getErrorMessage, logSlowApi } from "@/lib/serverLog";
-import { getServerCacheBackend, withServerCache } from "@/lib/serverCache";
-import { loadLatestNews, newsCacheConfig } from "@/lib/news";
+import { getServerCacheBackend } from "@/lib/serverCache";
+import { loadLatestNews } from "@/lib/news";
 
 export const dynamic = "force-dynamic";
 
@@ -17,24 +17,20 @@ export async function GET(request: Request) {
   if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
 
   try {
-    const cached = await withServerCache(
-      "latest-news",
-      newsCacheConfig.ttlMs,
-      loadLatestNews,
-      newsCacheConfig.staleTtlMs
-    );
+    const data = await loadLatestNews();
+    const fetchedAt = Date.now();
 
     const response = NextResponse.json(
       {
-        ok: cached.data.items.length > 0,
-        status: cached.status,
-        fetchedAt: cached.fetchedAt,
-        ageMs: cached.ageMs,
-        durationMs: cached.durationMs,
+        ok: data.items.length > 0,
+        status: "hit",
+        fetchedAt,
+        ageMs: 0,
+        durationMs: Date.now() - startedAt,
         cache: {
           backend: getServerCacheBackend(),
         },
-        ...cached.data,
+        ...data,
       },
       { status: 200, headers: withRateLimitHeaders(undefined, rateLimit) }
     );

@@ -1,17 +1,16 @@
+import { randomUUID } from "crypto";
+import { getServerRedisClient } from "@/lib/serverCache";
 import { getErrorMessage, logServerEvent, logSlowSource, sourceNameFromUrl } from "@/lib/serverLog";
 
 export interface NewsArticle {
+  id: string;
   title: string;
   link: string;
   source: string;
   summary: string;
   publishedAt: string;
   topic: string;
-}
-
-export interface NewsFeedQuery {
-  label: string;
-  query: string;
+  submittedAt?: number;
 }
 
 export interface LatestNewsPayload {
@@ -20,38 +19,64 @@ export interface LatestNewsPayload {
   feedCount: number;
 }
 
-export const NEWS_FEED_QUERIES: NewsFeedQuery[] = [
-  { label: "Monad", query: "Monad crypto when:7d" },
-  { label: "DeFi", query: "Monad DeFi when:7d" },
-  { label: "Ecosystem", query: '"Monad Foundation" when:7d' },
-];
-
-export const NEWS_SEARCH_URL =
-  "https://news.google.com/search?q=Monad%20crypto%20OR%20DeFi%20when:7d&hl=en-US&gl=US&ceid=US:en";
-
-const NEWS_FEED_TTL_MS = 10 * 60 * 1000;
-const NEWS_FEED_STALE_TTL_MS = 60 * 60 * 1000;
-const NEWS_FEED_URL = "https://news.google.com/rss/search";
-const NEWS_FETCH_TIMEOUT_MS = 4_000;
-const NEWS_FETCH_RETRIES = 1;
-const NEWS_LIMIT = 6;
-
-function buildFeedUrl(query: string) {
-  const params = new URLSearchParams({
-    q: query,
-    hl: "en-US",
-    gl: "US",
-    ceid: "US:en",
-  });
-
-  return `${NEWS_FEED_URL}?${params.toString()}`;
+export interface NewsSubmissionInput {
+  url?: string;
+  link?: string;
+  title?: string;
+  summary?: string;
+  text?: string;
+  source?: string;
+  topic?: string;
+  publishedAt?: string;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+const CURATED_NEWS_KEY = "onchain-pulse:curated-news";
+const NEWS_LIMIT = 20;
+const NEWS_STORAGE_LIMIT = 50;
+const NEWS_FETCH_TIMEOUT_MS = 5_000;
+const MAX_FIELD_LENGTH = 2_000;
+const MAX_BODY_LENGTH = 10_000;
+const memoryNews: NewsArticle[] = [];
+
+function cleanText(input: string) {
+  return decodeHtmlEntities(input)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_FIELD_LENGTH);
 }
 
-function decodeXmlEntities(input: string) {
+function summarize(text: string, maxLength = 220) {
+  const cleaned = cleanText(text);
+  if (cleaned.length <= maxLength) return cleaned;
+  const cut = cleaned.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 80 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
+}
+
+function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function sourceFromUrl(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./u, "");
+  } catch {
+    return "Manual";
+  }
+}
+
+function parsePublishedAt(value?: string) {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
+}
+
+function decodeHtmlEntities(input: string) {
   return input
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -66,167 +91,131 @@ function decodeXmlEntities(input: string) {
     );
 }
 
-function stripMarkup(input: string) {
-  return input.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+function findMeta(html: string, property: string) {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `<meta\\s+(?:property|name)=["']${escaped}["'][^>]*content=["']([^"']+)["'][^>]*>|<meta\\s+content=["']([^"']+)["'][^>]*(?:property|name)=["']${escaped}["'][^>]*>`,
+    "iu"
+  );
+  const match = html.match(regex);
+  return decodeHtmlEntities(match?.[1] || match?.[2] || "");
 }
 
-function cleanText(input: string) {
-  const text = decodeXmlEntities(input.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1"));
-  return stripMarkup(text);
+function findTitle(html: string) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/iu);
+  return decodeHtmlEntities(match?.[1] || "");
 }
 
-function extractTag(block: string, tagName: string) {
-  const tagRegex = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i");
-  const match = block.match(tagRegex);
-  return match?.[1] || "";
-}
+async function fetchUrlMetadata(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), NEWS_FETCH_TIMEOUT_MS);
+  const startedAt = Date.now();
+  const source = sourceNameFromUrl(url);
 
-function summarize(text: string, maxLength = 180) {
-  if (text.length <= maxLength) return text;
-  const cut = text.slice(0, maxLength - 1);
-  const lastSpace = cut.lastIndexOf(" ");
-  return `${(lastSpace > 80 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
-}
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "OnchainPulse/1.0",
+        accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    const durationMs = Date.now() - startedAt;
+    logSlowSource(source, durationMs);
 
-function parsePublishedAt(value: string) {
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : Date.now();
-}
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const html = await response.text();
 
-export function parseGoogleNewsRss(xml: string, topic: string): NewsArticle[] {
-  const items = xml.match(/<item\b[^>]*>[\s\S]*?<\/item>/gi) || [];
-
-  return items
-    .map((item) => {
-      const title = cleanText(extractTag(item, "title"));
-      const link = cleanText(extractTag(item, "link"));
-      const source = cleanText(extractTag(item, "source")) || topic;
-      const description = summarize(cleanText(extractTag(item, "description")));
-      const publishedAt =
-        cleanText(extractTag(item, "pubDate")) ||
-        cleanText(extractTag(item, "published")) ||
-        new Date().toISOString();
-
-      if (!title || !link) return null;
-
-      return {
-        title,
-        link,
-        source,
-        summary: description || title,
-        publishedAt: new Date(parsePublishedAt(publishedAt)).toISOString(),
-        topic,
-      } satisfies NewsArticle;
-    })
-    .filter((item): item is NewsArticle => item !== null);
-}
-
-export function dedupeAndSortNews(items: NewsArticle[], limit = NEWS_LIMIT) {
-  const unique = new Map<string, NewsArticle>();
-
-  for (const item of items) {
-    const key = item.link || `${item.title}|${item.source}`;
-    const existing = unique.get(key);
-    if (!existing) {
-      unique.set(key, item);
-      continue;
-    }
-
-    if (Date.parse(item.publishedAt) > Date.parse(existing.publishedAt)) {
-      unique.set(key, item);
-    }
+    return {
+      title: cleanText(findMeta(html, "og:title") || findTitle(html)),
+      summary: summarize(findMeta(html, "og:description") || findMeta(html, "description")),
+      source: cleanText(findMeta(html, "og:site_name") || sourceFromUrl(url)),
+    };
+  } catch (error) {
+    logServerEvent("warn", "news.metadata_fetch_failed", {
+      source,
+      error: getErrorMessage(error),
+    });
+    return {
+      title: "",
+      summary: "",
+      source: sourceFromUrl(url),
+    };
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  return [...unique.values()]
+async function readCuratedNews() {
+  const redis = getServerRedisClient();
+  if (!redis) return [...memoryNews];
+
+  const remote = await redis.get<NewsArticle[]>(CURATED_NEWS_KEY);
+  if (!Array.isArray(remote)) return [...memoryNews];
+  memoryNews.splice(0, memoryNews.length, ...remote);
+  return remote;
+}
+
+async function writeCuratedNews(items: NewsArticle[]) {
+  memoryNews.splice(0, memoryNews.length, ...items);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.set(CURATED_NEWS_KEY, items);
+}
+
+function dedupeKey(item: Pick<NewsArticle, "link" | "title" | "source">) {
+  return (item.link || `${item.title}|${item.source}`).trim().toLowerCase();
+}
+
+export function assertValidNewsRequestBody(raw: string) {
+  if (raw.length > MAX_BODY_LENGTH) {
+    throw new Error("News submission is too large.");
+  }
+}
+
+export async function addCuratedNews(input: NewsSubmissionInput) {
+  const link = cleanText(input.url || input.link || "");
+  if (link && !isValidHttpUrl(link)) throw new Error("URL must start with http:// or https://");
+
+  const metadata = link ? await fetchUrlMetadata(link) : null;
+  const fallbackText = input.text || input.summary || "";
+  const title = cleanText(input.title || metadata?.title || summarize(fallbackText, 90));
+  const summary = summarize(input.summary || input.text || metadata?.summary || title);
+  const source = cleanText(input.source || metadata?.source || (link ? sourceFromUrl(link) : "Manual"));
+  const topic = cleanText(input.topic || "Curated");
+
+  if (!title) throw new Error("Add a title, summary, text, or URL with readable metadata.");
+  if (!summary) throw new Error("Add a summary or text for this news item.");
+
+  const item: NewsArticle = {
+    id: randomUUID(),
+    title,
+    link,
+    source,
+    summary,
+    publishedAt: parsePublishedAt(input.publishedAt),
+    topic,
+    submittedAt: Date.now(),
+  };
+
+  const existing = await readCuratedNews();
+  const key = dedupeKey(item);
+  const next = [item, ...existing.filter((entry) => dedupeKey(entry) !== key)]
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
-    .slice(0, limit);
-}
+    .slice(0, NEWS_STORAGE_LIMIT);
 
-async function fetchTextWithRetry(
-  url: string,
-  {
-    timeoutMs = NEWS_FETCH_TIMEOUT_MS,
-    retries = NEWS_FETCH_RETRIES,
-    retryDelayMs = 250,
-    sourceName,
-  }: {
-    timeoutMs?: number;
-    retries?: number;
-    retryDelayMs?: number;
-    sourceName?: string;
-  } = {}
-) {
-  let lastError: unknown;
-  const source = sourceName || sourceNameFromUrl(url);
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    const startedAt = Date.now();
-
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          "user-agent": "OnchainPulse/1.0",
-          accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-        },
-      });
-
-      const durationMs = Date.now() - startedAt;
-      logSlowSource(source, durationMs);
-
-      if (!response.ok) {
-        logServerEvent("warn", "source.http_error", {
-          source,
-          status: response.status,
-          attempt,
-          durationMs,
-        });
-        throw new Error(`HTTP ${response.status} for ${url}`);
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      logServerEvent(attempt === retries ? "error" : "warn", "source.fetch_failed", {
-        source,
-        attempt,
-        retries,
-        error: getErrorMessage(error),
-      });
-
-      if (attempt === retries) break;
-      await sleep(retryDelayMs * (attempt + 1));
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${url}`);
-}
-
-async function fetchFeed(query: NewsFeedQuery) {
-  const xml = await fetchTextWithRetry(buildFeedUrl(query.query), {
-    sourceName: `google-news:${query.label.toLowerCase()}`,
-  });
-  return parseGoogleNewsRss(xml, query.label);
+  await writeCuratedNews(next);
+  return item;
 }
 
 export async function loadLatestNews() {
-  const results = await Promise.allSettled(NEWS_FEED_QUERIES.map((query) => fetchFeed(query)));
-  const items = results.flatMap((result) =>
-    result.status === "fulfilled" ? result.value : []
-  );
+  const items = (await readCuratedNews())
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+    .slice(0, NEWS_LIMIT);
 
   return {
-    items: dedupeAndSortNews(items, NEWS_LIMIT),
+    items,
     generatedAt: Date.now(),
-    feedCount: NEWS_FEED_QUERIES.length,
+    feedCount: items.length,
   } satisfies LatestNewsPayload;
 }
-
-export const newsCacheConfig = {
-  ttlMs: NEWS_FEED_TTL_MS,
-  staleTtlMs: NEWS_FEED_STALE_TTL_MS,
-};
