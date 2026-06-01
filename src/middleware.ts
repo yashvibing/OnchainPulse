@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const ADMIN_USERNAME = "admin";
+const DEFAULT_ADMIN_USERNAME = "OPbolte";
 const REALM = "Onchain Pulse News Admin";
 
 function unauthorized() {
@@ -54,6 +54,8 @@ function parseBasicAuth(header: string | null) {
 }
 
 export function middleware(request: NextRequest) {
+  const expectedUsername =
+    process.env.NEWS_ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
   const expectedPassword =
     process.env.NEWS_ADMIN_PASSWORD || process.env.NEWS_INGEST_TOKEN || "";
 
@@ -74,7 +76,7 @@ export function middleware(request: NextRequest) {
     return unauthorized();
   }
 
-  const usernameMatches = credentials.username === ADMIN_USERNAME;
+  const usernameMatches = credentials.username === expectedUsername;
   const passwordMatches = safeEqual(credentials.password, expectedPassword);
 
   if (!usernameMatches || !passwordMatches) {
