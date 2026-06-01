@@ -88,17 +88,25 @@ function DashboardInner() {
   function handleExportCsv() {
     if (!address || portfolio.isLoading || portfolio.isError) return;
 
-    const csv = buildPortfolioCsv(address, portfolio);
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `onchain-pulse-${shortenAddress(address).replace("...", "-")}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setCopyFeedback("CSV exported");
+    try {
+      const csv = buildPortfolioCsv(address, portfolio);
+      const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const filename = `onchain-pulse-${shortenAddress(address).replace("...", "-")}.csv`;
+
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      setCopyFeedback(`CSV download started: ${filename}`);
+    } catch {
+      setCopyFeedback("CSV download could not start. Try another browser.");
+    }
     setTimeout(() => setCopyFeedback(null), 2000);
   }
 

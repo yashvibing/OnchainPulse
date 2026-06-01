@@ -291,7 +291,7 @@ export function AlertCreator() {
       setConnectSession(data);
       setTelegramOpened(false);
       setStatusTone("success");
-      setStatus("Telegram link created. Use the bot link button, tap Start in Telegram, then confirm here.");
+      setStatus("Telegram link created. Next: launch the bot, tap Start, then return and confirm.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Telegram setup failed.";
       setStatusTone("error");
@@ -477,6 +477,16 @@ export function AlertCreator() {
               )}
             </div>
           </div>
+          {!connection && connectSession && (
+            <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.35)] bg-[rgba(0,245,204,0.07)] px-3 py-3 text-[12px] text-[var(--color-text-secondary)]">
+              <div className="font-bold text-[var(--color-text-primary)]">Finish Telegram setup</div>
+              <ol className="mt-2 grid gap-1 sm:grid-cols-3">
+                <li className={telegramOpened ? "text-[var(--color-positive)]" : ""}>1. Launch the bot link</li>
+                <li>2. Tap Start in Telegram</li>
+                <li>3. Click I tapped Start</li>
+              </ol>
+            </div>
+          )}
         </div>
 
         <div className={`rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4 ${connection ? "" : "opacity-70"}`}>

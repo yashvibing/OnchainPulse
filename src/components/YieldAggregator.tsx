@@ -77,6 +77,20 @@ function getDisplayProtocolIcon(iconUrl?: string) {
   }
 }
 
+function getExternalUrl(...urls: Array<string | undefined>) {
+  for (const value of urls) {
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (url.protocol === "https:" || url.protocol === "http:") return value;
+    } catch {
+      continue;
+    }
+  }
+
+  return "";
+}
+
 function Badge({
   children,
   tone = "neutral",
@@ -569,6 +583,7 @@ function OpportunityRow({
   const tokenLabel =
     assetSymbols.length > 0 ? assetSymbols.join(" / ") : opp.tokens.map((token) => token.symbol).join(" / ");
   const actionBadge = getOpportunityActionBadge(opp);
+  const externalUrl = getExternalUrl(opp.depositUrl, opp.protocolUrl);
 
   return (
     <div className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]">
@@ -601,7 +616,7 @@ function OpportunityRow({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+        <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 sm:grid-cols-3 md:bg-transparent md:px-0 md:py-0">
           <div>
             <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
@@ -615,15 +630,24 @@ function OpportunityRow({
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Open</div>
-            <a
-              href={opp.depositUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 inline-block text-[15px] text-[var(--color-text-muted)] transition-colors group-hover:text-[var(--color-text-primary)]"
-            >
-              &gt;
-            </a>
+            {externalUrl ? (
+              <>
+                <div className="text-[10px] uppercase text-[var(--color-text-dim)]">View</div>
+                <a
+                  href={externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center justify-end text-[12px] font-bold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-text-primary)]"
+                >
+                  Open
+                </a>
+              </>
+            ) : (
+              <>
+                <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Link</div>
+                <div className="mt-1 text-[13px] text-[var(--color-text-dim)]">-</div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -637,55 +661,67 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
     medium: "warning",
     high: "danger",
   } as const;
+  const externalUrl = getExternalUrl(strategy.depositUrl);
+  const content = (
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[14px] font-bold text-[var(--color-text-primary)]">
+            Supply {strategy.supplyToken} / Borrow {strategy.borrowToken}
+          </span>
+          <Badge tone={riskTone[strategy.liquidationRisk]}>{strategy.liquidationRisk} risk</Badge>
+        </div>
+        <div className="mt-2 grid gap-1 text-[12px] text-[var(--color-text-muted)] md:grid-cols-2">
+          <span>
+            Supply on <span className="text-[var(--color-text-secondary)]">{strategy.supplyProtocol}</span>{" "}
+            displayed APR{" "}
+            <span className="text-[var(--color-positive)]">{formatRateLabel(strategy.supplyApr)}</span>
+          </span>
+          <span>
+            Borrow on <span className="text-[var(--color-text-secondary)]">{strategy.borrowProtocol}</span>{" "}
+            {strategy.borrowApr > 0 && (
+              <span className="text-[var(--color-accent-secondary)]">+{formatRateLabel(strategy.borrowApr)} incentive</span>
+            )}
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-right sm:grid-cols-4">
+        <div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">Est. 1x</div>
+          <div className="font-semibold text-[var(--color-text-primary)]">{formatRateLabel(strategy.netAprAt1x)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">Est. 2x</div>
+          <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt2x)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">Est. 3x</div>
+          <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt3x)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">Max</div>
+          <div className="font-semibold text-[var(--color-text-secondary)]">{strategy.maxLeverage}x</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!externalUrl) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]">
+        {content}
+      </div>
+    );
+  }
 
   return (
     <a
-      href={strategy.depositUrl}
+      href={externalUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]"
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-bold text-[var(--color-text-primary)]">
-              Supply {strategy.supplyToken} / Borrow {strategy.borrowToken}
-            </span>
-            <Badge tone={riskTone[strategy.liquidationRisk]}>{strategy.liquidationRisk} risk</Badge>
-          </div>
-          <div className="mt-2 grid gap-1 text-[12px] text-[var(--color-text-muted)] md:grid-cols-2">
-            <span>
-              Supply on <span className="text-[var(--color-text-secondary)]">{strategy.supplyProtocol}</span>{" "}
-              displayed APR{" "}
-              <span className="text-[var(--color-positive)]">{formatRateLabel(strategy.supplyApr)}</span>
-            </span>
-            <span>
-              Borrow on <span className="text-[var(--color-text-secondary)]">{strategy.borrowProtocol}</span>{" "}
-              {strategy.borrowApr > 0 && (
-                <span className="text-[var(--color-accent-secondary)]">+{formatRateLabel(strategy.borrowApr)} incentive</span>
-              )}
-            </span>
-          </div>
-        </div>
-        <div className="grid grid-cols-4 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-right">
-          <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 1x</div>
-            <div className="font-semibold text-[var(--color-text-primary)]">{formatRateLabel(strategy.netAprAt1x)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 2x</div>
-            <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt2x)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">Est. 3x</div>
-            <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt3x)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-[var(--color-text-dim)]">Max</div>
-            <div className="font-semibold text-[var(--color-text-secondary)]">{strategy.maxLeverage}x</div>
-          </div>
-        </div>
-      </div>
+      {content}
     </a>
   );
 }
