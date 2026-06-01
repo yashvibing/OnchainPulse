@@ -74,14 +74,33 @@ export async function GET(
       }
     );
   } catch (error) {
-    logServerEvent("error", "api.failed", {
+    logServerEvent("warn", "api.degraded", {
       route: "/api/transactions/[address]",
       durationMs: Date.now() - startedAt,
       error: getErrorMessage(error),
     });
     return NextResponse.json(
-      { error: "Failed to load transaction history" },
-      { status: 502, headers: withRateLimitHeaders(undefined, rateLimit) }
+      {
+        address: normalized,
+        transactions: [],
+        nextCursor: "",
+        fetchedAt: Date.now(),
+        meta: {
+          unavailable: true,
+          reason: "indexer_unavailable",
+          durationMs: Date.now() - startedAt,
+        },
+      },
+      {
+        status: 200,
+        headers: withRateLimitHeaders(
+          {
+            "Cache-Control": "no-store",
+            "X-Cache-Status": "unavailable",
+          },
+          rateLimit
+        ),
+      }
     );
   }
 }

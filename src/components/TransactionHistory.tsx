@@ -21,6 +21,10 @@ interface TransactionHistoryResponse {
   transactions: WalletTransaction[];
   nextCursor: string;
   fetchedAt: number;
+  meta?: {
+    unavailable?: boolean;
+    reason?: string;
+  };
 }
 
 function explorerTxUrl(hash: string) {
@@ -114,6 +118,7 @@ export function TransactionHistory({ address }: { address: string }) {
   });
 
   const transactions = query.data?.transactions || [];
+  const historyUnavailable = Boolean(query.data?.meta?.unavailable);
 
   return (
     <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)]">
@@ -153,7 +158,13 @@ export function TransactionHistory({ address }: { address: string }) {
         </div>
       )}
 
-      {!query.isLoading && !query.isError && transactions.length === 0 && (
+      {!query.isLoading && !query.isError && historyUnavailable && (
+        <div className="p-6 text-center text-[13px] text-[var(--color-text-muted)]">
+          Transaction history is temporarily unavailable from the indexer.
+        </div>
+      )}
+
+      {!query.isLoading && !query.isError && !historyUnavailable && transactions.length === 0 && (
         <div className="p-6 text-center text-[13px] text-[var(--color-text-muted)]">
           No recent transactions found for this wallet.
         </div>
