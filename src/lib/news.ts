@@ -180,12 +180,11 @@ export async function addCuratedNews(input: NewsSubmissionInput) {
   const metadata = link ? await fetchUrlMetadata(link) : null;
   const fallbackText = input.text || input.summary || "";
   const title = cleanText(input.title || metadata?.title || summarize(fallbackText, 90));
-  const summary = summarize(input.summary || input.text || metadata?.summary || title);
+  const summary = summarize(input.summary || input.text || metadata?.summary || "");
   const source = cleanText(input.source || metadata?.source || (link ? sourceFromUrl(link) : "Manual"));
   const topic = cleanText(input.topic || "Curated");
 
   if (!title) throw new Error("Add a title, summary, text, or URL with readable metadata.");
-  if (!summary) throw new Error("Add a summary or text for this news item.");
 
   const item: NewsArticle = {
     id: randomUUID(),

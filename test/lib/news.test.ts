@@ -24,6 +24,33 @@ describe("curated news feed", () => {
     expect(feed.items.some((entry) => entry.id === item.id)).toBe(true);
   });
 
+  it("publishes immediately when no published date is provided", async () => {
+    const before = Date.now();
+    const item = await addCuratedNews({
+      title: `Immediate curated update ${before}`,
+      summary: "A curated update without a manual publish date.",
+      topic: "Monad",
+      source: "Manual",
+    });
+    const after = Date.now();
+    const publishedAt = Date.parse(item.publishedAt);
+
+    expect(publishedAt).toBeGreaterThanOrEqual(before);
+    expect(publishedAt).toBeLessThanOrEqual(after);
+  });
+
+  it("does not duplicate the title as summary", async () => {
+    const title = `Title only curated update ${Date.now()}`;
+    const item = await addCuratedNews({
+      title,
+      topic: "Bitcoin",
+      source: "Manual",
+    });
+
+    expect(item.title).toBe(title);
+    expect(item.summary).toBe("");
+  });
+
   it("deduplicates by title and source when no link is present", async () => {
     const title = `Duplicate curated update ${Date.now()}`;
 

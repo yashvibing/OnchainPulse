@@ -60,6 +60,9 @@ function getSignalText(topic: string) {
 }
 
 function NewsCard({ article }: { article: NewsArticle }) {
+  const normalizedTitle = article.title.trim().toLowerCase();
+  const normalizedSummary = article.summary.trim().toLowerCase();
+  const hasSummary = Boolean(normalizedSummary && normalizedSummary !== normalizedTitle);
   const content = (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -75,22 +78,28 @@ function NewsCard({ article }: { article: NewsArticle }) {
         {article.title}
       </h3>
 
-      <p
-        className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]"
-        style={{
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 3,
-          overflow: "hidden",
-        }}
-      >
-        {article.summary}
-      </p>
+      {hasSummary && (
+        <>
+          <p
+            className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]"
+            style={{
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 3,
+              overflow: "hidden",
+            }}
+          >
+            {article.summary}
+          </p>
 
-      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-        <span className="font-semibold text-[var(--color-text-secondary)]">Why it matters: </span>
-        {getSignalText(article.topic)}
-      </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+            <span className="font-semibold text-[var(--color-text-secondary)]">
+              Why it matters:{" "}
+            </span>
+            {getSignalText(article.topic)}
+          </div>
+        </>
+      )}
 
       {article.link ? (
         <div className="mt-auto flex items-center justify-between gap-3 text-[11px] text-[var(--color-text-muted)]">

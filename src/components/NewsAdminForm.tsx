@@ -170,13 +170,18 @@ export function NewsAdminForm() {
         </label>
 
         <label className="grid gap-2">
-          <span className="label-caps text-[var(--color-text-muted)]">Published at</span>
+          <span className="label-caps text-[var(--color-text-muted)]">
+            Published at (optional)
+          </span>
           <input
             type="datetime-local"
             value={form.publishedAt}
             onChange={(event) => updateField("publishedAt", event.target.value)}
             className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors focus:border-[var(--color-accent-primary)]"
           />
+          <span className="text-[12px] font-medium text-[var(--color-text-dim)]">
+            Leave blank to publish immediately.
+          </span>
         </label>
 
         {error && (
