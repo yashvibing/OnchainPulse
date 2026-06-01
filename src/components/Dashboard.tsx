@@ -179,21 +179,6 @@ function DashboardInner() {
                 Copy
               </button>
               <button
-                onClick={() => {
-                  const v = Math.round(portfolio.totalValue);
-                  const y = Math.round(portfolio.dailyYield * 100) / 100;
-                  const d = `${address}|${v}|${y}|${portfolio.positionCount}|${portfolio.protocolCount}`;
-                  const url = `${window.location.origin}/app?address=${address}&d=${encodeURIComponent(d)}`;
-                  navigator.clipboard.writeText(url).then(() => {
-                    setCopyFeedback("Card link copied!");
-                    setTimeout(() => setCopyFeedback(null), 2000);
-                  });
-                }}
-                className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
-              >
-                Share
-              </button>
-              <button
                 onClick={handleExportCsv}
                 disabled={portfolio.isLoading || portfolio.isError}
                 className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"

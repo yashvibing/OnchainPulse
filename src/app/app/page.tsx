@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { Dashboard } from "@/components/Dashboard";
 
 interface PageProps {
-  searchParams: Promise<{ address?: string; d?: string }>;
+  searchParams: Promise<{ address?: string }>;
 }
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams;
   const address = params.address;
-  const d = params.d;
 
   if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
     return {
@@ -23,7 +22,6 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     };
   }
 
-  const ogUrl = d ? `/api/og?d=${encodeURIComponent(d)}` : `/api/og?d=${address}`;
   const short = address.slice(0, 6) + "..." + address.slice(-4);
 
   return {
@@ -31,12 +29,12 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     openGraph: {
       title: `Portfolio ${short}`,
       description: "View this wallet's public DeFi positions relating to Monad.",
-      images: [{ url: ogUrl, width: 1200, height: 630 }],
+      images: [{ url: "/api/og", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title: `Portfolio ${short} - Onchain Pulse`,
-      images: [ogUrl],
+      images: ["/api/og"],
     },
   };
 }

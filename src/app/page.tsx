@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/Header";
 
 interface PageProps {
-  searchParams: Promise<{ address?: string; d?: string }>;
+  searchParams: Promise<{ address?: string }>;
 }
 
 export const metadata: Metadata = {
@@ -56,11 +56,9 @@ const TRUST_POINTS = [
 export default async function HomePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const address = params.address;
-  const d = params.d;
 
   if (address && /^0x[a-fA-F0-9]{40}$/.test(address)) {
     const query = new URLSearchParams({ address });
-    if (d) query.set("d", d);
     redirect(`/app?${query.toString()}`);
   }
 
