@@ -14,6 +14,7 @@ import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 import {
   loadSavedAddresses,
@@ -29,6 +30,7 @@ const PORTFOLIO_TABS = [
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
   { key: "yield", label: "Vaults", icon: "⬢" },
+  { key: "history", label: "History", icon: "Tx" },
 ] as const;
 
 type PortfolioTabKey = (typeof PORTFOLIO_TABS)[number]["key"];
@@ -330,6 +332,12 @@ function DashboardInner() {
                     </div>
                   )}
 
+                  {activeTab === "history" && (
+                    <div className="animate-fade-up">
+                      <TransactionHistory address={address} />
+                    </div>
+                  )}
+
                 </div>
 
                 <footer className="mt-12 text-center text-[11px] leading-relaxed text-[var(--color-text-dim)]">
@@ -512,8 +520,11 @@ function SavedAddressBar({
 
   return (
     <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3">
-      <div className="mb-2 text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">
-        Saved Addresses
+      <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--color-accent-primary)]">
+        Watchlist
+      </div>
+      <div className="mb-2 text-[11px] text-[var(--color-text-dim)]">
+        Saved in this browser. No login required.
       </div>
       <div className="flex flex-wrap gap-2">
         {addresses.map((item) => {
