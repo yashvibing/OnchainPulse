@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  getNewsAdminSecret,
+  isValidNewsAdminSession,
+  NEWS_ADMIN_COOKIE,
+} from "@/lib/newsAdminAuth";
 import { checkRateLimit, rateLimitResponse, withRateLimitHeaders } from "@/lib/rateLimit";
 import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 import { addCuratedNews, assertValidNewsRequestBody, type NewsSubmissionInput } from "@/lib/news";
@@ -11,6 +16,14 @@ function getBearerToken(request: Request) {
   return match?.[1]?.trim() || "";
 }
 
+function getCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get("cookie") || "";
+  const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
+  const target = `${name}=`;
+  const match = cookies.find((cookie) => cookie.startsWith(target));
+  return match ? decodeURIComponent(match.slice(target.length)) : "";
+}
+
 export async function POST(request: Request) {
   const rateLimit = await checkRateLimit(request, {
     namespace: "news-submit",
@@ -20,14 +33,22 @@ export async function POST(request: Request) {
   if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
 
   const expectedToken = process.env.NEWS_INGEST_TOKEN || "";
-  if (!expectedToken) {
+  const expectedAdminSecret = getNewsAdminSecret();
+  const adminSession = getCookie(request, NEWS_ADMIN_COOKIE);
+  const hasValidAdminSession = await isValidNewsAdminSession(
+    adminSession,
+    expectedAdminSecret,
+  );
+  const hasValidBearerToken = Boolean(expectedToken && getBearerToken(request) === expectedToken);
+
+  if (!expectedAdminSecret) {
     return NextResponse.json(
-      { ok: false, error: "NEWS_INGEST_TOKEN is not configured." },
+      { ok: false, error: "NEWS_ADMIN_PASSWORD or NEWS_INGEST_TOKEN is not configured." },
       { status: 503, headers: withRateLimitHeaders(undefined, rateLimit) }
     );
   }
 
-  if (getBearerToken(request) !== expectedToken) {
+  if (!hasValidAdminSession && !hasValidBearerToken) {
     return NextResponse.json(
       { ok: false, error: "Unauthorized news submission." },
       { status: 401, headers: withRateLimitHeaders(undefined, rateLimit) }

@@ -1,7 +1,15 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import {
+  createNewsAdminSession,
+  getNewsAdminSecret,
+  getNewsAdminUsername,
+  isValidNewsAdminSession,
+  NEWS_ADMIN_COOKIE,
+  NEWS_ADMIN_COOKIE_MAX_AGE,
+  safeEqual,
+} from "@/lib/newsAdminAuth";
 
-const DEFAULT_ADMIN_USERNAME = "OPbolte";
 const REALM = "Onchain Pulse News Admin";
 
 function unauthorized() {
@@ -12,19 +20,6 @@ function unauthorized() {
       "Cache-Control": "no-store",
     },
   });
-}
-
-function safeEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
 }
 
 function parseBasicAuth(header: string | null) {
@@ -53,11 +48,9 @@ function parseBasicAuth(header: string | null) {
   }
 }
 
-export function middleware(request: NextRequest) {
-  const expectedUsername =
-    process.env.NEWS_ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
-  const expectedPassword =
-    process.env.NEWS_ADMIN_PASSWORD || process.env.NEWS_INGEST_TOKEN || "";
+export async function middleware(request: NextRequest) {
+  const expectedUsername = getNewsAdminUsername();
+  const expectedPassword = getNewsAdminSecret();
 
   if (!expectedPassword) {
     return new NextResponse(
@@ -69,6 +62,11 @@ export function middleware(request: NextRequest) {
         },
       },
     );
+  }
+
+  const sessionToken = request.cookies.get(NEWS_ADMIN_COOKIE)?.value;
+  if (await isValidNewsAdminSession(sessionToken, expectedPassword)) {
+    return NextResponse.next();
   }
 
   const credentials = parseBasicAuth(request.headers.get("authorization"));
@@ -83,7 +81,16 @@ export function middleware(request: NextRequest) {
     return unauthorized();
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.cookies.set(NEWS_ADMIN_COOKIE, await createNewsAdminSession(expectedPassword), {
+    httpOnly: true,
+    maxAge: NEWS_ADMIN_COOKIE_MAX_AGE,
+    path: "/",
+    sameSite: "lax",
+    secure: request.nextUrl.protocol === "https:",
+  });
+
+  return response;
 }
 
 export const config = {

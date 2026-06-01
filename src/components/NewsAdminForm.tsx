@@ -10,7 +10,6 @@ interface SubmitResponse {
 }
 
 const emptyForm = {
-  token: "",
   url: "",
   title: "",
   summary: "",
@@ -44,7 +43,7 @@ export function NewsAdminForm() {
       form.url.trim().length > 0 ||
       form.title.trim().length > 0 ||
       form.summary.trim().length > 0;
-    return form.token.trim().length > 0 && hasContent && !submitting;
+    return hasContent && !submitting;
   }, [form, submitting]);
 
   function updateField(name: keyof typeof emptyForm, value: string) {
@@ -65,8 +64,8 @@ export function NewsAdminForm() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${form.token.trim()}`,
         },
+        credentials: "same-origin",
         body: JSON.stringify(cleanPayload(form)),
       });
       const data = (await response.json()) as SubmitResponse;
@@ -78,7 +77,6 @@ export function NewsAdminForm() {
       setMessage("News added. It should appear in the feed now.");
       setForm((current) => ({
         ...emptyForm,
-        token: current.token,
         topic: current.topic || "Monad",
       }));
     } catch (err) {
@@ -102,17 +100,6 @@ export function NewsAdminForm() {
       </div>
 
       <form className="grid gap-4" onSubmit={handleSubmit}>
-        <label className="grid gap-2">
-          <span className="label-caps text-[var(--color-text-muted)]">Ingest token</span>
-          <input
-            type="password"
-            value={form.token}
-            onChange={(event) => updateField("token", event.target.value)}
-            placeholder="NEWS_INGEST_TOKEN"
-            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
-          />
-        </label>
-
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="grid gap-2">
             <span className="label-caps text-[var(--color-text-muted)]">Article URL</span>
