@@ -14,7 +14,6 @@ import { LendingCards } from "@/components/LendingCards";
 import { LiquidityCards } from "@/components/LiquidityCards";
 import { SkeletonStatCards, SkeletonCards } from "@/components/EmptyState";
 import { PortfolioSparkline } from "@/components/Sparkline";
-import { TransactionHistory } from "@/components/TransactionHistory";
 import { shortenAddress, isValidEvmAddress } from "@/lib/format";
 import {
   loadSavedAddresses,
@@ -30,7 +29,6 @@ const PORTFOLIO_TABS = [
   { key: "liquidity", label: "Liquidity", icon: "◇" },
   { key: "lending", label: "Lending", icon: "⊞" },
   { key: "yield", label: "Vaults", icon: "⬢" },
-  { key: "history", label: "History", icon: "Tx" },
 ] as const;
 
 type PortfolioTabKey = (typeof PORTFOLIO_TABS)[number]["key"];
@@ -314,12 +312,6 @@ function DashboardInner() {
                     <div className="animate-fade-up">
                       <SectionTitle icon="⬢" title="Vault Positions" count={portfolio.vaults.length} />
                       {portfolio.vaults.length > 0 ? <VaultCards positions={portfolio.vaults} /> : <NoPositions label="vault positions" />}
-                    </div>
-                  )}
-
-                  {activeTab === "history" && (
-                    <div className="animate-fade-up">
-                      <TransactionHistory address={address} />
                     </div>
                   )}
 
