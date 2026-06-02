@@ -72,8 +72,33 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
   },
 ];
 
+const DAILY_RATES_DIGEST_IST_HOUR = 11;
+const DAILY_NEWS_BRIEF_IST_HOUR = 23;
+
 function protocolFilterKey(protocol: string) {
   return protocol.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function localTimeForIstHour(istHour: number) {
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const value = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+    const deliveryTime = new Date(Date.UTC(value("year"), value("month") - 1, value("day"), istHour - 5, 30));
+
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(deliveryTime);
+  } catch {
+    return "your local time";
+  }
 }
 
 function Badge({
@@ -98,6 +123,16 @@ function Badge({
 
 function notifyAlertsChanged() {
   window.dispatchEvent(new Event("onchain-pulse:alerts-changed"));
+}
+
+function dailyBriefCardClass(active: boolean, disabled: boolean) {
+  return [
+    "rounded-[var(--radius-md)] border px-4 py-4 text-left transition-colors",
+    disabled ? "cursor-not-allowed opacity-45" : "hover:border-[var(--color-accent-primary)]",
+    active
+      ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)]"
+      : "border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]",
+  ].join(" ");
 }
 
 function matchesAlertToken(opp: YieldOpportunity, tokenSymbol: string) {
@@ -239,8 +274,16 @@ export function AlertCreator() {
   const [busy, setBusy] = useState(false);
   const [telegramOpened, setTelegramOpened] = useState(false);
   const [existingRateMatch, setExistingRateMatch] = useState<ExistingRateMatch | null>(null);
+  const [localDeliveryTimes, setLocalDeliveryTimes] = useState({
+    rates: "your local time",
+    news: "your local time",
+  });
 
   useEffect(() => {
+    setLocalDeliveryTimes({
+      rates: localTimeForIstHour(DAILY_RATES_DIGEST_IST_HOUR),
+      news: localTimeForIstHour(DAILY_NEWS_BRIEF_IST_HOUR),
+    });
     setConnection(readStoredTelegramConnection());
     fetchYieldOpportunitiesWithClientMeta()
       .then((result) => setOpportunities(result.data))
@@ -407,9 +450,9 @@ export function AlertCreator() {
       setStatusTone("success");
       setStatus(
         isNewsBrief
-          ? "Daily latest news brief enabled for 11 PM IST."
+          ? `Daily latest news brief enabled for ${localDeliveryTimes.news}.`
           : isRatesDigest
-            ? "Daily DeFi rates digest enabled for 11 AM IST."
+            ? `Daily DeFi rates digest enabled for ${localDeliveryTimes.rates}.`
             : `${label} alert created for ${tokenSymbol}.`
       );
       notifyAlertsChanged();
@@ -437,9 +480,9 @@ export function AlertCreator() {
           <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
             Telegram alerts
           </div>
-          <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Set up rate alerts</h2>
+          <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Set up Telegram updates</h2>
           <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Connect Telegram, then create a watch.
+            Connect Telegram, then create a rate watch or daily brief.
           </p>
         </div>
         {connection ? <Badge tone="positive">Telegram connected</Badge> : <Badge tone="warning">Setup required</Badge>}
@@ -518,17 +561,61 @@ export function AlertCreator() {
               2. Create alert
             </div>
             <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
-              {isNewsBrief ? "Enable daily news brief" : isRatesDigest ? "Enable daily rates digest" : "Create a watch"}
+              {isNewsBrief ? "Daily latest news brief" : isRatesDigest ? "Daily DeFi rates brief" : "Create a watch"}
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
               {connection && isNewsBrief
-                ? "Receive one Telegram message at 11 PM IST with curated news titles, summaries, and source links."
+                ? `Receive one Telegram message at ${localDeliveryTimes.news} with curated news titles, summaries, and source links.`
                 : connection && isRatesDigest
-                  ? "Receive one Telegram message at 11 AM IST with the top displayed DeFi rates."
+                  ? `Receive one Telegram message at ${localDeliveryTimes.rates} with the top displayed DeFi rates.`
                 : connection
                   ? "Choose the token, condition, protocol, and APR target."
                   : "Connect Telegram first to unlock alert creation."}
             </p>
+          </div>
+
+          <div className="mb-4 grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              disabled={formDisabled}
+              onClick={() => {
+                setKind("daily_digest");
+                setTokenSymbol("ANY");
+                setProtocolKey("all");
+              }}
+              className={dailyBriefCardClass(isRatesDigest, formDisabled)}
+            >
+              <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+                Daily brief
+              </div>
+              <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+                DeFi rates daily brief
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+                Top displayed DeFi rates in Telegram every day at {localDeliveryTimes.rates}.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              disabled={formDisabled}
+              onClick={() => {
+                setKind("daily_news_brief");
+                setTokenSymbol("ANY");
+                setProtocolKey("all");
+              }}
+              className={dailyBriefCardClass(isNewsBrief, formDisabled)}
+            >
+              <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+                Daily brief
+              </div>
+              <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+                Latest news daily brief
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+                Curated latest-news links in Telegram every day at {localDeliveryTimes.news}.
+              </p>
+            </button>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr_0.9fr_0.7fr_auto] lg:items-end">

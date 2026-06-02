@@ -22,7 +22,7 @@ export default function AlertsPage() {
             Alerts
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Telegram alerts for APR thresholds, best-place changes, and new markets.
+            Telegram alerts for APR thresholds, best-place changes, new markets, and daily briefs.
           </p>
         </section>
 
