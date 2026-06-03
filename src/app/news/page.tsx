@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { LatestNewsSection } from "@/components/LatestNewsSection";
+import { NewsTipSubmitForm } from "@/components/NewsTipSubmitForm";
 
 export const metadata: Metadata = {
   title: "Latest News - Onchain Pulse",
@@ -27,6 +28,7 @@ export default function NewsPage() {
           </p>
         </section>
 
+        <NewsTipSubmitForm />
         <LatestNewsSection />
       </main>
     </div>

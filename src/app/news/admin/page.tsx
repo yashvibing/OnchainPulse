@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { NewsAdminForm } from "@/components/NewsAdminForm";
+import { NewsTipReviewPanel } from "@/components/NewsTipReviewPanel";
 
 export const metadata: Metadata = {
   title: "News Admin - Onchain Pulse",
@@ -26,7 +27,10 @@ export default function NewsAdminPage() {
           </p>
         </section>
 
-        <NewsAdminForm />
+        <div className="grid gap-5">
+          <NewsTipReviewPanel />
+          <NewsAdminForm />
+        </div>
       </main>
     </div>
   );
