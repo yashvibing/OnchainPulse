@@ -164,11 +164,12 @@ function AssetStack({ symbols }: { symbols: string[] }) {
             title={symbol}
           >
             {logoSrc ? (
-              <Image
+              // Local SVG/PNG token marks render more predictably as plain images.
+              // Protocol marks still use next/image because many are remote URLs.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={logoSrc}
                 alt=""
-                width={36}
-                height={36}
                 className="h-full w-full object-contain"
                 loading="lazy"
               />
