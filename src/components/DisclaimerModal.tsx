@@ -21,7 +21,6 @@ export function DisclaimerModal() {
   const [ready, setReady] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [checked, setChecked] = useState(false);
-  const [showFullText, setShowFullText] = useState(false);
 
   useEffect(() => {
     setAccepted(window.localStorage.getItem(STORAGE_KEY) === "accepted");
@@ -85,24 +84,17 @@ export function DisclaimerModal() {
         </div>
 
         <div className="mt-5 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.045)] px-4 py-4 sm:px-6 sm:py-5">
-          <button
-            type="button"
-            onClick={() => setShowFullText((value) => !value)}
-            className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)] hover:opacity-80"
-          >
-            {showFullText ? "Hide full disclaimer" : "Read full disclaimer"}
-          </button>
-
-          {showFullText && (
-            <ul className="mt-4 space-y-3">
-              {DISCLAIMER_ITEMS.map((item) => (
-                <li key={item} className="flex gap-3 text-[13px] leading-relaxed text-[var(--color-text-primary)] sm:text-[15px]">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent-violet)]" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--color-accent-primary)]">
+            Full disclaimer
+          </div>
+          <ul className="mt-4 space-y-3">
+            {DISCLAIMER_ITEMS.map((item) => (
+              <li key={item} className="flex gap-3 text-[13px] leading-relaxed text-[var(--color-text-primary)] sm:text-[15px]">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent-violet)]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
