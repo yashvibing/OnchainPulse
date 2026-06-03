@@ -29,6 +29,7 @@ import {
   getHeldYieldSymbols,
 } from "@/lib/walletOpportunities";
 import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
+import { getTokenLogoSrc } from "@/lib/tokenLogos";
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -152,15 +153,31 @@ function AssetStack({ symbols }: { symbols: string[] }) {
 
   return (
     <div className="flex -space-x-2">
-      {visibleSymbols.map((symbol, index) => (
-        <div
-          key={`${symbol}-${index}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--color-bg-primary)] bg-[rgba(0,245,204,0.14)] text-[9px] font-extrabold text-[var(--color-positive)]"
-          style={{ zIndex: visibleSymbols.length - index }}
-        >
-          {symbol.slice(0, 2).toUpperCase()}
-        </div>
-      ))}
+      {visibleSymbols.map((symbol, index) => {
+        const logoSrc = getTokenLogoSrc(symbol);
+
+        return (
+          <div
+            key={`${symbol}-${index}`}
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--color-bg-primary)] bg-[rgba(255,255,255,0.08)] text-[9px] font-extrabold text-[var(--color-positive)] shadow-[0_8px_22px_rgba(0,0,0,0.22)]"
+            style={{ zIndex: visibleSymbols.length - index }}
+            title={symbol}
+          >
+            {logoSrc ? (
+              <Image
+                src={logoSrc}
+                alt=""
+                width={36}
+                height={36}
+                className="h-full w-full object-contain"
+                loading="lazy"
+              />
+            ) : (
+              symbol.slice(0, 2).toUpperCase()
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -44,6 +44,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 6,
     category: "stablecoin",
     logoColor: "#2775CA",
+    logoURI: "/token-logos/usdc.svg",
   },
   // The token at this address is USDT0 (LayerZero Omnichain USDT), not Tether's
   // native USDT. Verified on-chain 2026-04-11: symbol() returns "USDT0",
@@ -55,6 +56,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 6,
     category: "stablecoin",
     logoColor: "#26A17B",
+    logoURI: "/token-logos/usdt0.svg",
   },
   WETH: {
     address: "0xEE8c0E9f1BFFb4Eb878d8f15f368A02a35481242",
@@ -63,6 +65,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "wrapped",
     logoColor: "#627EEA",
+    logoURI: "/token-logos/weth.svg",
   },
   WBTC: {
     address: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
@@ -71,6 +74,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 8,
     category: "wrapped",
     logoColor: "#F7931A",
+    logoURI: "/token-logos/wbtc.svg",
   },
   // Coinbase Wrapped BTC — used as the underlying for several Morpho vaults
   // on Monad (Hyperithm cbBTC Apex, Steakhouse High Yield cbBTC).
@@ -82,6 +86,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 8,
     category: "wrapped",
     logoColor: "#0052FF",
+    logoURI: "/token-logos/cbbtc.svg",
   },
   // World Liberty Financial USD — stablecoin used by Morpho's bbqUSD1 vault.
   // Verified on-chain 2026-04-11: name() = "World Liberty Financial USD".
@@ -92,6 +97,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 6,
     category: "stablecoin",
     logoColor: "#FCD34D",
+    logoURI: "/token-logos/usd1.svg",
   },
   AUSD: {
     address: "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a",
@@ -100,6 +106,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 6,
     category: "stablecoin",
     logoColor: "#1A73E8",
+    logoURI: "/token-logos/ausd.svg",
   },
 
   // ─── Liquid Staking Tokens ───
@@ -110,6 +117,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "lst",
     logoColor: "#6D28D9",
+    logoURI: "/token-logos/aprmon.svg",
   },
   shMON: {
     address: "0x1B68626dCa36c7fE922fD2d55E4f631d962dE19c",
@@ -118,6 +126,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "lst",
     logoColor: "#D97706",
+    logoURI: "/token-logos/shmon.png",
   },
   // Note: Kintsu's on-chain symbol is sMON, not kMON. The community
   // historically called it "kMON" but the actual ERC-20 reports "sMON".
@@ -128,6 +137,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "lst",
     logoColor: "#EC4899",
+    logoURI: "/token-logos/smon.svg",
   },
   gMON: {
     address: "0x8498312A6B3CbD158bf0c93AbdCF29E6e4F55081",
@@ -136,6 +146,7 @@ export const TOKENS: Record<string, TokenInfo> = {
     decimals: 18,
     category: "lst",
     logoColor: "#F97316",
+    logoURI: "/token-logos/gmon.svg",
   },
 };
 
