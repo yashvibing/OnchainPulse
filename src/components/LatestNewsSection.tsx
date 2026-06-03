@@ -185,7 +185,7 @@ export function LatestNewsSection() {
   const displayedItems = items.slice(0, 4);
 
   return (
-    <section className="mt-10 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
+    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="label-caps text-[var(--color-accent-primary)]">

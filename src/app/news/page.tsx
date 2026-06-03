@@ -28,8 +28,12 @@ export default function NewsPage() {
           </p>
         </section>
 
-        <NewsTipSubmitForm />
-        <LatestNewsSection />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <LatestNewsSection />
+          <aside className="lg:sticky lg:top-24">
+            <NewsTipSubmitForm />
+          </aside>
+        </div>
       </main>
     </div>
   );

@@ -53,11 +53,11 @@ export function NewsTipSubmitForm() {
   }
 
   return (
-    <section className="mb-8 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
-      <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
+      <div className="grid gap-5">
         <div>
           <div className="label-caps text-[var(--color-accent-primary)]">Submit an update</div>
-          <h2 className="mt-2 text-[24px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
+          <h2 className="mt-2 text-[22px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
             Found something important?
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
@@ -66,7 +66,7 @@ export function NewsTipSubmitForm() {
         </div>
 
         <form className="grid gap-3" onSubmit={handleSubmit}>
-          <div className="grid gap-3 md:grid-cols-[1fr_160px]">
+          <div className="grid gap-3">
             <input
               type="url"
               value={form.url}
@@ -109,7 +109,7 @@ export function NewsTipSubmitForm() {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="justify-self-start rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            className="w-full rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {submitting ? "Sending..." : "Send for review"}
           </button>
