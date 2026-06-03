@@ -16,7 +16,10 @@ export async function POST(request: Request) {
   if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
 
   try {
-    const session = await createTelegramConnectSession();
+    const body = await request.json().catch(() => ({}));
+    const session = await createTelegramConnectSession(
+      body.loginToken ? String(body.loginToken) : undefined
+    );
     return NextResponse.json(session, {
       status: 201,
       headers: withRateLimitHeaders(undefined, rateLimit),

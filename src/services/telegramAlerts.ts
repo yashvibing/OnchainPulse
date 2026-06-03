@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { getServerRedisClient } from "@/lib/serverCache";
 import { loadLatestNews } from "@/lib/news";
 import { getErrorMessage, logServerEvent, shortHash } from "@/lib/serverLog";
@@ -43,32 +43,65 @@ export interface TelegramConnectSession {
   createdAt: number;
   expiresAt: number;
   chatId?: string;
+  telegramUserId?: string;
 }
 
 interface TelegramUpdate {
   update_id: number;
   message?: {
     text?: string;
+    from?: {
+      id?: number | string;
+      username?: string;
+      first_name?: string;
+      last_name?: string;
+    };
     chat?: {
       id?: number | string;
     };
   };
 }
 
+export interface TelegramLoginPayload {
+  id?: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date?: number | string;
+  hash?: string;
+}
+
+export interface TelegramUserConnection {
+  userId: string;
+  chatId?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  photoUrl?: string;
+  updatedAt: number;
+}
+
 const ALERT_REGISTRY_KEY = "onchain-pulse:alerts:registry";
 const ALERT_ITEM_PREFIX = "onchain-pulse:alerts:item:";
 const CONNECT_PREFIX = "onchain-pulse:telegram-connect:";
+const TELEGRAM_USER_PREFIX = "onchain-pulse:telegram-user:";
+const TELEGRAM_LOGIN_SESSION_PREFIX = "onchain-pulse:telegram-login-session:";
 const CONNECTED_CHATS_KEY = "onchain-pulse:telegram:connected-chats";
 const TELEGRAM_OFFSET_KEY = "onchain-pulse:telegram:update-offset";
 const WEEKLY_ECOSYSTEM_UPDATE_KEY = "onchain-pulse:telegram:weekly-ecosystem-update";
 const WEEKLY_ECOSYSTEM_SENT_PREFIX = "onchain-pulse:telegram:weekly-ecosystem-sent:";
 const CONNECT_TTL_SECONDS = 15 * 60;
+const LOGIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const TELEGRAM_LOGIN_MAX_AGE_SECONDS = 60 * 60 * 24;
 const DAILY_RATES_DIGEST_HOUR_IST = 11;
 const DAILY_NEWS_BRIEF_HOUR_IST = 23;
 const WEEKLY_ECOSYSTEM_TITLE = "This week's ecosystem updates are out";
 
 const memoryAlerts = new Map<string, TelegramAlert>();
 const memoryConnectSessions = new Map<string, TelegramConnectSession>();
+const memoryTelegramUsers = new Map<string, TelegramUserConnection>();
+const memoryTelegramLoginSessions = new Map<string, { userId: string; expiresAt: number }>();
 const memoryConnectedChats = new Set<string>();
 let memoryWeeklyEcosystemUpdate: WeeklyEcosystemUpdate | null = null;
 const memoryWeeklyEcosystemSent = new Set<string>();
@@ -86,6 +119,14 @@ function alertKey(id: string) {
 
 function connectKey(code: string) {
   return `${CONNECT_PREFIX}${code}`;
+}
+
+function telegramUserKey(userId: string) {
+  return `${TELEGRAM_USER_PREFIX}${userId}`;
+}
+
+function telegramLoginSessionKey(token: string) {
+  return `${TELEGRAM_LOGIN_SESSION_PREFIX}${token}`;
 }
 
 function normalizeTokenSymbol(symbol: string) {
@@ -111,6 +152,110 @@ export function getTelegramAlertConfig() {
   return {
     configured: Boolean(getTelegramBotToken() && botUsername),
     botUsername,
+  };
+}
+
+async function readTelegramUser(userId: string) {
+  const redis = getServerRedisClient();
+  if (!redis) return memoryTelegramUsers.get(userId) || null;
+  return redis.get<TelegramUserConnection>(telegramUserKey(userId));
+}
+
+async function writeTelegramUser(user: TelegramUserConnection) {
+  memoryTelegramUsers.set(user.userId, user);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.set(telegramUserKey(user.userId), user);
+}
+
+async function createTelegramLoginSession(userId: string) {
+  const token = randomUUID().replace(/-/g, "");
+  const expiresAt = Date.now() + LOGIN_SESSION_TTL_SECONDS * 1000;
+  memoryTelegramLoginSessions.set(token, { userId, expiresAt });
+  const redis = getServerRedisClient();
+  if (redis) await redis.set(telegramLoginSessionKey(token), { userId, expiresAt }, { ex: LOGIN_SESSION_TTL_SECONDS });
+  return token;
+}
+
+async function readTelegramLoginSession(token: string) {
+  if (!token) return null;
+  const redis = getServerRedisClient();
+  const session = redis
+    ? await redis.get<{ userId: string; expiresAt: number }>(telegramLoginSessionKey(token))
+    : memoryTelegramLoginSessions.get(token) || null;
+
+  if (!session || session.expiresAt < Date.now()) return null;
+  return session;
+}
+
+function timingSafeHexEqual(a: string, b: string) {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function verifyTelegramLoginPayload(payload: TelegramLoginPayload) {
+  const token = getTelegramBotToken();
+  if (!token) throw new Error("Telegram bot token is not configured");
+  if (!payload.id || !payload.auth_date || !payload.hash) {
+    throw new Error("Telegram login payload is incomplete");
+  }
+
+  const authDate = Number(payload.auth_date);
+  if (!Number.isFinite(authDate)) throw new Error("Telegram login auth date is invalid");
+  if (Date.now() / 1000 - authDate > TELEGRAM_LOGIN_MAX_AGE_SECONDS) {
+    throw new Error("Telegram login expired. Try again.");
+  }
+
+  const data = {
+    id: String(payload.id),
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    username: payload.username,
+    photo_url: payload.photo_url,
+    auth_date: String(payload.auth_date),
+  };
+
+  const dataCheckString = Object.entries(data)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+
+  const secret = createHash("sha256").update(token).digest();
+  const computed = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  if (!timingSafeHexEqual(computed, String(payload.hash))) {
+    throw new Error("Telegram login signature is invalid");
+  }
+
+  return {
+    userId: String(payload.id),
+    username: payload.username?.trim() || undefined,
+    firstName: payload.first_name?.trim() || undefined,
+    lastName: payload.last_name?.trim() || undefined,
+    photoUrl: payload.photo_url?.trim() || undefined,
+  };
+}
+
+export async function verifyTelegramLogin(payload: TelegramLoginPayload) {
+  const identity = verifyTelegramLoginPayload(payload);
+  const existing = await readTelegramUser(identity.userId);
+  const user: TelegramUserConnection = {
+    ...existing,
+    userId: identity.userId,
+    username: identity.username || existing?.username,
+    firstName: identity.firstName || existing?.firstName,
+    lastName: identity.lastName || existing?.lastName,
+    photoUrl: identity.photoUrl || existing?.photoUrl,
+    updatedAt: Date.now(),
+  };
+
+  await writeTelegramUser(user);
+  const loginToken = await createTelegramLoginSession(user.userId);
+
+  return {
+    loginToken,
+    user,
   };
 }
 
@@ -217,7 +362,7 @@ async function registerTelegramChat(chatId: string) {
   await redis.sadd(CONNECTED_CHATS_KEY, chatId);
 }
 
-async function listConnectedTelegramChatIds() {
+export async function listConnectedTelegramChatIds() {
   const redis = getServerRedisClient();
   const connected = redis
     ? (await redis.smembers(CONNECTED_CHATS_KEY)).map(String)
@@ -287,17 +432,19 @@ function createConnectionCode() {
   return `ocp_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
-export async function createTelegramConnectSession() {
+export async function createTelegramConnectSession(loginToken?: string) {
   const config = getTelegramAlertConfig();
   if (!config.configured) {
     throw new Error("Telegram bot is not configured");
   }
+  const loginSession = loginToken ? await readTelegramLoginSession(loginToken) : null;
 
   const now = Date.now();
   const session: TelegramConnectSession = {
     code: createConnectionCode(),
     createdAt: now,
     expiresAt: now + CONNECT_TTL_SECONDS * 1000,
+    telegramUserId: loginSession?.userId,
   };
 
   await writeConnectSession(session);
@@ -358,6 +505,15 @@ export async function claimTelegramConnectSession(code: string) {
   const connected = { ...session, chatId: String(chatId) };
   await writeConnectSession(connected);
   await registerTelegramChat(String(chatId));
+  if (connected.telegramUserId) {
+    const existing = await readTelegramUser(connected.telegramUserId);
+    await writeTelegramUser({
+      ...existing,
+      userId: connected.telegramUserId,
+      chatId: String(chatId),
+      updatedAt: Date.now(),
+    });
+  }
   await sendTelegramMessage(
     String(chatId),
     "Onchain Pulse alerts are connected. You can now create DeFi rate alerts from the app."
@@ -864,10 +1020,23 @@ async function processTelegramBotCommands() {
     if (startCode) {
       const session = await readConnectSession(startCode);
       if (session && session.expiresAt >= Date.now()) {
+        const chatIdString = String(chatId);
         await writeConnectSession({ ...session, chatId: String(chatId) });
-        await registerTelegramChat(String(chatId));
+        await registerTelegramChat(chatIdString);
+        if (session.telegramUserId) {
+          const existing = await readTelegramUser(session.telegramUserId);
+          await writeTelegramUser({
+            ...existing,
+            userId: session.telegramUserId,
+            chatId: chatIdString,
+            username: update.message?.from?.username || existing?.username,
+            firstName: update.message?.from?.first_name || existing?.firstName,
+            lastName: update.message?.from?.last_name || existing?.lastName,
+            updatedAt: Date.now(),
+          });
+        }
         await sendTelegramMessage(
-          String(chatId),
+          chatIdString,
           "Onchain Pulse alerts are connected. Return to the app and press Confirm."
         );
       }

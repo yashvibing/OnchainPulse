@@ -8,8 +8,11 @@ import {
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
 import {
+  readStoredTelegramIdentity,
   readStoredTelegramConnection,
+  saveStoredTelegramIdentity,
   saveStoredTelegramConnection,
+  type StoredTelegramIdentity,
   type StoredTelegramConnection,
 } from "@/lib/telegramAlertClient";
 
@@ -28,6 +31,19 @@ type ExistingRateMatch = {
   protocolScope: string;
   protocol: string;
   apr: number;
+};
+type TelegramAuthPayload = {
+  id: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number | string;
+  hash: string;
+};
+type TelegramAlertConfig = {
+  configured: boolean;
+  botUsername: string;
 };
 
 const POPULAR_TOKENS = [
@@ -133,6 +149,59 @@ function dailyBriefCardClass(active: boolean, disabled: boolean) {
       ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)]"
       : "border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]",
   ].join(" ");
+}
+
+function telegramDisplayName(identity: StoredTelegramIdentity) {
+  if (identity.username) return `@${identity.username}`;
+  return [identity.firstName, identity.lastName].filter(Boolean).join(" ") || `Telegram ${identity.id}`;
+}
+
+function TelegramLoginButton({
+  botUsername,
+  disabled,
+  onLogin,
+}: {
+  botUsername: string;
+  disabled?: boolean;
+  onLogin: (payload: TelegramAuthPayload) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !botUsername || disabled) return;
+
+    const callbackName = "onchainPulseTelegramAuth";
+    const targetWindow = window as typeof window & {
+      onchainPulseTelegramAuth?: (payload: TelegramAuthPayload) => void;
+    };
+    targetWindow[callbackName] = onLogin;
+    container.innerHTML = "";
+
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.async = true;
+    script.setAttribute("data-telegram-login", botUsername);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "8");
+    script.setAttribute("data-request-access", "write");
+    script.setAttribute("data-onauth", `window.${callbackName}(user)`);
+    container.appendChild(script);
+
+    return () => {
+      container.innerHTML = "";
+    };
+  }, [botUsername, disabled, onLogin]);
+
+  if (disabled) {
+    return (
+      <button type="button" disabled className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2 text-[12px] font-bold text-[var(--color-text-muted)] opacity-45">
+        Continue with Telegram
+      </button>
+    );
+  }
+
+  return <div ref={containerRef} className="min-h-[40px]" />;
 }
 
 function matchesAlertToken(opp: YieldOpportunity, tokenSymbol: string) {
@@ -260,6 +329,8 @@ function AlertSelect({
 export function AlertCreator() {
   const [opportunities, setOpportunities] = useState<YieldOpportunity[]>([]);
   const [connection, setConnection] = useState<StoredTelegramConnection | null>(null);
+  const [telegramIdentity, setTelegramIdentity] = useState<StoredTelegramIdentity | null>(null);
+  const [alertConfig, setAlertConfig] = useState<TelegramAlertConfig | null>(null);
   const [connectSession, setConnectSession] = useState<{
     code: string;
     deepLink: string;
@@ -284,7 +355,15 @@ export function AlertCreator() {
       rates: localTimeForIstHour(DAILY_RATES_DIGEST_IST_HOUR),
       news: localTimeForIstHour(DAILY_NEWS_BRIEF_IST_HOUR),
     });
+    setTelegramIdentity(readStoredTelegramIdentity());
     setConnection(readStoredTelegramConnection());
+    fetch("/api/alerts")
+      .then((response) => response.json())
+      .then((data) => setAlertConfig({
+        configured: Boolean(data.configured),
+        botUsername: String(data.botUsername || ""),
+      }))
+      .catch(() => setAlertConfig({ configured: false, botUsername: "" }));
     fetchYieldOpportunitiesWithClientMeta()
       .then((result) => setOpportunities(result.data))
       .catch(() => {
@@ -340,18 +419,23 @@ export function AlertCreator() {
       : protocolChoices.map((option) => ({ value: option.key, label: option.label }))),
   ];
 
-  const createConnectionCode = useCallback(async () => {
+  const createConnectionCode = useCallback(async (loginTokenOverride?: string) => {
     setBusy(true);
     setStatus("");
     setStatusTone("info");
     try {
-      const response = await fetch("/api/alerts/connect", { method: "POST" });
+      const loginToken = loginTokenOverride || telegramIdentity?.loginToken;
+      const response = await fetch("/api/alerts/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loginToken }),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create Telegram connection.");
       setConnectSession(data);
       setTelegramOpened(false);
       setStatusTone("success");
-      setStatus("Telegram link created. Next: launch the bot, tap Start, then return and confirm.");
+      setStatus("Bot link created. Launch it, tap Start in Telegram, then confirm here.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Telegram setup failed.";
       setStatusTone("error");
@@ -363,7 +447,58 @@ export function AlertCreator() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [telegramIdentity?.loginToken]);
+
+  const handleTelegramLogin = useCallback(async (payload: TelegramAuthPayload) => {
+    setBusy(true);
+    setStatus("");
+    setStatusTone("info");
+    try {
+      const response = await fetch("/api/alerts/telegram-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Telegram login failed.");
+
+      const nextIdentity: StoredTelegramIdentity = {
+        id: String(data.identity.id),
+        loginToken: String(data.identity.loginToken),
+        username: data.identity.username,
+        firstName: data.identity.firstName,
+        lastName: data.identity.lastName,
+        photoUrl: data.identity.photoUrl,
+        connectedAt: Number(data.identity.connectedAt || Date.now()),
+      };
+      saveStoredTelegramIdentity(nextIdentity);
+      setTelegramIdentity(nextIdentity);
+
+      if (data.connection?.chatId) {
+        const nextConnection = {
+          chatId: String(data.connection.chatId),
+          connectedAt: Number(data.connection.connectedAt || Date.now()),
+        };
+        saveStoredTelegramConnection(nextConnection);
+        setConnection(nextConnection);
+        setConnectSession(null);
+        setTelegramOpened(false);
+        setStatusTone("success");
+        setStatus("Telegram restored. You can manage alerts now.");
+        notifyAlertsChanged();
+        return;
+      }
+
+      setStatusTone("success");
+      setStatus("Telegram login confirmed. Start the bot once to receive alerts.");
+      await createConnectionCode(nextIdentity.loginToken);
+    } catch (error) {
+      setStatusTone("error");
+      setStatus(error instanceof Error ? error.message : "Telegram login failed.");
+    } finally {
+      setBusy(false);
+    }
+  }, [createConnectionCode]);
 
   async function claimConnection() {
     if (!connectSession) return;
@@ -496,23 +631,42 @@ export function AlertCreator() {
                 1. Connect Telegram
               </div>
               <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
-                {connection ? "Telegram is ready" : "Send alerts to Telegram"}
+                {connection
+                  ? "Telegram is ready"
+                  : telegramIdentity
+                    ? "Start the bot once"
+                    : "Continue with Telegram"}
               </div>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
                 {connection
                   ? "Alerts go to your connected chat."
-                  : "Create a link, launch the bot, tap Start, then confirm."}
+                  : telegramIdentity
+                    ? `${telegramDisplayName(telegramIdentity)} is verified. Start the bot so it can send messages.`
+                    : "Use Telegram login for recovery. This stays separate from wallet addresses."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {!connection && (
+              {!connection && !telegramIdentity && (
+                alertConfig?.configured && alertConfig.botUsername ? (
+                  <TelegramLoginButton
+                    botUsername={alertConfig.botUsername}
+                    disabled={busy}
+                    onLogin={handleTelegramLogin}
+                  />
+                ) : (
+                  <button type="button" disabled className={setupButtonClass(false)}>
+                    Continue with Telegram
+                  </button>
+                )
+              )}
+              {!connection && telegramIdentity && (
                 <button
                   type="button"
-                  onClick={createConnectionCode}
+                  onClick={() => createConnectionCode()}
                   disabled={busy || Boolean(connectSession)}
                   className={setupButtonClass(!connectSession, Boolean(connectSession))}
                 >
-                  Create Telegram link
+                  Create bot link
                 </button>
               )}
               {!connection &&
