@@ -8,18 +8,18 @@ interface PageProps {
 }
 
 export const metadata: Metadata = {
-  title: "Onchain Pulse - Portfolio & DeFi Rates",
+  title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
   description:
-    "A read-only interface for portfolio tracking, displayed DeFi rates, Telegram alerts, and Monad ecosystem context.",
+    "A read-only interface for public portfolio tracking, displayed DeFi rates, latest news, Telegram alerts, and Monad ecosystem context.",
   openGraph: {
-    title: "Onchain Pulse - Portfolio & DeFi Rates",
+    title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
     description:
-      "Inspect public portfolios, compare displayed DeFi rates, set Telegram alerts, and browse Monad ecosystem context.",
+      "Inspect public portfolios, compare displayed DeFi rates, follow latest news, set Telegram alerts, and browse Monad ecosystem context.",
     images: [{ url: "/api/og", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Onchain Pulse - Portfolio & DeFi Rates",
+    title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
     images: ["/api/og"],
   },
 };
@@ -27,30 +27,29 @@ export const metadata: Metadata = {
 const FEATURE_CARDS = [
   {
     title: "Portfolio Tracker",
-    body: "Inspect public wallet positions.",
+    body: "Paste a wallet to inspect positions, trends, and CSV exports.",
     href: "/app",
   },
   {
     title: "DeFi Rates",
-    body: "Compare displayed market rates.",
+    body: "Compare lending, staking, LP, vault, and borrow markets.",
     href: "/defi-rates",
   },
   {
-    title: "Read Ecosystem Signals",
-    body: "Browse builders and market updates.",
+    title: "Latest News",
+    body: "Read curated Monad, DeFi, and ecosystem updates.",
+    href: "/news",
+  },
+  {
+    title: "Ecosystem",
+    body: "Browse DeltaV startups and continue to founder feedback.",
     href: "/startups",
   },
   {
-    title: "Set Alerts",
-    body: "Get Telegram watches for rate changes.",
+    title: "Telegram Alerts",
+    body: "Create rate watches, new-market alerts, and daily briefs.",
     href: "/alerts",
   },
-];
-
-const TRUST_POINTS = [
-  "No wallet connection required",
-  "Read-only public data",
-  "Built for quick Monad research",
 ];
 
 export default async function HomePage({ searchParams }: PageProps) {
@@ -68,43 +67,22 @@ export default async function HomePage({ searchParams }: PageProps) {
 
       <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
         <section className="border-b border-[var(--color-border)] pb-10 pt-8">
-          <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-            <div>
-              <div className="label-caps text-[var(--color-accent-primary)]">
-                Read-only Monad intelligence
-              </div>
-              <h1 className="mt-4 max-w-[820px] text-[42px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[64px]">
-                Portfolio tracking and DeFi rates in one place.
-              </h1>
-              <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-                Inspect public wallets, compare displayed rates, and set Telegram
-                alerts without connecting a wallet.
-              </p>
+          <div>
+            <h1 className="max-w-[900px] text-[42px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[64px]">
+              Track portfolios, compare DeFi rates, and stay updated.
+            </h1>
+            <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
+              Paste a public wallet, explore displayed Monad-related rates, follow
+              curated updates, and send alerts to Telegram without connecting a wallet.
+            </p>
 
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Link
-                  href="/app"
-                  className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-5 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
-                >
-                  Open App
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
-              <div className="text-[12px] font-bold uppercase text-[var(--color-accent-primary)]">
-                What it does
-              </div>
-              <div className="mt-4 space-y-3">
-                {TRUST_POINTS.map((point) => (
-                  <div
-                    key={point}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3 text-[13px] font-semibold text-[var(--color-text-primary)]"
-                  >
-                    {point}
-                  </div>
-                ))}
-              </div>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                href="/app"
+                className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-5 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
+              >
+                Open App
+              </Link>
             </div>
           </div>
         </section>
@@ -115,11 +93,11 @@ export default async function HomePage({ searchParams }: PageProps) {
               Product areas
             </div>
             <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">
-              Choose an area
+              Choose what you need
             </h2>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             {FEATURE_CARDS.map((feature) => (
               <Link
                 key={feature.title}
