@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -132,12 +131,11 @@ function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
       aria-hidden="true"
     >
       {iconUrl && !iconFailed ? (
-        // Third-party icon CDNs can be blocked by browser response sniffing; fall back cleanly.
-        <Image
+        // Protocol icons can be local SVG/PNG assets or third-party URLs.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={iconUrl}
           alt=""
-          width={32}
-          height={32}
           className="h-full w-full object-cover"
           loading="lazy"
           onError={() => setIconFailed(true)}
