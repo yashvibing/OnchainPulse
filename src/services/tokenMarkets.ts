@@ -5,7 +5,7 @@ const GECKO_MONAD_POOLS_URL = "https://api.geckoterminal.com/api/v2/networks/mon
 const TOKEN_MARKETS_CACHE_KEY = "token-markets:monad:v1";
 const TOKEN_MARKETS_TTL_MS = 5 * 60 * 1000;
 const TOKEN_MARKETS_STALE_TTL_MS = 30 * 60 * 1000;
-const PAGES_TO_SCAN = 3;
+const PAGES_TO_SCAN = 10;
 
 interface GeckoToken {
   id: string;

@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TokenMarket } from "@/services/tokenMarkets";
 
-type SortKey = "volume" | "change" | "liquidity" | "fdv";
+type SortKey = "volume" | "change" | "liquidity" | "marketCap" | "fdv";
 type SortDirection = "asc" | "desc";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  volume: "24 hr volume",
+  change: "24 hr price change",
+  liquidity: "Liquidity",
+  marketCap: "Market cap",
+  fdv: "FDV",
+};
 
 function formatCurrency(value?: number, maximumFractionDigits = 2) {
   if (typeof value !== "number") return "-";
@@ -24,7 +32,13 @@ function sortValue(market: TokenMarket, key: SortKey) {
   if (key === "volume") return market.volume24hUsd || 0;
   if (key === "change") return market.priceChange24h || 0;
   if (key === "liquidity") return market.liquidityUsd || 0;
-  return market.marketCapUsd || market.fdvUsd || 0;
+  if (key === "marketCap") return market.marketCapUsd || 0;
+  return market.fdvUsd || 0;
+}
+
+function shortAddress(address: string) {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function TokenIcon({ market }: { market: TokenMarket }) {
@@ -56,6 +70,7 @@ export function TokenMarkets() {
   const [sortKey, setSortKey] = useState<SortKey>("volume");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState("");
 
   async function loadMarkets() {
     setLoading(true);
@@ -106,7 +121,39 @@ export function TokenMarkets() {
     setSortDirection("desc");
   }
 
-  const activeSortLabel = sortDirection === "asc" ? "low to high" : "high to low";
+  const activeSortLabel = `${SORT_LABELS[sortKey]} ${
+    sortDirection === "asc" ? "low to high" : "high to low"
+  }`;
+
+  function copyWithFallback(address: string) {
+    const textarea = document.createElement("textarea");
+    textarea.value = address;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+
+  async function copyContract(address: string) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(address);
+        } catch {
+          copyWithFallback(address);
+        }
+      } else {
+        copyWithFallback(address);
+      }
+      setCopiedAddress(address);
+      window.setTimeout(() => setCopiedAddress((current) => current === address ? "" : current), 1600);
+    } catch {
+      setCopiedAddress("");
+    }
+  }
 
   return (
     <section className="space-y-5">
@@ -123,22 +170,30 @@ export function TokenMarkets() {
 
         <div className="flex flex-wrap gap-2 md:justify-end">
           {[
-            ["volume", "24h volume"],
-            ["change", "24h move"],
+            ["volume", SORT_LABELS.volume],
+            ["change", SORT_LABELS.change],
             ["liquidity", "Liquidity"],
+            ["marketCap", "Market cap"],
             ["fdv", "FDV"],
           ].map(([key, label]) => (
             <button
               key={key}
               type="button"
               onClick={() => toggleSort(key as SortKey)}
+              aria-label={`Sort by ${label}${
+                sortKey === key
+                  ? sortDirection === "asc"
+                    ? ", currently low to high"
+                    : ", currently high to low"
+                  : ""
+              }`}
               className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
                 sortKey === key
                   ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
                   : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
-              }`}
+                }`}
             >
-              {label} {sortKey === key ? (sortDirection === "asc" ? "Asc" : "Desc") : ""}
+              {label} {sortKey === key ? (sortDirection === "asc" ? "↑" : "↓") : ""}
             </button>
           ))}
         </div>
@@ -146,7 +201,7 @@ export function TokenMarkets() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[var(--color-text-muted)]">
         <span>
-          Showing {filteredMarkets.length} token markets sorted {activeSortLabel}.
+          Showing {filteredMarkets.length} token markets sorted by {activeSortLabel}.
         </span>
         <button
           type="button"
@@ -184,14 +239,14 @@ export function TokenMarkets() {
         <div className="grid gap-3">
           {filteredMarkets.map((market) => {
             const positive = typeof market.priceChange24h === "number" && market.priceChange24h >= 0;
-            const marketCap = market.marketCapUsd || market.fdvUsd;
+            const isCopied = copiedAddress === market.tokenAddress;
 
             return (
               <article
                 key={market.id}
                 className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4"
               >
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_repeat(5,minmax(90px,0.45fr))_auto] lg:items-center">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_repeat(6,minmax(86px,0.42fr))_auto] lg:items-center">
                   <div className="flex min-w-0 items-center gap-3">
                     <TokenIcon market={market} />
                     <div className="min-w-0">
@@ -206,6 +261,17 @@ export function TokenMarkets() {
                       <div className="mt-1 truncate text-[12px] text-[var(--color-text-muted)]">
                         {market.tokenName} - {market.poolName}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => copyContract(market.tokenAddress)}
+                        className="mt-2 inline-flex max-w-full items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
+                        aria-label={`Copy ${market.tokenSymbol} contract address`}
+                      >
+                        <span className="truncate">{shortAddress(market.tokenAddress)}</span>
+                        <span className="font-sans text-[9px] uppercase">
+                          {isCopied ? "Copied" : "Copy"}
+                        </span>
+                      </button>
                     </div>
                   </div>
 
@@ -217,7 +283,7 @@ export function TokenMarkets() {
                   </div>
 
                   <div>
-                    <div className="label-caps text-[var(--color-text-dim)]">24h</div>
+                    <div className="label-caps text-[var(--color-text-dim)]">24 hr</div>
                     <div className={`mt-1 text-[15px] font-bold ${positive ? "text-[var(--color-positive)]" : "text-[var(--color-negative)]"}`}>
                       {formatPercent(market.priceChange24h)}
                     </div>
@@ -238,9 +304,16 @@ export function TokenMarkets() {
                   </div>
 
                   <div>
+                    <div className="label-caps text-[var(--color-text-dim)]">Market cap</div>
+                    <div className="mt-1 text-[15px] font-bold text-[var(--color-text-primary)]">
+                      {formatCurrency(market.marketCapUsd)}
+                    </div>
+                  </div>
+
+                  <div>
                     <div className="label-caps text-[var(--color-text-dim)]">FDV</div>
                     <div className="mt-1 text-[15px] font-bold text-[var(--color-text-primary)]">
-                      {formatCurrency(marketCap)}
+                      {formatCurrency(market.fdvUsd)}
                     </div>
                   </div>
 
