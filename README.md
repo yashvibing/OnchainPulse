@@ -1,171 +1,170 @@
-# MonFolio
+# Onchain Pulse
 
-**Community-made Monad Portfolio Dashboard. Not affiliated with Monad Foundation.**
+Onchain Pulse is an independent, unofficial interface for exploring public wallet portfolios, displayed DeFi rates, curated ecosystem updates, and Telegram alerts relating to Monad.
 
-Track your DeFi positions across the entire Monad ecosystem in one place: liquid staking, LP positions, lending vaults, yield vaults, token holdings, and recent transfer history.
+It is not associated with, endorsed by, sponsored by, maintained by, or affiliated with Monad Foundation.
 
----
+## What It Does
 
-## Quick Start
+- **Portfolio Tracker** - paste a public wallet address and view token holdings, staking positions, lending, vaults, liquidity positions, MON price context, and CSV export.
+- **DeFi Rates** - compare displayed lending, staking, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
+- **Latest News** - curated updates with an admin review flow, X post ingestion, and optional Telegram distribution.
+- **Ecosystem / Startups** - browse curated DeltaV startup listings and continue to DeltaV to leave feedback.
+- **Telegram Alerts** - create APR threshold, best-place-change, new-market, and daily-brief alerts through Telegram.
 
-```bash
-# Install dependencies
-npm install
+The app does not require wallet connection for the core experience. Users can paste public wallet addresses and opt into Telegram alerts separately.
 
-# Copy env and configure RPC (optional — defaults work for dev)
-cp .env.example .env.local
+## Live App
 
-# Run dev server
-npm run dev
-```
+Production: [https://onchainpulse.app](https://onchainpulse.app)
 
-Open [http://localhost:3000](http://localhost:3000) in your browser. Enter any Monad wallet address or click "Load demo wallet" to explore.
+Main routes:
 
----
+- `/` - product home
+- `/app` - portfolio tracker
+- `/defi-rates` - DeFi rates
+- `/news` - latest news
+- `/news/admin` - protected news admin
+- `/startups` - DeltaV startup directory
+- `/alerts` - Telegram alert setup and management
+- `/api/health` - source and cache health check
 
-## What's Tracked
+## Data Sources
 
-### Liquid Staking (4 protocols)
-- **aPriori** (aprMON), **FastLane** (shMON), **Magma** (gMON) — standard ERC-4626
-- **Kintsu** (sMON) — non-standard `convertToAssets(uint96)`, handled with a dedicated ABI
+| Area | Sources |
+| --- | --- |
+| Portfolio balances | Monad RPC, token registry, protocol readers |
+| Token prices and MON chart | DefiLlama / configured market sources |
+| DeFi rates | Merkl, DefiLlama yields, protocol/source metadata |
+| Startup listings | Curated DeltaV data |
+| Latest news | Manual admin entries, submitted tips, tracked X accounts |
+| Alerts | Onchain Pulse rate/news data plus Telegram Bot API |
+| Cache and rate limits | Upstash Redis with in-memory local fallback |
 
-### Lending (Morpho, dynamic)
-- **MetaMorpho vaults** — top vaults discovered live from Morpho's GraphQL API at runtime. APYs fetched live. Static fallback list for when the API is down.
-- Covers steakETH, hyperUSDCa, augustUSDC, bbqUSDT0, and more as they launch.
-
-### LP Positions
-- **Uniswap V3** — NFT-based positions with proper tick-range amount math (sqrtPrice calculations, 4-round multicall). Shows In Range / Out of Range badge, composition, and unclaimed fees.
-- **Curve** — Factory-enumerated LP positions across StableSwap (20 pools) and Twocrypto (11 pools). Computes user share of underlying tokens via pool balances.
-
-### Yield Vaults
-- **Upshift earnAUSD** — Custom vault (not standard ERC-4626). Valued at 1:1 with AUSD. 8% APY from DefiLlama.
-
-### Token Holdings
-- 15 known tokens with real-time prices and 24h change from DefiLlama
-- MON, WMON, USDC, USDT0, AUSD, USD1, cbBTC, WBTC, WETH, aprMON, shMON, sMON, gMON
-
-### Transaction History
-- Recent token transfers (in/out) via `eth_getLogs` on drpc.org
-- ~70 minutes of lookback, all tracked tokens, both directions
-- Upgrade path to BlockVision API for full coverage (see `.env.example`)
-
-### LST Double-Count Protection
-LST tokens (shMON, aprMON, sMON, gMON) appear in the Tokens table for visibility but are excluded from the Total Value sum — the staking position already accounts for their value. Regression-tested in `test/hooks/usePortfolio.regression-001.test.tsx`.
-
----
-
-## Commands
-
-```bash
-npm run dev        # Start dev server
-npm run dev:fresh  # Clean .next/ first — use after running next build
-npm run build      # Production build (includes type check)
-npm run lint       # ESLint
-npm test           # Run vitest suite (20 tests, ~1.5s)
-npm run test:watch # Vitest in watch mode
-npm run clean      # Wipe .next/ cache
-```
-
-**Gotcha:** Don't run `npm run build` while `npm run dev` is running — both write into `.next/` and the dev server will crash. Use `npm run dev:fresh` to recover.
-
----
-
-## Project Structure
-
-```
-monfolio/
-├── src/
-│   ├── app/
-│   │   ├── globals.css              # Tailwind + design tokens
-│   │   ├── layout.tsx               # Root layout with providers
-│   │   ├── page.tsx                 # Main dashboard (7 tabs)
-│   │   └── providers.tsx            # React Query provider
-│   ├── components/
-│   │   ├── Header.tsx               # App header
-│   │   ├── AddressInput.tsx         # Wallet address input + demo button
-│   │   ├── StatCards.tsx            # Total value, daily yield, position count
-│   │   ├── TabBar.tsx               # Tab navigation
-│   │   ├── TokenTable.tsx           # Token holdings with 24h change
-│   │   ├── StakingCards.tsx         # Staking position cards
-│   │   ├── LiquidityCards.tsx       # Uniswap V3 + Curve LP cards
-│   │   ├── LendingCards.tsx         # Morpho lending cards
-│   │   ├── VaultCards.tsx           # Yield vault cards
-│   │   ├── TransactionList.tsx      # Transfer history list
-│   │   └── EmptyState.tsx           # Empty + loading states
-│   ├── config/
-│   │   ├── chain.ts                 # Monad chain (ID 143)
-│   │   ├── tokens.ts                # Token address registry (15 tokens)
-│   │   └── protocols.ts             # Protocol addresses + vault configs
-│   ├── hooks/
-│   │   └── usePortfolio.ts          # React Query hooks (8 hooks)
-│   ├── lib/
-│   │   ├── abis.ts                  # Contract ABIs
-│   │   ├── client.ts                # viem PublicClient singleton
-│   │   └── format.ts                # Display formatting
-│   └── services/
-│       ├── tokens.ts                # Token balances + prices + 24h change
-│       ├── staking.ts               # 4 LST protocols
-│       ├── lending.ts               # Morpho dynamic vault discovery
-│       ├── liquidity.ts             # Uniswap V3 + Curve LP
-│       ├── vaults.ts                # Upshift yield vaults
-│       ├── transactions.ts          # Transfer history via eth_getLogs
-│       └── yields.ts                # DefiLlama yields API
-├── test/
-│   ├── setup.ts
-│   ├── lib/format.test.ts           # 16 unit tests
-│   └── hooks/usePortfolio.regression-001.test.tsx  # LST double-count regression
-├── vitest.config.ts
-├── CLAUDE.md                        # Project context for Claude Code
-├── TESTING.md                       # Test conventions and workflow
-├── .env.example
-├── package.json
-└── next.config.mjs
-```
-
----
+Source data can be incomplete, delayed, or changed by upstream providers. Displayed rates and portfolio values are snapshots, not recommendations.
 
 ## Tech Stack
 
 | Layer | Tool |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript (strict, ES2020 target) |
-| Styling | Tailwind CSS v4 |
-| Chain SDK | viem |
-| Data fetching | @tanstack/react-query |
-| Prices + 24h | DefiLlama (coins + percentage endpoints) |
-| APYs | DefiLlama Yields + Morpho GraphQL API |
-| RPC | rpc.monad.xyz (default) + monad-mainnet.drpc.org (tx history) |
-| Testing | vitest + @testing-library/react + jsdom |
+| --- | --- |
+| Framework | Next.js 15 App Router |
+| Language | TypeScript |
+| UI | React 19, Tailwind CSS v4 |
+| Chain reads | viem |
+| Data fetching | TanStack Query |
+| Cache | Upstash Redis |
+| Alerts | Telegram Bot API |
+| News ingest | X API v2 |
+| Tests | Vitest, Testing Library |
+| Hosting | Vercel |
 
----
+## Local Development
 
-## Still TODO
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-1. Replace manual address input with wagmi wallet connect
-2. 30-day portfolio value sparkline chart
-3. Upgrade transaction history to BlockVision (full coverage, requires API key)
-4. Balancer V3 LP positions (contracts deployed but non-functional, needs investigation)
-5. Kuru DEX positions (CLOB+AMM hybrid, needs their SDK)
+Open [http://localhost:3000](http://localhost:3000).
 
-See [CLAUDE.md](CLAUDE.md) for the full prioritized TODO list with investigation notes.
+Common commands:
 
----
+```bash
+npm run dev        # Start local dev server
+npm run dev:fresh  # Clear .next and start dev server
+npm run build      # Production build
+npm run lint       # ESLint
+npm test           # Vitest
+npm run clean      # Remove .next
+```
 
-## Configuration
+## Environment Variables
 
-### RPC Endpoint
+Core:
 
-Default uses `rpc.monad.xyz` (public, rate-limited). For production, get a paid key from Alchemy, QuickNode, or Chainstack and set `NEXT_PUBLIC_MONAD_RPC_URL` in `.env.local`.
+```bash
+NEXT_PUBLIC_SITE_URL=https://onchainpulse.app
+MONAD_RPC_URL=
+NEXT_PUBLIC_MONAD_RPC_URL=
+```
 
-### Adding New Tokens
+Redis cache:
 
-Edit `src/config/tokens.ts`. Add address, symbol, decimals, and category. Tokens with `category: "lst"` are automatically excluded from the Total Value sum (the staking position handles their value).
+```bash
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
 
-### Adding New Protocols
+Telegram alerts:
 
-Edit `src/config/protocols.ts`. For staking: add to `STAKING_PROTOCOLS`. For Morpho vaults: they're discovered automatically from the API. For Curve: pools are discovered via factory enumeration. For custom protocols: create a service in `src/services/` and wire it into `usePortfolio`.
+```bash
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_USERNAME=
+```
 
----
+News admin and cron:
 
-*MonFolio — Built for the Monad community.*
+```bash
+NEWS_ADMIN_USERNAME=OPbolte
+NEWS_ADMIN_PASSWORD=
+NEWS_INGEST_TOKEN=
+CRON_SECRET=
+```
+
+X ingest:
+
+```bash
+X_BEARER_TOKEN=
+X_TRACKED_ACCOUNTS=account1:5,account2:3
+```
+
+Optional enrichments:
+
+```bash
+BLOCKVISION_API_KEY=
+DEBANK_API_KEY=
+```
+
+Never commit real API keys or secrets.
+
+## Scheduled Jobs
+
+GitHub Actions runs `.github/workflows/x-ingest.yml` every 30 minutes.
+
+The workflow:
+
+1. Calls `/api/cron/x-ingest` to fetch and score posts from tracked X accounts.
+2. Adds high-signal posts to Latest News, capped by run and daily limits.
+3. Sends only higher-priority updates to Telegram, also capped by run and daily limits.
+4. Calls `/api/alerts/check` to process Telegram alerts and daily briefs.
+
+Current safety limits in code:
+
+- X accounts processed per run: max 15
+- X posts fetched per account per run: max 5
+- Latest news from X: max 4 per run, max 10 per UTC day
+- Telegram broadcasts from X: max 2 per run, max 3 per UTC day
+
+## Project Structure
+
+```txt
+src/
+  app/                  Next.js routes and API routes
+  components/           Portfolio, DeFi rates, news, alerts, and shared UI
+  config/               Chain, token, and protocol configuration
+  data/                 Curated static datasets
+  hooks/                Client data hooks
+  lib/                  Formatting, logging, cache, auth, logos, helpers
+  services/             Portfolio, rate, Telegram, X, and protocol services
+test/                   Unit and regression tests
+.github/workflows/      Scheduled ingest and alert checks
+```
+
+## Important Notes
+
+- Onchain Pulse is informational software, not financial, investment, tax, or legal advice.
+- Inclusion of an asset, protocol, vault, startup, news item, or data source is not an endorsement.
+- The interface does not custody assets or execute transactions.
+- Keep Monad Foundation language precise: this project is independent and unaffiliated.
+
