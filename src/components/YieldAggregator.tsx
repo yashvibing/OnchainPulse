@@ -30,6 +30,7 @@ import {
 } from "@/lib/walletOpportunities";
 import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
 import { getTokenLogoSrc } from "@/lib/tokenLogos";
+import { getProtocolLogoSrc } from "@/lib/protocolLogos";
 
 const POPULAR_TOKENS = [
   "WMON",
@@ -117,7 +118,7 @@ function Badge({
 
 function ProtocolMark({ opp }: { opp: YieldOpportunity }) {
   const [iconFailed, setIconFailed] = useState(false);
-  const iconUrl = getDisplayProtocolIcon(opp.protocolIcon);
+  const iconUrl = getProtocolLogoSrc(opp.protocol) || getDisplayProtocolIcon(opp.protocolIcon);
   const initials = opp.protocol
     .split(/\s+/)
     .slice(0, 2)
