@@ -39,6 +39,11 @@ export function saveStoredTelegramConnection(connection: StoredTelegramConnectio
   window.localStorage.setItem(TELEGRAM_CONNECTION_STORAGE_KEY, JSON.stringify(connection));
 }
 
+export function clearStoredTelegramAlertState() {
+  window.localStorage.removeItem(TELEGRAM_CONNECTION_STORAGE_KEY);
+  window.localStorage.removeItem(TELEGRAM_IDENTITY_STORAGE_KEY);
+}
+
 export function readStoredTelegramIdentity(): StoredTelegramIdentity | null {
   const raw = window.localStorage.getItem(TELEGRAM_IDENTITY_STORAGE_KEY);
   if (!raw) return null;

@@ -373,6 +373,18 @@ export function AlertCreator() {
   }, []);
 
   useEffect(() => {
+    function handleAlertsChanged() {
+      setTelegramIdentity(readStoredTelegramIdentity());
+      setConnection(readStoredTelegramConnection());
+      setConnectSession(null);
+      setTelegramOpened(false);
+    }
+
+    window.addEventListener("onchain-pulse:alerts-changed", handleAlertsChanged);
+    return () => window.removeEventListener("onchain-pulse:alerts-changed", handleAlertsChanged);
+  }, []);
+
+  useEffect(() => {
     if (kind !== "new_market" && kind !== "daily_digest" && kind !== "daily_news_brief" && tokenSymbol === "ANY") {
       setTokenSymbol("USDC");
     }

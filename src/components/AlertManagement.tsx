@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { readStoredTelegramConnection, type StoredTelegramConnection } from "@/lib/telegramAlertClient";
+import {
+  clearStoredTelegramAlertState,
+  readStoredTelegramConnection,
+  readStoredTelegramIdentity,
+  type StoredTelegramConnection,
+} from "@/lib/telegramAlertClient";
 
 type AlertKind =
   | "apr_above"
@@ -86,6 +91,7 @@ export function AlertManagement() {
   const [alerts, setAlerts] = useState<ManagedAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const loadAlerts = useCallback(async (chatId: string) => {
     if (!chatId) return;
@@ -165,6 +171,40 @@ export function AlertManagement() {
     }
   }
 
+  async function disconnectTelegram() {
+    if (!connection) return;
+    const confirmed = window.confirm(
+      "Disconnect Telegram from Onchain Pulse? This removes your connected chat and deletes your current Telegram alerts."
+    );
+    if (!confirmed) return;
+
+    setDisconnecting(true);
+    setStatus("");
+    try {
+      const identity = readStoredTelegramIdentity();
+      const response = await fetch("/api/alerts/connect", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: connection.chatId,
+          loginToken: identity?.loginToken,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not disconnect Telegram.");
+
+      clearStoredTelegramAlertState();
+      setConnection(null);
+      setAlerts([]);
+      setStatus("Telegram disconnected. Existing alerts were removed.");
+      window.dispatchEvent(new Event("onchain-pulse:alerts-changed"));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not disconnect Telegram.");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
   if (!connection) {
     return (
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
@@ -186,13 +226,23 @@ export function AlertManagement() {
           <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">3. Manage alerts</div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => connection && loadAlerts(connection.chatId)}
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => connection && loadAlerts(connection.chatId)}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={disconnectTelegram}
+            disabled={disconnecting}
+            className="rounded-[var(--radius-md)] border border-[rgba(255,71,87,0.45)] px-3 py-2 text-[12px] font-semibold text-[var(--color-negative)] hover:bg-[rgba(255,71,87,0.08)] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {disconnecting ? "Disconnecting..." : "Disconnect Telegram"}
+          </button>
+        </div>
       </div>
 
       {status && (

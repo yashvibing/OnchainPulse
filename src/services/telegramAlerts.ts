@@ -415,6 +415,54 @@ export async function deleteTelegramAlert(id: string, chatId: string) {
   }
 }
 
+async function deleteTelegramAlertsForChat(chatId: string) {
+  const ids = await listAlertIds();
+  const alerts = await Promise.all(ids.map(readAlert));
+  const ownedIds = alerts
+    .filter((alert): alert is TelegramAlert => Boolean(alert && alert.chatId === chatId))
+    .map((alert) => alert.id);
+
+  ownedIds.forEach((id) => memoryAlerts.delete(id));
+  const redis = getServerRedisClient();
+  if (redis && ownedIds.length > 0) {
+    await Promise.all(ownedIds.map((id) => redis.del(alertKey(id))));
+    await redis.srem(ALERT_REGISTRY_KEY, ...ownedIds);
+  }
+
+  return ownedIds.length;
+}
+
+export async function disconnectTelegramChat(chatId: string, loginToken?: string) {
+  if (!chatId) throw new Error("Telegram chat is required");
+
+  const deletedAlerts = await deleteTelegramAlertsForChat(chatId);
+  memoryConnectedChats.delete(chatId);
+
+  const redis = getServerRedisClient();
+  if (redis) {
+    await redis.srem(CONNECTED_CHATS_KEY, chatId);
+  }
+
+  const loginSession = loginToken ? await readTelegramLoginSession(loginToken) : null;
+  if (loginSession) {
+    const existing = await readTelegramUser(loginSession.userId);
+    if (existing?.chatId === chatId) {
+      await writeTelegramUser({
+        ...existing,
+        chatId: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+  }
+
+  logServerEvent("info", "alerts.telegram_disconnected", {
+    chatId: shortHash(chatId),
+    deletedAlerts,
+  });
+
+  return { deletedAlerts };
+}
+
 async function writeConnectSession(session: TelegramConnectSession) {
   memoryConnectSessions.set(session.code, session);
   const redis = getServerRedisClient();
