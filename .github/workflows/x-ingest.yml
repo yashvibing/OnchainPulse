@@ -11,8 +11,12 @@ jobs:
     steps:
       - name: Ingest tracked X posts
         run: |
-          curl --fail --show-error --silent --max-time 120 https://onchainpulse.app/api/cron/x-ingest
+          curl --fail --show-error --silent --max-time 120 \
+            --header "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://onchainpulse.app/api/cron/x-ingest
 
       - name: Check Telegram alerts and daily briefs
         run: |
-          curl --fail --show-error --silent --max-time 120 https://onchainpulse.app/api/alerts/check
+          curl --fail --show-error --silent --max-time 120 \
+            --header "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://onchainpulse.app/api/alerts/check

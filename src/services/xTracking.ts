@@ -212,7 +212,7 @@ function tweetUrl(username: string, tweetId: string) {
 
 function scoreTweet(tweet: XTweet, account: TrackedAccount) {
   const text = tweet.text.toLowerCase();
-  let score = account.priority;
+  let score = Math.max(0, account.priority - 3);
 
   const criticalKeywords = [
     "exploit",
@@ -235,6 +235,12 @@ function scoreTweet(tweet: XTweet, account: TrackedAccount) {
     "funding",
     "testnet",
     "monad",
+    "evm",
+    "research",
+    "paper",
+    "protocol",
+    "compliance",
+    "institution",
   ];
   const lowSignalWords = ["gm", "gn", "meme", "vibes"];
 
