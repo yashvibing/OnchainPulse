@@ -16,7 +16,11 @@ import {
 } from "@/lib/newsTips";
 import { checkRateLimit, rateLimitResponse, withRateLimitHeaders } from "@/lib/rateLimit";
 import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
-import { listConnectedTelegramChatIds, sendTelegramMessage } from "@/services/telegramAlerts";
+import {
+  isTelegramNotificationCategoryEnabled,
+  listConnectedTelegramChatIds,
+  sendTelegramMessage,
+} from "@/services/telegramAlerts";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +145,8 @@ export async function PATCH(request: Request) {
       const chatIds = await listConnectedTelegramChatIds();
       let sent = 0;
       for (const chatId of chatIds) {
+        const category = tip.category === "security" ? "securityUpdates" : "ecosystemUpdates";
+        if (!(await isTelegramNotificationCategoryEnabled(chatId, category))) continue;
         await sendTelegramMessage(chatId, telegramMessageForTip(tip));
         sent += 1;
       }

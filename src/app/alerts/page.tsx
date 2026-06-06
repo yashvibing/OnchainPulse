@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AlertCreator } from "@/components/AlertCreator";
 import { AlertManagement } from "@/components/AlertManagement";
+import { AlertPreferences } from "@/components/AlertPreferences";
 import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function AlertsPage() {
         </section>
 
         <AlertCreator />
+        <AlertPreferences />
         <AlertManagement />
       </main>
     </div>

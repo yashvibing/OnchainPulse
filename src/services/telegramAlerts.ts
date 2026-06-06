@@ -82,12 +82,21 @@ export interface TelegramUserConnection {
   updatedAt: number;
 }
 
+export interface TelegramNotificationPreferences {
+  defiRateAlerts: boolean;
+  dailyDefiBrief: boolean;
+  latestNewsBrief: boolean;
+  ecosystemUpdates: boolean;
+  securityUpdates: boolean;
+}
+
 const ALERT_REGISTRY_KEY = "onchain-pulse:alerts:registry";
 const ALERT_ITEM_PREFIX = "onchain-pulse:alerts:item:";
 const CONNECT_PREFIX = "onchain-pulse:telegram-connect:";
 const TELEGRAM_USER_PREFIX = "onchain-pulse:telegram-user:";
 const TELEGRAM_LOGIN_SESSION_PREFIX = "onchain-pulse:telegram-login-session:";
 const CONNECTED_CHATS_KEY = "onchain-pulse:telegram:connected-chats";
+const TELEGRAM_PREFERENCES_PREFIX = "onchain-pulse:telegram-preferences:";
 const TELEGRAM_OFFSET_KEY = "onchain-pulse:telegram:update-offset";
 const WEEKLY_ECOSYSTEM_UPDATE_KEY = "onchain-pulse:telegram:weekly-ecosystem-update";
 const WEEKLY_ECOSYSTEM_SENT_PREFIX = "onchain-pulse:telegram:weekly-ecosystem-sent:";
@@ -103,9 +112,18 @@ const memoryConnectSessions = new Map<string, TelegramConnectSession>();
 const memoryTelegramUsers = new Map<string, TelegramUserConnection>();
 const memoryTelegramLoginSessions = new Map<string, { userId: string; expiresAt: number }>();
 const memoryConnectedChats = new Set<string>();
+const memoryTelegramPreferences = new Map<string, TelegramNotificationPreferences>();
 let memoryWeeklyEcosystemUpdate: WeeklyEcosystemUpdate | null = null;
 const memoryWeeklyEcosystemSent = new Set<string>();
 let memoryTelegramOffset = 0;
+
+const DEFAULT_TELEGRAM_NOTIFICATION_PREFERENCES: TelegramNotificationPreferences = {
+  defiRateAlerts: true,
+  dailyDefiBrief: true,
+  latestNewsBrief: true,
+  ecosystemUpdates: true,
+  securityUpdates: true,
+};
 
 export interface WeeklyEcosystemUpdate {
   title: string;
@@ -127,6 +145,10 @@ function telegramUserKey(userId: string) {
 
 function telegramLoginSessionKey(token: string) {
   return `${TELEGRAM_LOGIN_SESSION_PREFIX}${token}`;
+}
+
+function telegramPreferencesKey(chatId: string) {
+  return `${TELEGRAM_PREFERENCES_PREFIX}${chatId}`;
 }
 
 function normalizeTokenSymbol(symbol: string) {
@@ -186,6 +208,69 @@ async function readTelegramLoginSession(token: string) {
 
   if (!session || session.expiresAt < Date.now()) return null;
   return session;
+}
+
+function normalizeTelegramPreferences(
+  preferences?: Partial<TelegramNotificationPreferences> | null
+): TelegramNotificationPreferences {
+  return {
+    ...DEFAULT_TELEGRAM_NOTIFICATION_PREFERENCES,
+    ...(preferences || {}),
+  };
+}
+
+export async function getTelegramNotificationPreferences(chatId: string) {
+  if (!chatId) throw new Error("Telegram chat is required");
+
+  const redis = getServerRedisClient();
+  const stored = redis
+    ? await redis.get<TelegramNotificationPreferences>(telegramPreferencesKey(chatId))
+    : memoryTelegramPreferences.get(chatId);
+
+  return normalizeTelegramPreferences(stored);
+}
+
+export async function updateTelegramNotificationPreferences(
+  chatId: string,
+  changes: Partial<TelegramNotificationPreferences>
+) {
+  if (!chatId) throw new Error("Telegram chat is required");
+
+  const current = await getTelegramNotificationPreferences(chatId);
+  const next: TelegramNotificationPreferences = {
+    ...current,
+    defiRateAlerts: typeof changes.defiRateAlerts === "boolean" ? changes.defiRateAlerts : current.defiRateAlerts,
+    dailyDefiBrief: typeof changes.dailyDefiBrief === "boolean" ? changes.dailyDefiBrief : current.dailyDefiBrief,
+    latestNewsBrief: typeof changes.latestNewsBrief === "boolean" ? changes.latestNewsBrief : current.latestNewsBrief,
+    ecosystemUpdates: typeof changes.ecosystemUpdates === "boolean" ? changes.ecosystemUpdates : current.ecosystemUpdates,
+    securityUpdates: typeof changes.securityUpdates === "boolean" ? changes.securityUpdates : current.securityUpdates,
+  };
+
+  memoryTelegramPreferences.set(chatId, next);
+  const redis = getServerRedisClient();
+  if (redis) await redis.set(telegramPreferencesKey(chatId), next);
+
+  return next;
+}
+
+async function deleteTelegramNotificationPreferences(chatId: string) {
+  memoryTelegramPreferences.delete(chatId);
+  const redis = getServerRedisClient();
+  if (redis) await redis.del(telegramPreferencesKey(chatId));
+}
+
+function preferenceKeyForAlertKind(kind: AlertKind): keyof TelegramNotificationPreferences {
+  if (kind === "daily_digest") return "dailyDefiBrief";
+  if (kind === "daily_news_brief") return "latestNewsBrief";
+  return "defiRateAlerts";
+}
+
+export async function isTelegramNotificationCategoryEnabled(
+  chatId: string,
+  category: keyof TelegramNotificationPreferences
+) {
+  const preferences = await getTelegramNotificationPreferences(chatId);
+  return preferences[category];
 }
 
 function timingSafeHexEqual(a: string, b: string) {
@@ -436,6 +521,7 @@ export async function disconnectTelegramChat(chatId: string, loginToken?: string
   if (!chatId) throw new Error("Telegram chat is required");
 
   const deletedAlerts = await deleteTelegramAlertsForChat(chatId);
+  await deleteTelegramNotificationPreferences(chatId);
   memoryConnectedChats.delete(chatId);
 
   const redis = getServerRedisClient();
@@ -680,6 +766,7 @@ export async function sendWeeklyEcosystemUpdateIfNeeded() {
   for (const chatId of chatIds) {
     try {
       if (await hasSentWeeklyEcosystemUpdate(chatId, weekKey)) continue;
+      if (!(await isTelegramNotificationCategoryEnabled(chatId, "ecosystemUpdates"))) continue;
       await sendTelegramMessage(chatId, `${update.title}\n${update.twitterUrl}`);
       await markWeeklyEcosystemUpdateSent(chatId, weekKey);
       sent += 1;
@@ -927,20 +1014,32 @@ async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOppor
     }
   }
 
+  const categoryEnabled = message
+    ? await isTelegramNotificationCategoryEnabled(alert.chatId, preferenceKeyForAlertKind(alert.kind))
+    : true;
+
   const updated: TelegramAlert = {
     ...alert,
     updatedAt: Date.now(),
-    lastTriggeredAt: message ? Date.now() : alert.lastTriggeredAt,
+    lastTriggeredAt: message && categoryEnabled ? Date.now() : alert.lastTriggeredAt,
     state: nextState,
   };
 
   if (message) {
-    await sendTelegramMessage(alert.chatId, message);
-    logServerEvent("info", "alerts.triggered", {
-      alertId: shortHash(alert.id),
-      kind: alert.kind,
-      tokenSymbol: alert.tokenSymbol,
-    });
+    if (categoryEnabled) {
+      await sendTelegramMessage(alert.chatId, message);
+      logServerEvent("info", "alerts.triggered", {
+        alertId: shortHash(alert.id),
+        kind: alert.kind,
+        tokenSymbol: alert.tokenSymbol,
+      });
+    } else {
+      logServerEvent("info", "alerts.trigger_suppressed_by_preferences", {
+        alertId: shortHash(alert.id),
+        kind: alert.kind,
+        tokenSymbol: alert.tokenSymbol,
+      });
+    }
   }
 
   await writeAlert(updated);

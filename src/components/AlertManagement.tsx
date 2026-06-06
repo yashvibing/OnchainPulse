@@ -209,7 +209,7 @@ export function AlertManagement() {
     return (
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
         <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
-          3. Manage alerts
+          4. Manage alerts
         </div>
         <h2 className="mt-2 text-[22px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
         <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-5 text-[13px] text-[var(--color-text-muted)]">
@@ -223,7 +223,7 @@ export function AlertManagement() {
     <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-5">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">3. Manage alerts</div>
+          <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">4. Manage alerts</div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Your alerts</h2>
         </div>
         <div className="flex flex-wrap gap-2">
