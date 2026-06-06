@@ -14,7 +14,11 @@ type AlertKind =
   | "best_market_change"
   | "new_market"
   | "daily_digest"
-  | "daily_news_brief";
+  | "daily_news_brief"
+  | "token_market_new"
+  | "token_volume_above"
+  | "token_liquidity_above"
+  | "token_price_move";
 
 interface ManagedAlert {
   id: string;
@@ -37,6 +41,10 @@ const KIND_LABELS: Record<AlertKind, string> = {
   new_market: "New market appears",
   daily_digest: "DeFi rates digest",
   daily_news_brief: "Latest news brief",
+  token_market_new: "New token market",
+  token_volume_above: "Token volume",
+  token_liquidity_above: "Token liquidity",
+  token_price_move: "Token price move",
 };
 
 function formatDate(value?: number) {
@@ -51,6 +59,13 @@ function formatDate(value?: number) {
 
 function formatApr(value?: number) {
   return typeof value === "number" ? `${value.toFixed(2)}% APR` : "Checking soon";
+}
+
+function formatUsd(value?: number) {
+  if (typeof value !== "number") return "Checking soon";
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(2)}`;
 }
 
 function formatMessageStatus(value?: number) {
@@ -79,11 +94,36 @@ function describeAlert(alert: ManagedAlert) {
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
   if (alert.kind === "daily_digest") return "Daily DeFi rates digest";
   if (alert.kind === "daily_news_brief") return "Daily latest news brief";
+  if (alert.kind === "token_market_new") return alert.tokenSymbol === "ANY" ? "Any new token market" : `New ${alert.tokenSymbol} token market`;
+  if (alert.kind === "token_volume_above") return `${alert.tokenSymbol} 24h volume above ${formatUsd(alert.thresholdApr)}`;
+  if (alert.kind === "token_liquidity_above") return `${alert.tokenSymbol} liquidity above ${formatUsd(alert.thresholdApr)}`;
+  if (alert.kind === "token_price_move") return `${alert.tokenSymbol} 24h move above ${alert.thresholdApr}%`;
   return alert.tokenSymbol === "ANY" ? `Any new displayed market on ${scope}` : `New ${alert.tokenSymbol} market on ${scope}`;
 }
 
 function alertConditionTitle(alert: ManagedAlert) {
   return describeAlert(alert);
+}
+
+function alertMetricLabel(alert: ManagedAlert) {
+  if (alert.kind === "token_volume_above") return "Latest volume";
+  if (alert.kind === "token_liquidity_above") return "Latest liquidity";
+  if (alert.kind === "token_price_move") return "Latest move";
+  if (alert.kind === "token_market_new") return "Known markets";
+  return "Current best";
+}
+
+function alertMetricValue(alert: ManagedAlert) {
+  if (alert.kind === "token_market_new") {
+    return typeof alert.lastApr === "number" ? `${alert.lastApr} tracked` : "Checking soon";
+  }
+  if (alert.kind === "token_volume_above" || alert.kind === "token_liquidity_above") {
+    return formatUsd(alert.lastApr);
+  }
+  if (alert.kind === "token_price_move") {
+    return typeof alert.lastApr === "number" ? `${alert.lastApr.toFixed(2)}%` : "Checking soon";
+  }
+  return formatApr(alert.lastApr);
 }
 
 export function AlertManagement() {
@@ -293,10 +333,10 @@ export function AlertManagement() {
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
                     <div className="text-[9px] font-bold uppercase text-[var(--color-text-dim)]">
-                      Current best
+                      {alertMetricLabel(alert)}
                     </div>
                     <div className="mt-1 text-[14px] font-bold text-[var(--color-accent-primary)]">
-                      {formatApr(alert.lastApr)}
+                      {alertMetricValue(alert)}
                     </div>
                   </div>
                   <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">

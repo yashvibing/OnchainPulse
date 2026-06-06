@@ -21,6 +21,10 @@ const ALERT_KINDS = new Set<AlertKind>([
   "new_market",
   "daily_digest",
   "daily_news_brief",
+  "token_market_new",
+  "token_volume_above",
+  "token_liquidity_above",
+  "token_price_move",
 ]);
 
 export async function GET(request: Request) {
@@ -68,9 +72,16 @@ export async function POST(request: Request) {
       ? undefined
       : Number(body.thresholdApr);
 
-    if ((kind === "apr_above" || kind === "apr_below") && !Number.isFinite(thresholdApr)) {
+    if (
+      (kind === "apr_above" ||
+        kind === "apr_below" ||
+        kind === "token_volume_above" ||
+        kind === "token_liquidity_above" ||
+        kind === "token_price_move") &&
+      !Number.isFinite(thresholdApr)
+    ) {
       return NextResponse.json(
-        { error: "APR threshold is required" },
+        { error: "A numeric threshold is required" },
         { status: 400, headers: withRateLimitHeaders(undefined, rateLimit) }
       );
     }

@@ -7,6 +7,7 @@ import {
   getOpportunityAssetSymbols,
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
+import type { TokenMarket } from "@/services/tokenMarkets";
 import {
   readStoredTelegramIdentity,
   readStoredTelegramConnection,
@@ -22,7 +23,11 @@ type AlertKind =
   | "best_market_change"
   | "new_market"
   | "daily_digest"
-  | "daily_news_brief";
+  | "daily_news_brief"
+  | "token_market_new"
+  | "token_volume_above"
+  | "token_liquidity_above"
+  | "token_price_move";
 type SelectOption = { value: string; label: string };
 type ExistingRateMatch = {
   tokenSymbol: string;
@@ -85,6 +90,22 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
   {
     value: "daily_news_brief",
     label: "Daily latest news brief",
+  },
+  {
+    value: "token_market_new",
+    label: "New token market",
+  },
+  {
+    value: "token_volume_above",
+    label: "Token volume above",
+  },
+  {
+    value: "token_liquidity_above",
+    label: "Token liquidity above",
+  },
+  {
+    value: "token_price_move",
+    label: "Token 24h move above",
   },
 ];
 
@@ -328,6 +349,7 @@ function AlertSelect({
 
 export function AlertCreator() {
   const [opportunities, setOpportunities] = useState<YieldOpportunity[]>([]);
+  const [tokenMarkets, setTokenMarkets] = useState<TokenMarket[]>([]);
   const [connection, setConnection] = useState<StoredTelegramConnection | null>(null);
   const [telegramIdentity, setTelegramIdentity] = useState<StoredTelegramIdentity | null>(null);
   const [alertConfig, setAlertConfig] = useState<TelegramAlertConfig | null>(null);
@@ -370,6 +392,12 @@ export function AlertCreator() {
         setStatusTone("error");
         setStatus("Rate data is temporarily unavailable, but you can still create broad alerts.");
       });
+    fetch("/api/token-markets")
+      .then((response) => response.json())
+      .then((data) => setTokenMarkets(Array.isArray(data.data) ? data.data : []))
+      .catch(() => {
+        setTokenMarkets([]);
+      });
   }, []);
 
   useEffect(() => {
@@ -385,21 +413,54 @@ export function AlertCreator() {
   }, []);
 
   useEffect(() => {
-    if (kind !== "new_market" && kind !== "daily_digest" && kind !== "daily_news_brief" && tokenSymbol === "ANY") {
+    const tokenMarketKind =
+      kind === "token_market_new" ||
+      kind === "token_volume_above" ||
+      kind === "token_liquidity_above" ||
+      kind === "token_price_move";
+    if (
+      kind !== "new_market" &&
+      kind !== "token_market_new" &&
+      kind !== "daily_digest" &&
+      kind !== "daily_news_brief" &&
+      tokenSymbol === "ANY"
+    ) {
       setTokenSymbol("USDC");
     }
-    if ((kind === "best_market_change" || kind === "daily_digest" || kind === "daily_news_brief") && protocolKey !== "all") {
+    if (
+      (kind === "best_market_change" ||
+        kind === "daily_digest" ||
+        kind === "daily_news_brief" ||
+        tokenMarketKind) &&
+      protocolKey !== "all"
+    ) {
       setProtocolKey("all");
     }
   }, [kind, protocolKey, tokenSymbol]);
 
-  const needsThreshold = kind === "apr_above" || kind === "apr_below";
+  const isTokenMarketAlert =
+    kind === "token_market_new" ||
+    kind === "token_volume_above" ||
+    kind === "token_liquidity_above" ||
+    kind === "token_price_move";
+  const isTokenMarketThreshold =
+    kind === "token_volume_above" ||
+    kind === "token_liquidity_above" ||
+    kind === "token_price_move";
+  const needsThreshold = kind === "apr_above" || kind === "apr_below" || isTokenMarketThreshold;
   const isRatesDigest = kind === "daily_digest";
   const isNewsBrief = kind === "daily_news_brief";
   const isDigestStyle = isRatesDigest || isNewsBrief;
   const formDisabled = busy || !connection;
-  const protocolDisabled = formDisabled || kind === "best_market_change" || isDigestStyle;
-  const tokenChoices = kind === "new_market" || isDigestStyle ? ["ANY", ...POPULAR_TOKENS] : POPULAR_TOKENS;
+  const protocolDisabled = formDisabled || kind === "best_market_change" || isDigestStyle || isTokenMarketAlert;
+  const marketTokenSymbols = [...new Set(tokenMarkets.map((market) => market.tokenSymbol).filter(Boolean))];
+  const baseTokenChoices = marketTokenSymbols.length > 0 ? marketTokenSymbols : POPULAR_TOKENS;
+  const tokenChoices =
+    kind === "new_market" || kind === "token_market_new" || isDigestStyle
+      ? ["ANY", ...baseTokenChoices]
+      : isTokenMarketAlert
+        ? baseTokenChoices
+        : POPULAR_TOKENS;
   const tokenOptions = tokenChoices.map((symbol) => ({
     value: symbol,
     label: symbol === "ANY" ? "Any token" : symbol,
@@ -426,7 +487,7 @@ export function AlertCreator() {
   }, [opportunities, tokenSymbol]);
   const protocolOptions = [
     { value: "all", label: "All protocols" },
-    ...(kind === "best_market_change"
+    ...(kind === "best_market_change" || isTokenMarketAlert
       ? []
       : protocolChoices.map((option) => ({ value: option.key, label: option.label }))),
   ];
@@ -555,15 +616,20 @@ export function AlertCreator() {
     const threshold = Number(thresholdApr);
     if (needsThreshold && !Number.isFinite(threshold)) {
       setStatusTone("error");
-      setStatus("Enter a valid APR percentage.");
+      setStatus(isTokenMarketThreshold ? "Enter a valid target." : "Enter a valid APR percentage.");
       return;
     }
 
     const selectedProtocol = protocolOptions.find((option) => option.value === protocolKey);
-    const existingMatch = findExistingThresholdMatch(opportunities, kind, tokenSymbol, protocolKey, threshold);
+    const selectedTokenSymbol = tokenOptions.some((option) => option.value === tokenSymbol)
+      ? tokenSymbol
+      : tokenOptions[0]?.value || tokenSymbol;
+    const existingMatch = isTokenMarketAlert
+      ? undefined
+      : findExistingThresholdMatch(opportunities, kind, selectedTokenSymbol, protocolKey, threshold);
     if (existingMatch) {
       setExistingRateMatch({
-        tokenSymbol,
+        tokenSymbol: selectedTokenSymbol,
         condition: kind === "apr_below" ? "below" : "above",
         thresholdApr: threshold,
         protocolScope: selectedProtocol?.label || "All protocols",
@@ -585,7 +651,7 @@ export function AlertCreator() {
         body: JSON.stringify({
           kind,
           chatId: connection.chatId,
-          tokenSymbol: isDigestStyle ? "ANY" : tokenSymbol,
+          tokenSymbol: isDigestStyle ? "ANY" : selectedTokenSymbol,
           protocolKey,
           protocolLabel: selectedProtocol?.label,
           thresholdApr: needsThreshold ? threshold : undefined,
@@ -600,7 +666,9 @@ export function AlertCreator() {
           ? `Daily latest news brief enabled for ${localDeliveryTimes.news}.`
           : isRatesDigest
             ? `Daily DeFi rates digest enabled for ${localDeliveryTimes.rates}.`
-            : `${label} alert created for ${tokenSymbol}.`
+            : isTokenMarketAlert
+              ? `${label} alert created for ${selectedTokenSymbol}.`
+              : `${label} alert created for ${selectedTokenSymbol}.`
       );
       notifyAlertsChanged();
     } catch (error) {
@@ -785,7 +853,7 @@ export function AlertCreator() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr_0.9fr_0.7fr_auto] lg:items-end">
-            <div className={isDigestStyle ? "hidden" : "block"}>
+            <div className={isDigestStyle || isTokenMarketAlert ? "hidden" : "block"}>
               <AlertSelect
                 label="Token"
                 value={tokenSymbol}
@@ -807,7 +875,15 @@ export function AlertCreator() {
                 onChange={(nextValue) => {
                   const nextKind = nextValue as AlertKind;
                   setKind(nextKind);
-                  if (nextKind === "best_market_change" || nextKind === "daily_digest" || nextKind === "daily_news_brief") {
+                  if (
+                    nextKind === "best_market_change" ||
+                    nextKind === "daily_digest" ||
+                    nextKind === "daily_news_brief" ||
+                    nextKind === "token_market_new" ||
+                    nextKind === "token_volume_above" ||
+                    nextKind === "token_liquidity_above" ||
+                    nextKind === "token_price_move"
+                  ) {
                     setProtocolKey("all");
                   }
                 }}
@@ -830,14 +906,26 @@ export function AlertCreator() {
             </div>
 
             <label className={`block ${isDigestStyle ? "hidden" : needsThreshold ? "" : "opacity-45"}`}>
-              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">APR %</span>
+              <span className="text-[10px] font-semibold uppercase text-[var(--color-text-dim)]">
+                {kind === "token_volume_above" || kind === "token_liquidity_above"
+                  ? "USD target"
+                  : kind === "token_price_move"
+                    ? "24h move %"
+                    : "APR %"}
+              </span>
               <input
                 value={thresholdApr}
                 onChange={(event) => setThresholdApr(event.target.value)}
                 disabled={formDisabled || !needsThreshold}
                 inputMode="decimal"
                 className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)] disabled:cursor-not-allowed"
-                placeholder="12"
+                placeholder={
+                  kind === "token_volume_above"
+                    ? "100000"
+                    : kind === "token_liquidity_above"
+                      ? "50000"
+                      : "12"
+                }
               />
             </label>
 

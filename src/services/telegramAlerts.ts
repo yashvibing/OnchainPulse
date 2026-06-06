@@ -7,6 +7,7 @@ import {
   getOpportunityAssetSymbols,
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
+import { fetchTokenMarkets, type TokenMarket } from "@/services/tokenMarkets";
 
 export type AlertKind =
   | "apr_above"
@@ -14,7 +15,11 @@ export type AlertKind =
   | "best_market_change"
   | "new_market"
   | "daily_digest"
-  | "daily_news_brief";
+  | "daily_news_brief"
+  | "token_market_new"
+  | "token_volume_above"
+  | "token_liquidity_above"
+  | "token_price_move";
 
 export interface TelegramAlert {
   id: string;
@@ -34,7 +39,9 @@ export interface TelegramAlert {
     lastOpportunityId?: string;
     lastBestOpportunityId?: string;
     knownOpportunityIds?: string[];
+    knownTokenMarketIds?: string[];
     lastDigestDay?: string;
+    lastMetric?: number;
   };
 }
 
@@ -106,6 +113,12 @@ const TELEGRAM_LOGIN_MAX_AGE_SECONDS = 60 * 60 * 24;
 const DAILY_RATES_DIGEST_HOUR_IST = 11;
 const DAILY_NEWS_BRIEF_HOUR_IST = 23;
 const WEEKLY_ECOSYSTEM_TITLE = "This week's ecosystem updates are out";
+const TOKEN_MARKET_ALERT_KINDS = new Set<AlertKind>([
+  "token_market_new",
+  "token_volume_above",
+  "token_liquidity_above",
+  "token_price_move",
+]);
 
 const memoryAlerts = new Map<string, TelegramAlert>();
 const memoryConnectSessions = new Map<string, TelegramConnectSession>();
@@ -153,6 +166,10 @@ function telegramPreferencesKey(chatId: string) {
 
 function normalizeTokenSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
+}
+
+function isTokenMarketAlert(kind: AlertKind) {
+  return TOKEN_MARKET_ALERT_KINDS.has(kind);
 }
 
 function normalizeProtocolKey(protocol: string) {
@@ -372,6 +389,40 @@ function relevantOpportunities(
     .sort((a, b) => b.apr - a.apr);
 }
 
+function relevantTokenMarkets(
+  markets: TokenMarket[],
+  alert: Pick<TelegramAlert, "tokenSymbol">
+) {
+  const selected = normalizeTokenSymbol(alert.tokenSymbol);
+  return markets
+    .filter((market) => selected === "ANY" || normalizeTokenSymbol(market.tokenSymbol) === selected)
+    .sort((a, b) => (b.volume24hUsd || 0) - (a.volume24hUsd || 0));
+}
+
+function tokenMarketMetric(alert: Pick<TelegramAlert, "kind">, market: TokenMarket) {
+  if (alert.kind === "token_volume_above") return market.volume24hUsd;
+  if (alert.kind === "token_liquidity_above") return market.liquidityUsd;
+  if (alert.kind === "token_price_move") return Math.abs(market.priceChange24h || 0);
+  return undefined;
+}
+
+function tokenMarketLabel(market: TokenMarket) {
+  return `${market.tokenSymbol} on ${market.dexLabel}`;
+}
+
+function formatCompactUsd(value?: number) {
+  if (typeof value !== "number") return "unknown";
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(2)}`;
+}
+
+function formatPercentForMessage(value?: number) {
+  if (typeof value !== "number") return "unknown";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
 function findAlreadyMetThresholdAlert(
   opportunities: YieldOpportunity[],
   kind: AlertKind,
@@ -394,6 +445,21 @@ function findAlreadyMetThresholdAlert(
     .sort((a, b) => a.apr - b.apr)[0];
 }
 
+function findAlreadyMetTokenMarketAlert(
+  markets: TokenMarket[],
+  kind: AlertKind,
+  tokenSymbol: string,
+  threshold?: number
+) {
+  if (kind === "token_market_new" || typeof threshold !== "number") return undefined;
+  return relevantTokenMarkets(markets, { tokenSymbol })
+    .filter((market) => {
+      const metric = tokenMarketMetric({ kind }, market);
+      return typeof metric === "number" && metric >= threshold;
+    })
+    .sort((a, b) => Number(tokenMarketMetric({ kind }, b) || 0) - Number(tokenMarketMetric({ kind }, a) || 0))[0];
+}
+
 async function readAlert(id: string): Promise<TelegramAlert | null> {
   const redis = getServerRedisClient();
   if (!redis) return memoryAlerts.get(id) || null;
@@ -412,7 +478,7 @@ function publicAlert(alert: TelegramAlert) {
     createdAt: alert.createdAt,
     updatedAt: alert.updatedAt,
     lastTriggeredAt: alert.lastTriggeredAt,
-    lastApr: alert.state.lastApr,
+    lastApr: alert.state.lastMetric ?? alert.state.lastApr,
   };
 }
 
@@ -827,6 +893,30 @@ function buildInitialState(
   };
 }
 
+function buildInitialTokenMarketState(
+  kind: AlertKind,
+  markets: TokenMarket[],
+  tokenSymbol: string,
+  threshold?: number
+): TelegramAlert["state"] {
+  const relevant = relevantTokenMarkets(markets, { tokenSymbol });
+  const best = relevant[0];
+
+  if (kind === "token_market_new") {
+    return {
+      knownTokenMarketIds: relevant.map((market) => market.id),
+      lastMetric: relevant.length,
+    };
+  }
+
+  const metric = best ? tokenMarketMetric({ kind }, best) : undefined;
+  return {
+    conditionMet: typeof metric === "number" ? metric >= Number(threshold || 0) : false,
+    lastMetric: metric,
+    lastOpportunityId: best?.id,
+  };
+}
+
 export async function createTelegramAlert(input: {
   kind: AlertKind;
   chatId: string;
@@ -836,12 +926,22 @@ export async function createTelegramAlert(input: {
   thresholdApr?: number;
 }) {
   if (!input.chatId) throw new Error("Telegram is not connected");
-  if ((input.kind === "apr_above" || input.kind === "apr_below") && typeof input.thresholdApr !== "number") {
-    throw new Error("APR threshold is required");
+  if (
+    (input.kind === "apr_above" ||
+      input.kind === "apr_below" ||
+      input.kind === "token_volume_above" ||
+      input.kind === "token_liquidity_above" ||
+      input.kind === "token_price_move") &&
+    typeof input.thresholdApr !== "number"
+  ) {
+    throw new Error("A numeric threshold is required");
   }
 
-  const needsOpportunities = input.kind !== "daily_digest" && input.kind !== "daily_news_brief";
+  const tokenAlert = isTokenMarketAlert(input.kind);
+  const needsOpportunities =
+    !tokenAlert && input.kind !== "daily_digest" && input.kind !== "daily_news_brief";
   const opportunities = needsOpportunities ? await fetchCombinedYieldOpportunities() : [];
+  const tokenMarkets = tokenAlert ? (await fetchTokenMarkets()).data : [];
   const tokenSymbol = normalizeTokenSymbol(input.tokenSymbol || "ANY");
   const protocolKey = input.protocolKey && input.protocolKey !== "all" ? normalizeProtocolKey(input.protocolKey) : undefined;
   const alreadyMet = findAlreadyMetThresholdAlert(
@@ -854,6 +954,22 @@ export async function createTelegramAlert(input: {
   if (alreadyMet) {
     throw new Error(
       `Alert condition already exists: ${opportunityLabel(alreadyMet)} is ${alreadyMet.apr.toFixed(2)}% APR.`
+    );
+  }
+  const alreadyMetTokenMarket = findAlreadyMetTokenMarketAlert(
+    tokenMarkets,
+    input.kind,
+    tokenSymbol,
+    input.thresholdApr
+  );
+  if (alreadyMetTokenMarket) {
+    const metric = tokenMarketMetric({ kind: input.kind }, alreadyMetTokenMarket);
+    const formattedMetric =
+      input.kind === "token_price_move"
+        ? formatPercentForMessage(metric)
+        : formatCompactUsd(metric);
+    throw new Error(
+      `Alert condition already exists: ${tokenMarketLabel(alreadyMetTokenMarket)} is already at ${formattedMetric}.`
     );
   }
 
@@ -869,7 +985,9 @@ export async function createTelegramAlert(input: {
     status: "active",
     createdAt: now,
     updatedAt: now,
-    state: buildInitialState(input.kind, opportunities, tokenSymbol, protocolKey, input.thresholdApr),
+    state: tokenAlert
+      ? buildInitialTokenMarketState(input.kind, tokenMarkets, tokenSymbol, input.thresholdApr)
+      : buildInitialState(input.kind, opportunities, tokenSymbol, protocolKey, input.thresholdApr),
   };
 
   await writeAlert(alert);
@@ -889,6 +1007,10 @@ function alertTitle(alert: TelegramAlert) {
   if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best market changed`;
   if (alert.kind === "daily_digest") return alert.tokenSymbol === "ANY" ? "Daily DeFi rates digest" : `Daily ${alert.tokenSymbol} rates digest`;
   if (alert.kind === "daily_news_brief") return "Daily latest news brief";
+  if (alert.kind === "token_volume_above") return `${alert.tokenSymbol} 24h volume crossed ${formatCompactUsd(alert.thresholdApr)}`;
+  if (alert.kind === "token_liquidity_above") return `${alert.tokenSymbol} liquidity crossed ${formatCompactUsd(alert.thresholdApr)}`;
+  if (alert.kind === "token_price_move") return `${alert.tokenSymbol} 24h move crossed ${alert.thresholdApr}%`;
+  if (alert.kind === "token_market_new") return alert.tokenSymbol === "ANY" ? "New token market detected" : `New ${alert.tokenSymbol} market detected`;
   return alert.tokenSymbol === "ANY" ? "New DeFi market detected" : `New ${alert.tokenSymbol} market detected`;
 }
 
@@ -950,7 +1072,73 @@ async function buildLatestNewsBriefMessage() {
   return `Daily latest news brief\n${lines.join("\n\n")}`;
 }
 
-async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOpportunity[]) {
+async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOpportunity[], tokenMarkets: TokenMarket[] = []) {
+  if (isTokenMarketAlert(alert.kind)) {
+    const relevant = relevantTokenMarkets(tokenMarkets, alert);
+    const nextState = { ...alert.state };
+    let message = "";
+
+    if (alert.kind === "token_market_new") {
+      const known = new Set(alert.state.knownTokenMarketIds || []);
+      const fresh = relevant.filter((market) => !known.has(market.id));
+      if (fresh.length > 0) {
+        const topFresh = fresh.sort((a, b) => (b.volume24hUsd || 0) - (a.volume24hUsd || 0))[0];
+        message = `${alertTitle(alert)}\n${tokenMarketLabel(topFresh)} is live with ${formatCompactUsd(topFresh.volume24hUsd)} 24h volume.`;
+      }
+      nextState.knownTokenMarketIds = relevant.map((market) => market.id);
+      nextState.lastMetric = relevant.length;
+    } else {
+      const best = relevant
+        .filter((market) => typeof tokenMarketMetric(alert, market) === "number")
+        .sort((a, b) => Number(tokenMarketMetric(alert, b) || 0) - Number(tokenMarketMetric(alert, a) || 0))[0];
+      const metric = best ? tokenMarketMetric(alert, best) : undefined;
+      const threshold = Number(alert.thresholdApr || 0);
+      const conditionMet = typeof metric === "number" && metric >= threshold;
+
+      if (conditionMet && !alert.state.conditionMet && best && typeof metric === "number") {
+        if (alert.kind === "token_price_move") {
+          message = `${alertTitle(alert)}\n${tokenMarketLabel(best)} moved ${formatPercentForMessage(best.priceChange24h)} in 24h.`;
+        } else {
+          message = `${alertTitle(alert)}\n${tokenMarketLabel(best)} is now at ${formatCompactUsd(metric)}.`;
+        }
+      }
+
+      nextState.conditionMet = conditionMet;
+      nextState.lastMetric = metric;
+      nextState.lastOpportunityId = best?.id;
+    }
+
+    const categoryEnabled = message
+      ? await isTelegramNotificationCategoryEnabled(alert.chatId, preferenceKeyForAlertKind(alert.kind))
+      : true;
+    const updated: TelegramAlert = {
+      ...alert,
+      updatedAt: Date.now(),
+      lastTriggeredAt: message && categoryEnabled ? Date.now() : alert.lastTriggeredAt,
+      state: nextState,
+    };
+
+    if (message) {
+      if (categoryEnabled) {
+        await sendTelegramMessage(alert.chatId, message);
+        logServerEvent("info", "alerts.triggered", {
+          alertId: shortHash(alert.id),
+          kind: alert.kind,
+          tokenSymbol: alert.tokenSymbol,
+        });
+      } else {
+        logServerEvent("info", "alerts.trigger_suppressed_by_preferences", {
+          alertId: shortHash(alert.id),
+          kind: alert.kind,
+          tokenSymbol: alert.tokenSymbol,
+        });
+      }
+    }
+
+    await writeAlert(updated);
+    return Boolean(message);
+  }
+
   const relevant = relevantOpportunities(opportunities, alert);
   const best = relevant[0];
   const nextState = { ...alert.state };
@@ -1065,19 +1253,37 @@ export async function checkTelegramAlerts() {
     return { checked: 0, triggered: 0, weeklyEcosystem };
   }
 
-  const hasMarketAlerts = alerts.some((alert) => alert.kind !== "daily_news_brief");
+  const hasTokenAlerts = alerts.some((alert) => isTokenMarketAlert(alert.kind));
+  const hasYieldAlerts = alerts.some(
+    (alert) => !isTokenMarketAlert(alert.kind) && alert.kind !== "daily_news_brief"
+  );
   let opportunities: YieldOpportunity[] = [];
+  let tokenMarkets: TokenMarket[] = [];
   let alertsToCheck = alerts;
 
-  if (hasMarketAlerts) {
+  if (hasYieldAlerts) {
     try {
       opportunities = await fetchCombinedYieldOpportunities();
     } catch (error) {
-      const newsOnlyAlerts = alerts.filter((alert) => alert.kind === "daily_news_brief");
-      if (newsOnlyAlerts.length === 0) throw error;
+      alertsToCheck = alertsToCheck.filter(
+        (alert) => isTokenMarketAlert(alert.kind) || alert.kind === "daily_news_brief"
+      );
+      if (alertsToCheck.length === 0) throw error;
 
-      alertsToCheck = newsOnlyAlerts;
       logServerEvent("warn", "alerts.market_fetch_failed_news_continues", {
+        error: getErrorMessage(error),
+      });
+    }
+  }
+
+  if (hasTokenAlerts) {
+    try {
+      tokenMarkets = (await fetchTokenMarkets()).data;
+    } catch (error) {
+      alertsToCheck = alertsToCheck.filter((alert) => !isTokenMarketAlert(alert.kind));
+      if (alertsToCheck.length === 0) throw error;
+
+      logServerEvent("warn", "alerts.token_market_fetch_failed_others_continue", {
         error: getErrorMessage(error),
       });
     }
@@ -1087,7 +1293,7 @@ export async function checkTelegramAlerts() {
 
   for (const alert of alertsToCheck) {
     try {
-      if (await maybeTriggerAlert(alert, opportunities)) triggered += 1;
+      if (await maybeTriggerAlert(alert, opportunities, tokenMarkets)) triggered += 1;
     } catch (error) {
       logServerEvent("warn", "alerts.check_failed", {
         alertId: shortHash(alert.id),
