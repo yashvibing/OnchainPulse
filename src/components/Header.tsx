@@ -28,7 +28,7 @@ export function Header() {
               width={28}
               height={28}
               priority
-              className="h-7 w-7 object-contain"
+              style={{ width: 28, height: 28 }}
             />
           </span>
           <span className="hidden text-[18px] font-black tracking-[-0.02em] text-[var(--color-accent-primary)] sm:inline">
@@ -37,7 +37,7 @@ export function Header() {
         </Link>
 
         {showAppNav && (
-          <nav className="flex items-center gap-1 sm:gap-4">
+          <nav className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto sm:gap-4">
             {NAV_ITEMS.map((item) => {
               const active = pathname.startsWith(item.href);
 
@@ -45,7 +45,7 @@ export function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`border-b-2 px-2 py-2 text-[12px] font-semibold transition-colors sm:text-[14px] ${
+                  className={`shrink-0 border-b-2 px-2 py-2 text-[12px] font-semibold transition-colors sm:text-[14px] ${
                     active
                       ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
                       : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-accent-primary)]"
