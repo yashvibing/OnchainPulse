@@ -2,11 +2,7 @@
   "crons": [
     {
       "path": "/api/alerts/check",
-      "schedule": "0 */3 * * *"
-    },
-    {
-      "path": "/api/cron/x-ingest",
-      "schedule": "0 */3 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
