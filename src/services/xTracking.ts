@@ -43,20 +43,25 @@ const SINCE_ID_PREFIX = "onchain-pulse:x:since:";
 const TWEET_PREFIX = "onchain-pulse:x:tweet:";
 const TWEET_IDS_KEY = "onchain-pulse:x:tweets";
 const TELEGRAM_SENT_KEY = "onchain-pulse:x:telegram-sent";
+const DAILY_COUNTER_PREFIX = "onchain-pulse:x:daily:";
 const MAX_ACCOUNTS_PER_RUN = 15;
 const MAX_RESULTS_PER_ACCOUNT = 5;
-const MAX_NEWS_PER_RUN = 5;
-const MAX_TELEGRAM_PER_RUN = 3;
+const MAX_NEWS_PER_RUN = 4;
+const MAX_NEWS_PER_DAY = 10;
+const MAX_TELEGRAM_PER_RUN = 2;
+const MAX_TELEGRAM_PER_DAY = 3;
 const NEWS_SCORE_THRESHOLD = 4;
 const TELEGRAM_SCORE_THRESHOLD = 7;
 const USER_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const TWEET_STORAGE_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DAILY_COUNTER_TTL_SECONDS = 48 * 60 * 60;
 
 const memoryUsers = new Map<string, XUser>();
 const memorySinceIds = new Map<string, string>();
 const memoryTweets = new Map<string, StoredTweet>();
 const memoryTweetIds = new Set<string>();
 const memoryTelegramSent = new Set<string>();
+const memoryDailyCounters = new Map<string, number>();
 
 function getXBearerToken() {
   return process.env.X_BEARER_TOKEN || process.env.TWITTER_BEARER_TOKEN || "";
@@ -106,6 +111,37 @@ function sinceKey(username: string) {
 
 function tweetKey(tweetId: string) {
   return `${TWEET_PREFIX}${tweetId}`;
+}
+
+function currentUtcDay() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function dailyCounterKey(kind: "news" | "telegram", day = currentUtcDay()) {
+  return `${DAILY_COUNTER_PREFIX}${kind}:${day}`;
+}
+
+async function readDailyCounter(kind: "news" | "telegram") {
+  const key = dailyCounterKey(kind);
+  const redis = getServerRedisClient();
+  if (!redis) return memoryDailyCounters.get(key) || 0;
+  return Number((await redis.get<number | string>(key)) || 0);
+}
+
+async function incrementDailyCounter(kind: "news" | "telegram") {
+  const key = dailyCounterKey(kind);
+  const redis = getServerRedisClient();
+  if (!redis) {
+    const next = (memoryDailyCounters.get(key) || 0) + 1;
+    memoryDailyCounters.set(key, next);
+    return next;
+  }
+
+  const count = await redis.incr(key);
+  if (count === 1) {
+    await redis.expire(key, DAILY_COUNTER_TTL_SECONDS);
+  }
+  return count;
 }
 
 async function readUser(username: string) {
@@ -346,6 +382,8 @@ export async function ingestTrackedXTweets() {
   let telegramSent = 0;
   let publishedThisRun = 0;
   let telegramThisRun = 0;
+  let publishedToday = await readDailyCounter("news");
+  let telegramToday = await readDailyCounter("telegram");
 
   for (const account of accounts) {
     try {
@@ -372,17 +410,30 @@ export async function ingestTrackedXTweets() {
         await storeTweet(stored);
         newTweets += 1;
 
-        if (stored.score >= NEWS_SCORE_THRESHOLD && publishedThisRun < MAX_NEWS_PER_RUN) {
+        if (
+          stored.score >= NEWS_SCORE_THRESHOLD &&
+          publishedThisRun < MAX_NEWS_PER_RUN &&
+          publishedToday < MAX_NEWS_PER_DAY
+        ) {
           await publishTweetToLatestNews(stored);
           stored.publishedAt = Date.now();
           await storeTweet(stored);
           published += 1;
           publishedThisRun += 1;
+          publishedToday = await incrementDailyCounter("news");
         }
 
-        if (stored.score >= TELEGRAM_SCORE_THRESHOLD && telegramThisRun < MAX_TELEGRAM_PER_RUN) {
-          telegramSent += await sendTweetToTelegram(stored);
-          telegramThisRun += 1;
+        if (
+          stored.score >= TELEGRAM_SCORE_THRESHOLD &&
+          telegramThisRun < MAX_TELEGRAM_PER_RUN &&
+          telegramToday < MAX_TELEGRAM_PER_DAY
+        ) {
+          const sent = await sendTweetToTelegram(stored);
+          telegramSent += sent;
+          if (sent > 0) {
+            telegramThisRun += 1;
+            telegramToday = await incrementDailyCounter("telegram");
+          }
         }
       }
     } catch (error) {
@@ -399,6 +450,12 @@ export async function ingestTrackedXTweets() {
     newTweets,
     published,
     telegramSent,
+    publishedToday,
+    maxNewsPerDay: MAX_NEWS_PER_DAY,
+    maxNewsPerRun: MAX_NEWS_PER_RUN,
+    telegramBroadcastsToday: telegramToday,
+    maxTelegramBroadcastsPerDay: MAX_TELEGRAM_PER_DAY,
+    maxTelegramBroadcastsPerRun: MAX_TELEGRAM_PER_RUN,
   });
 
   return {
@@ -408,5 +465,11 @@ export async function ingestTrackedXTweets() {
     newTweets,
     published,
     telegramSent,
+    publishedToday,
+    maxNewsPerDay: MAX_NEWS_PER_DAY,
+    maxNewsPerRun: MAX_NEWS_PER_RUN,
+    telegramBroadcastsToday: telegramToday,
+    maxTelegramBroadcastsPerDay: MAX_TELEGRAM_PER_DAY,
+    maxTelegramBroadcastsPerRun: MAX_TELEGRAM_PER_RUN,
   };
 }
