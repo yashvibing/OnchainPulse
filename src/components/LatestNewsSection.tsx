@@ -70,7 +70,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
           {article.topic}
         </span>
         <span className="text-[10px] font-semibold text-[var(--color-text-dim)]">
-          {article.source} - {formatRelativeTime(article.publishedAt)}
+          Source: {article.source} - {formatRelativeTime(article.publishedAt)}
         </span>
       </div>
 
