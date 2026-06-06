@@ -3,9 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  useTokenBalances,
-} from "@/hooks/usePortfolio";
-import {
   calculateLoopStrategies,
   fetchYieldOpportunitiesWithClientMeta,
   filterBorrowOpportunities,
@@ -19,15 +16,7 @@ import {
 } from "@/services/yields-aggregator";
 import {
   formatNumber,
-  getPeriodicYieldEstimate,
-  isValidEvmAddress,
-  shortenAddress,
 } from "@/lib/format";
-import {
-  buildWalletYieldMatches,
-  getHeldYieldSymbols,
-} from "@/lib/walletOpportunities";
-import { getLastAddress, saveAddress } from "@/lib/savedAddresses";
 import { getTokenLogoSrc } from "@/lib/tokenLogos";
 import { getProtocolLogoSrc } from "@/lib/protocolLogos";
 
@@ -268,182 +257,6 @@ function RateExplainerStrip() {
           </div>
         ))}
       </div>
-    </section>
-  );
-}
-
-function WalletHoldingsPanel({
-  address,
-  input,
-  onInputChange,
-  onLoad,
-  loading,
-  heldSymbols,
-  matches,
-}: {
-  address: string;
-  input: string;
-  onInputChange: (value: string) => void;
-  onLoad: () => void;
-  loading: boolean;
-  heldSymbols: string[];
-  matches: ReturnType<typeof buildWalletYieldMatches>;
-}) {
-  const bestMatch = matches[0];
-  const bestEstimate = bestMatch
-    ? getPeriodicYieldEstimate(bestMatch.valueUsd, bestMatch.estimatedDailyUsd)
-    : null;
-  const matchedSymbols = new Set(matches.map((match) => match.symbol));
-  const unmatchedSymbols = heldSymbols.filter((symbol) => !matchedSymbols.has(symbol));
-
-  return (
-    <section className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4">
-      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-[12px] font-bold uppercase text-[var(--color-text-secondary)]">
-            Best Places For Wallet Tokens
-          </div>
-          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            Match wallet tokens to displayed rates.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          value={input}
-          onChange={(event) => onInputChange(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && onLoad()}
-          placeholder="0x wallet address"
-          className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
-        />
-        <button
-          type="button"
-          onClick={onLoad}
-          className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-4 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
-        >
-          Check wallet
-        </button>
-      </div>
-
-      {address && (
-        <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-          {!address ? (
-            null
-          ) : loading ? (
-            <div>
-              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
-                Wallet {shortenAddress(address)}
-              </div>
-              <div className="mt-3 h-4 w-48 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
-              <div className="mt-2 h-3 w-full max-w-[520px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
-            </div>
-          ) : heldSymbols.length === 0 ? (
-            <div>
-              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
-                Wallet {shortenAddress(address)}
-              </div>
-              <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-                We did not find wallet tokens that match the displayed markets.
-              </div>
-            </div>
-          ) : matches.length === 0 ? (
-            <div>
-              <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
-                Wallet {shortenAddress(address)}
-              </div>
-              <div className="mt-2 text-[12px] text-[var(--color-text-muted)]">
-                We found supported wallet tokens, but none have a displayed
-                rate row right now.
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="font-mono text-[11px] text-[var(--color-text-dim)]">
-                    Wallet {shortenAddress(address)}
-                  </div>
-                  <div className="mt-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-                    Best displayed place found for {matches.length} wallet token{matches.length === 1 ? "" : "s"}
-                  </div>
-                  <div className="mt-1 text-[11px] text-[var(--color-text-dim)]">
-                    Static matches from the current market list.
-                  </div>
-                </div>
-              </div>
-
-              {bestMatch && (
-                <div
-                  className="mb-3 max-w-[520px] rounded-[var(--radius-md)] border border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] px-3 py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <div className="text-[9px] font-bold uppercase text-[var(--color-positive)]">
-                        Highest wallet match
-                      </div>
-                      <div className="truncate text-[15px] font-bold text-[var(--color-text-primary)]">
-                        {bestMatch.symbol}
-                      </div>
-                      <div className="truncate text-[11px] text-[var(--color-text-dim)]">
-                        {bestMatch.opportunity.protocol} - wallet holds {bestMatch.balanceLabel}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-[14px] font-bold text-[var(--color-positive)]">
-                        {formatRateLabel(bestMatch.opportunity.apr)}
-                      </div>
-                      {bestEstimate && (
-                        <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">
-                          {bestEstimate.shortLabel} {bestEstimate.formatted}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {matches.slice(0, 6).map((match) => {
-                  const estimate = getPeriodicYieldEstimate(match.valueUsd, match.estimatedDailyUsd);
-
-                  return (
-                    <div
-                      key={`${match.symbol}-${match.opportunity.id}`}
-                      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-3"
-                    >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                          {match.symbol}
-                        </div>
-                        <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          {match.opportunity.protocol} - wallet holds {match.balanceLabel}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[12px] font-bold text-[var(--color-positive)]">
-                          {formatRateLabel(match.opportunity.apr)}
-                        </div>
-                        <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
-                          {estimate.shortLabel} {estimate.formatted}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-
-              {unmatchedSymbols.length > 0 && (
-                <div className="mt-3 text-[11px] text-[var(--color-text-dim)]">
-                  Wallet tokens without a displayed rate match right now: {unmatchedSymbols.slice(0, 6).join(", ")}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </section>
   );
 }
@@ -859,18 +672,10 @@ export function YieldAggregator() {
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
   const [protocolFilter, setProtocolFilter] = useState("all");
-  const [walletAddress, setWalletAddress] = useState("");
-  const [walletInput, setWalletInput] = useState("");
-  const walletBalances = useTokenBalances(walletAddress || null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const addressParam = params.get("address") || getLastAddress();
     const lendParam = params.get("lend");
-    if (addressParam && isValidEvmAddress(addressParam)) {
-      setWalletAddress(addressParam);
-      setWalletInput(addressParam);
-    }
     if (lendParam) {
       setLendTokens([lendParam]);
     }
@@ -937,21 +742,6 @@ export function YieldAggregator() {
           protocolFilterKey(strategy.supplyProtocol) === activeProtocol ||
           protocolFilterKey(strategy.borrowProtocol) === activeProtocol
       );
-  const walletTokens = walletBalances.data || [];
-  const walletMatches = buildWalletYieldMatches(walletTokens, allOpps);
-  const heldYieldSymbols = getHeldYieldSymbols(walletTokens);
-
-  function loadWalletHoldings() {
-    const nextAddress = walletInput.trim();
-    if (!isValidEvmAddress(nextAddress)) return;
-    saveAddress(nextAddress);
-    setWalletAddress(nextAddress);
-    const params = new URLSearchParams(window.location.search);
-    params.set("address", nextAddress);
-    const nextUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.replaceState(null, "", nextUrl);
-  }
-
   if (loading) return <AggregatorSkeleton />;
 
   if (error) {
@@ -968,16 +758,6 @@ export function YieldAggregator() {
   return (
     <div>
       <RateExplainerStrip />
-
-      <WalletHoldingsPanel
-        address={walletAddress}
-        input={walletInput}
-        onInputChange={setWalletInput}
-        onLoad={loadWalletHoldings}
-        loading={walletBalances.isLoading}
-        heldSymbols={heldYieldSymbols}
-        matches={walletMatches}
-      />
 
       {dataStatus.fetchedAt && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-dim)]">
