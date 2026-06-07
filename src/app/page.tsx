@@ -94,7 +94,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                 href="/app"
                 className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-5 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
               >
-                Open Portfolio Tracker
+                Open App
               </Link>
             </div>
           </div>
@@ -131,7 +131,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           </div>
         </section>
 
-        <section className="grid gap-4 border-t border-[var(--color-border)] py-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="border-t border-[var(--color-border)] py-10">
           <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
             <div className="label-caps text-[var(--color-accent-primary)]">
               Telegram alerts
@@ -153,25 +153,6 @@ export default async function HomePage({ searchParams }: PageProps) {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
-            <div className="label-caps text-[var(--color-accent-primary)]">
-              Distribution layer
-            </div>
-            <h2 className="mt-3 text-[28px] font-bold tracking-[-0.01em] text-[var(--color-text-primary)]">
-              A direct line to Monad users.
-            </h2>
-            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-              Personal alerts help individual users. The Onchain Pulse Telegram
-              channel can also carry broader product updates, launch updates,
-              DeFi briefs, ecosystem news, and selected DeltaV startup spotlights.
-            </p>
-            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-              As the audience grows, this makes distribution less dependent on
-              outside channels while giving builders another way to get attention
-              and feedback.
-            </p>
           </div>
         </section>
 
