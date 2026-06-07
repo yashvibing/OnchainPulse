@@ -27,34 +27,41 @@ export const metadata: Metadata = {
 const FEATURE_CARDS = [
   {
     title: "Portfolio Tracker",
-    body: "Paste a public wallet to inspect holdings, positions, trends, and CSV exports.",
+    body: "Paste a public wallet to inspect holdings, staking, lending, vaults, liquidity, and exports.",
     href: "/app",
   },
   {
     title: "Token Markets",
-    body: "Scan Monad token prices, 24h movement, liquidity, market cap, and contracts.",
+    body: "Scan prices, volume, liquidity, market cap, FDV, contracts, and short-term charts.",
     href: "/token-markets",
   },
   {
     title: "DeFi Rates",
-    body: "Compare displayed lending, staking, LP, vault, and borrow opportunities.",
+    body: "Compare displayed lending, staking, LP, vault, and borrow opportunities across protocols.",
     href: "/defi-rates",
   },
   {
     title: "Latest News",
-    body: "Read curated Monad, DeFi, and market updates, with briefs from tracked sources.",
+    body: "Read Monad and crypto updates from tracked X sources and curated ecosystem context.",
     href: "/news",
   },
   {
-    title: "Ecosystem",
-    body: "Browse DeltaV startups and continue to founder feedback on DeltaV.",
+    title: "DeltaV Startups",
+    body: "Discover startups and continue to DeltaV when you want to give founder feedback.",
     href: "/startups",
   },
   {
     title: "Telegram Alerts",
-    body: "Create rate watches, new-market alerts, and Telegram daily briefs.",
+    body: "Create rate watches, new-market alerts, and best-place change alerts in Telegram.",
     href: "/alerts",
   },
+];
+
+const ALERT_POINTS = [
+  "APR crosses a target you care about.",
+  "A new DeFi market appears.",
+  "The best displayed place for a token changes.",
+  "Important news, briefs, and startup highlights can be pushed to Telegram as the audience grows.",
 ];
 
 export default async function HomePage({ searchParams }: PageProps) {
@@ -74,11 +81,12 @@ export default async function HomePage({ searchParams }: PageProps) {
         <section className="border-b border-[var(--color-border)] pb-10 pt-8">
           <div>
             <h1 className="max-w-[900px] text-[42px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[64px]">
-              Portfolio tracking, token markets, DeFi rates, and alerts.
+              Monad portfolios, DeFi rates, token markets, news, and alerts.
             </h1>
             <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-              Paste a public wallet, scan Monad token markets, compare displayed
-              DeFi opportunities, follow curated updates, and send useful alerts to Telegram.
+              Onchain Pulse helps users understand what is happening across
+              Monad wallets, markets, and ecosystem activity without connecting
+              a wallet.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -86,7 +94,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                 href="/app"
                 className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-5 py-3 text-[13px] font-bold text-[#07110C] transition-opacity hover:opacity-90"
               >
-                Open App
+                Open Portfolio Tracker
               </Link>
             </div>
           </div>
@@ -98,7 +106,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               Product areas
             </div>
             <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">
-              Choose what you need
+              What users can do
             </h2>
           </div>
 
@@ -120,6 +128,50 @@ export default async function HomePage({ searchParams }: PageProps) {
                 </div>
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 border-t border-[var(--color-border)] py-10 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
+            <div className="label-caps text-[var(--color-accent-primary)]">
+              Telegram alerts
+            </div>
+            <h2 className="mt-3 text-[28px] font-bold tracking-[-0.01em] text-[var(--color-text-primary)]">
+              Useful updates without refreshing the app.
+            </h2>
+            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+              Users can connect Telegram and get notified when market conditions
+              match what they care about.
+            </p>
+            <div className="mt-5 grid gap-2">
+              {ALERT_POINTS.map((point) => (
+                <div
+                  key={point}
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.035)] px-4 py-3 text-[13px] font-semibold text-[var(--color-text-secondary)]"
+                >
+                  {point}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
+            <div className="label-caps text-[var(--color-accent-primary)]">
+              Distribution layer
+            </div>
+            <h2 className="mt-3 text-[28px] font-bold tracking-[-0.01em] text-[var(--color-text-primary)]">
+              A direct line to Monad users.
+            </h2>
+            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+              Personal alerts help individual users. The Onchain Pulse Telegram
+              channel can also carry broader product updates, launch updates,
+              DeFi briefs, ecosystem news, and selected DeltaV startup spotlights.
+            </p>
+            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+              As the audience grows, this makes distribution less dependent on
+              outside channels while giving builders another way to get attention
+              and feedback.
+            </p>
           </div>
         </section>
 
