@@ -5,6 +5,7 @@ import type {
   AnalyticsBar,
   AnalyticsPayload,
   AnalyticsPoint,
+  AnalyticsStablecoin,
   AnalyticsValidator,
 } from "@/services/analytics";
 
@@ -37,6 +38,13 @@ function formatPercent(value?: number, digits = 2) {
 function formatNumber(value?: number, digits = 0) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function formatDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function chartPath(points: AnalyticsPoint[], width = 100, height = 44, padding = 2) {
@@ -218,6 +226,43 @@ function ValidatorTable({ validators }: { validators: AnalyticsValidator[] }) {
   );
 }
 
+function StablecoinTable({ stablecoins }: { stablecoins: AnalyticsStablecoin[] }) {
+  if (stablecoins.length === 0) {
+    return <div className="text-[13px] text-[var(--color-text-muted)]">No stablecoin data available.</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[460px] text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-[var(--color-border)] text-[var(--color-text-dim)]">
+            <th className="py-2 pr-3 font-semibold">Asset</th>
+            <th className="py-2 pr-3 text-right font-semibold">Amount</th>
+            <th className="py-2 pr-3 text-right font-semibold">Share</th>
+            <th className="py-2 pr-3 text-right font-semibold">30d</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stablecoins.map((asset) => (
+            <tr key={asset.symbol} className="border-b border-[rgba(255,255,255,0.055)]">
+              <td className="py-3 pr-3 font-bold text-[var(--color-text-primary)]">{asset.symbol}</td>
+              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
+                {formatCurrency(asset.valueUsd)}
+              </td>
+              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
+                {formatPercent(asset.sharePct, 1)}
+              </td>
+              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
+                {formatSignedPercent(asset.change30dPct, 1)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 async function loadAnalytics() {
   const response = await fetch("/api/analytics");
   const data = await response.json();
@@ -263,7 +308,7 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-5">
       <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
-        <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           <MetricCard label="MON price" value={formatCurrency(analytics.market.priceUsd, 6)} />
           <MetricCard
             label="24 hr"
@@ -276,7 +321,9 @@ export function AnalyticsDashboard() {
             helper={positive30 ? "price up" : "price down"}
           />
           <MetricCard label="Market cap" value={formatCurrency(analytics.market.marketCapUsd)} />
+          <MetricCard label="FDV" value={formatCurrency(analytics.market.fdvUsd)} />
           <MetricCard label="24 hr volume" value={formatCurrency(analytics.market.volume24hUsd)} />
+          <MetricCard label="Open interest" value={formatCurrency(analytics.market.openInterestUsd)} />
           <MetricCard label="Block height" value={formatNumber(analytics.network.blockHeight)} />
         </div>
       </div>
@@ -290,8 +337,58 @@ export function AnalyticsDashboard() {
           <div className="grid gap-3 sm:grid-cols-2">
             <MetricCard label="Active validators" value={`${formatNumber(analytics.staking.activeValidators)} / ${formatNumber(analytics.staking.activeSetCap)}`} />
             <MetricCard label="Total active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
+            <MetricCard label="Value staked" value={formatCurrency(analytics.staking.totalValueStakedUsd)} />
+            <MetricCard
+              label="Est. APY"
+              value={formatPercent(analytics.staking.estimatedApyPct, 1)}
+              helper={
+                analytics.staking.minApyPct && analytics.staking.maxApyPct
+                  ? `${formatPercent(analytics.staking.minApyPct, 1)}-${formatPercent(analytics.staking.maxApyPct, 1)} range`
+                  : undefined
+              }
+            />
             <MetricCard label="Mean commission" value={formatPercent(analytics.staking.meanCommissionPct, 1)} />
             <MetricCard label="At commission cap" value={formatNumber(analytics.staking.atCommissionCap)} />
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Panel title="Supply metrics">
+          <div className="grid gap-3">
+            <MetricCard label="Total supply" value={formatMon(analytics.supply.totalSupplyMon)} />
+            <MetricCard
+              label="Circulating supply"
+              value={formatMon(analytics.supply.circulatingSupplyMon)}
+              helper={formatPercent(analytics.supply.circulatingPct, 2)}
+            />
+            <MetricCard label="Locked / staked" value={formatMon(analytics.supply.lockedOrStakedMon)} />
+            <MetricCard label="Burned" value={formatMon(analytics.supply.burnedMon)} />
+          </div>
+        </Panel>
+
+        <Panel title="Staking flow">
+          <div className="grid gap-3">
+            <MetricCard label="Active nodes" value={formatNumber(analytics.staking.activeNodes)} />
+            <MetricCard label="Min. delegation" value={formatMon(analytics.staking.minDelegationMon)} />
+            <MetricCard
+              label="Unbonding"
+              value={
+                typeof analytics.staking.unbondingHours === "number"
+                  ? `${analytics.staking.unbondingHours}h`
+                  : "-"
+              }
+            />
+            <MetricCard label="Delegation flow 7d" value={formatMon(analytics.staking.delegationFlow7dMon)} />
+          </div>
+        </Panel>
+
+        <Panel title="Network economy">
+          <div className="grid gap-3">
+            <MetricCard label="Inflation rate" value={formatPercent(analytics.economy.inflationRatePct, 1)} />
+            <MetricCard label="Burn rate 24h" value={formatMon(analytics.economy.burnRate24hMon)} />
+            <MetricCard label="Block reward" value={formatMon(analytics.economy.blockRewardMon)} />
+            <MetricCard label="Net emission / yr" value={formatMon(analytics.economy.netEmissionYearMon)} />
           </div>
         </Panel>
       </div>
@@ -301,7 +398,13 @@ export function AnalyticsDashboard() {
           <div className="grid gap-3">
             <MetricCard label="Gas" value={`${formatNumber(analytics.network.gasGwei, 4)} gwei`} />
             <MetricCard label="Block time" value={analytics.network.blockTimeSeconds ? `${analytics.network.blockTimeSeconds}s` : "-"} />
-            <MetricCard label="Source" value="RPC" helper="block, gas, and timing" />
+            <MetricCard label="Finality" value={analytics.network.finalitySeconds ? `${analytics.network.finalitySeconds}s` : "-"} />
+            <MetricCard label="Parallel exec" value={formatPercent(analytics.network.parallelExecutionPct, 0)} />
+            <MetricCard
+              label="Epoch"
+              value={formatNumber(analytics.network.epoch)}
+              helper={analytics.network.epochTimeRemaining || formatPercent(analytics.network.epochProgressPct, 0)}
+            />
           </div>
         </Panel>
 
@@ -326,12 +429,51 @@ export function AnalyticsDashboard() {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
+        <Panel title="Chain fees & revenue">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricCard label="Daily fees" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
+            <MetricCard label="Ann. fees" value={formatCurrency(analytics.economy.annualizedFeesUsd)} />
+            <MetricCard label="P/S ratio" value={analytics.economy.psRatio ? `${formatNumber(analytics.economy.psRatio, 0)}x` : "-"} />
+            <MetricCard label="P/F ratio" value={analytics.economy.pfRatio ? `${formatNumber(analytics.economy.pfRatio, 0)}x` : "-"} />
+          </div>
+          <div className="mt-4">
+            <VolumeBars points={analytics.economy.feeTrend} />
+          </div>
+        </Panel>
+
+        <Panel title="DEX efficiency">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricCard label="24h volume" value={formatCurrency(analytics.dex.volume24hUsd)} />
+            <MetricCard label="DEX TVL" value={formatCurrency(analytics.dex.tvlUsd)} />
+            <MetricCard label="Vol / TVL" value={formatPercent(analytics.dex.volumeToTvlPct, 2)} />
+            <MetricCard label="7d volume" value={formatCurrency(analytics.dex.volume7dUsd)} />
+            <MetricCard label="24h fees" value={formatCurrency(analytics.dex.fees24hUsd)} />
+            <MetricCard label="Fees / TVL" value={formatPercent(analytics.dex.feesToTvlPct, 2)} />
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="DeFi TVL distribution" meta="displayed markets">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <MetricCard label="Chain TVL" value={formatCurrency(analytics.defi.totalChainTvlUsd)} />
+            <MetricCard label="Displayed TVL" value={formatCurrency(analytics.defi.totalTvlUsd)} />
+          </div>
           <BarList items={analytics.defi.protocolTvl} valueFormatter={formatCurrency} />
         </Panel>
 
+        <Panel title="TVL categories" meta="displayed markets">
+          <BarList items={analytics.defi.categoryTvl} valueFormatter={formatCurrency} />
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="DEX liquidity">
           <BarList items={analytics.defi.topDexLiquidity} valueFormatter={formatCurrency} />
+        </Panel>
+
+        <Panel title="Top DEX volume" meta="24 hr">
+          <BarList items={analytics.dex.topProtocols} valueFormatter={formatCurrency} />
         </Panel>
       </div>
 
@@ -349,6 +491,39 @@ export function AnalyticsDashboard() {
             valueFormatter={(value) => `${value.toFixed(2)}%`}
             maxValue={100}
           />
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel title="Stablecoins on Monad" meta="all time">
+          <MetricCard label="Total" value={formatCurrency(analytics.stablecoins.totalUsd)} />
+          <div className="mt-4">
+            <StablecoinTable stablecoins={analytics.stablecoins.assets} />
+          </div>
+        </Panel>
+
+        <Panel title="Supply analysis">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricCard
+              label="Next unlock"
+              value={formatDate(analytics.unlocks.nextUnlockDate)}
+              helper={analytics.unlocks.label}
+            />
+            <MetricCard label="Unlock size" value={formatMon(analytics.unlocks.nextUnlockMon)} />
+            <MetricCard label="Unlock / circ." value={formatPercent(analytics.unlocks.nextUnlockPctOfCirculating, 1)} />
+            <MetricCard label="Daily burn" value={formatMon(analytics.economy.burnRate24hMon)} />
+            <MetricCard label="Exchange inflow" value={formatMon(analytics.flows.exchangeInflowMon)} />
+            <MetricCard label="Exchange outflow" value={formatMon(analytics.flows.exchangeOutflowMon)} />
+            <MetricCard label="Net flow" value={formatMon(analytics.flows.netFlowMon)} />
+            <MetricCard
+              label="Staking ratio"
+              value={
+                analytics.supply.totalSupplyMon && analytics.supply.lockedOrStakedMon
+                  ? formatPercent((analytics.supply.lockedOrStakedMon / analytics.supply.totalSupplyMon) * 100, 1)
+                  : "-"
+              }
+            />
+          </div>
         </Panel>
       </div>
 
