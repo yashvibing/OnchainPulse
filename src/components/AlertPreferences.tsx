@@ -28,18 +28,8 @@ const PREFERENCE_ITEMS: Array<{
   },
   {
     key: "dailyDefiBrief",
-    title: "Daily DeFi rates brief",
-    description: "Daily Telegram summary for displayed DeFi rates.",
-  },
-  {
-    key: "latestNewsBrief",
-    title: "Bot DM latest news brief",
-    description: "Optional private daily recap. The public channel remains the default news feed.",
-  },
-  {
-    key: "ecosystemUpdates",
-    title: "Bot DM ecosystem updates",
-    description: "Optional private ecosystem updates. Public announcements should go to the channel.",
+    title: "Weekly DeFi rates brief",
+    description: "Weekly Telegram summary for displayed DeFi rates.",
   },
   {
     key: "securityUpdates",
@@ -164,7 +154,7 @@ export function AlertPreferences() {
           Telegram categories
         </h2>
         <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-          Choose which private bot messages this chat can receive. Public news lives in the Telegram channel.
+          Choose which private bot messages this chat can receive.
         </p>
       </div>
 
