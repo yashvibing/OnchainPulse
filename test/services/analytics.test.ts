@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateAverageBlockTimeSeconds,
+  calculateEstimatedBurnRateMonPerDay,
   pickMonMarketStats,
 } from "@/services/analytics";
 
@@ -8,6 +9,11 @@ describe("analytics helpers", () => {
   it("averages block time across a window so sub-second chains do not render as zero", () => {
     expect(calculateAverageBlockTimeSeconds(1_780_819_744n, 1_780_819_704n, 100n))
       .toBe(0.4);
+  });
+
+  it("estimates daily burn from sampled base-fee burn", () => {
+    expect(calculateEstimatedBurnRateMonPerDay(100_000_000_000_000_000_000n, 100n, 0.4))
+      .toBe(216000);
   });
 
   it("uses native MON market data before wrapped-token fallback data", () => {

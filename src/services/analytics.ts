@@ -6,13 +6,20 @@ import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 import { fetchTokenMarkets, type TokenMarket } from "@/services/tokenMarkets";
 import { fetchCombinedYieldOpportunitiesWithMeta } from "@/services/yields-aggregator";
 
-const ANALYTICS_CACHE_KEY = "analytics:monad:v2";
+const ANALYTICS_CACHE_KEY = "analytics:monad:v5";
 const ANALYTICS_TTL_MS = 5 * 60 * 1000;
 const ANALYTICS_STALE_TTL_MS = 30 * 60 * 1000;
 const BLOCK_TIME_SAMPLE_SIZE = 100n;
+const BURN_SAMPLE_SIZE = 100n;
+const MONAD_STAKING_PRECOMPILE = "0x0000000000000000000000000000000000001000" as const;
+const MONAD_BLOCK_REWARD_MON = 25;
+const MONAD_FINALITY_SECONDS = 0.8;
+const MONAD_EPOCH_HOURS = 5.5;
+const MONAD_INITIAL_SUPPLY_MON = 100_000_000_000;
 
 const MONSCOPE_DECENTRALIZATION_URL = "https://monscope.xyz/api/v1/decentralization";
 const MONSCOPE_VALIDATORS_URL = "https://monscope.xyz/api/v1/validators";
+const MONSCOPE_OPEN_INTEREST_URL = "https://monscope.xyz/api/open-interest";
 const MONAD_FORUM_MIPS_URL = "https://forum.monad.xyz/c/mips/8.json";
 const DEFILLAMA_MON_PRICE_URL = "https://coins.llama.fi/prices/current/coingecko:monad";
 const COINGECKO_MON_URL =
@@ -25,6 +32,7 @@ const DEFILLAMA_DEX_OVERVIEW_URL =
 const DEFILLAMA_FEES_OVERVIEW_URL =
   "https://api.llama.fi/overview/fees/Monad?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true&dataType=dailyFees";
 const DEFILLAMA_CHAINS_URL = "https://api.llama.fi/v2/chains";
+const DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols";
 const DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools";
 
 export interface AnalyticsPoint {
@@ -88,7 +96,6 @@ export interface AnalyticsPayload {
     circulatingPct?: number;
     activeStakeMon?: number;
     lockedOrStakedMon?: number;
-    burnedMon?: number;
   };
   staking: {
     activeValidators?: number;
@@ -99,9 +106,7 @@ export interface AnalyticsPayload {
     minApyPct?: number;
     maxApyPct?: number;
     activeNodes?: number;
-    minDelegationMon?: number;
     unbondingHours?: number;
-    delegationFlow7dMon?: number;
     meanCommissionPct?: number;
     medianCommissionPct?: number;
     atCommissionCap?: number;
@@ -111,32 +116,20 @@ export interface AnalyticsPayload {
     gasGwei?: number;
     blockTimeSeconds?: number;
     finalitySeconds?: number;
-    parallelExecutionPct?: number;
     epoch?: number;
-    epochProgressPct?: number;
-    epochTimeRemaining?: string;
+    inEpochDelayPeriod?: boolean;
   };
   economy: {
     inflationRatePct?: number;
     burnRate24hMon?: number;
     blockRewardMon?: number;
+    netEmission24hMon?: number;
     netEmissionYearMon?: number;
     dailyFeesUsd?: number;
     annualizedFeesUsd?: number;
     psRatio?: number;
     pfRatio?: number;
     feeTrend: AnalyticsPoint[];
-  };
-  unlocks: {
-    nextUnlockDate?: string;
-    nextUnlockMon?: number;
-    nextUnlockPctOfCirculating?: number;
-    label?: string;
-  };
-  flows: {
-    exchangeInflowMon?: number;
-    exchangeOutflowMon?: number;
-    netFlowMon?: number;
   };
   decentralization: {
     nakamotoLiveness?: number;
@@ -252,6 +245,20 @@ interface DefiLlamaChain {
   tvl?: number;
 }
 
+interface DefiLlamaProtocol {
+  name?: string;
+  category?: string;
+  chains?: string[];
+  chainTvls?: { Monad?: number };
+  currentChainTvls?: { Monad?: number };
+  tvl?: number;
+}
+
+interface DexTvlSummary {
+  totalUsd: number;
+  protocols: AnalyticsBar[];
+}
+
 interface DefiLlamaYieldResponse {
   data?: Array<{
     chain?: string;
@@ -259,6 +266,10 @@ interface DefiLlamaYieldResponse {
     symbol?: string;
     apy?: number;
   }>;
+}
+
+interface MonscopeOpenInterestResponse {
+  openInterest?: string;
 }
 
 interface MonscopeDecentralizationResponse {
@@ -352,6 +363,22 @@ function toPoints(chart?: Array<[number, number]>) {
     .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value));
 }
 
+function parseCompactUsd(value?: string) {
+  if (!value) return undefined;
+  const match = value.trim().match(/^\$?\s*([\d,.]+)\s*([KMBT])?$/iu);
+  if (!match) return undefined;
+  const amount = Number(match[1].replace(/,/gu, ""));
+  if (!Number.isFinite(amount)) return undefined;
+  const suffix = match[2]?.toUpperCase();
+  const multiplier =
+    suffix === "T" ? 1_000_000_000_000 :
+    suffix === "B" ? 1_000_000_000 :
+    suffix === "M" ? 1_000_000 :
+    suffix === "K" ? 1_000 :
+    1;
+  return amount * multiplier;
+}
+
 export function calculateAverageBlockTimeSeconds(
   latestTimestamp: bigint,
   sampleTimestamp: bigint,
@@ -365,6 +392,18 @@ export function calculateAverageBlockTimeSeconds(
   if (!Number.isFinite(sampledBlocks) || sampledBlocks <= 0) return undefined;
 
   return Math.round((elapsedSeconds / sampledBlocks) * 100) / 100;
+}
+
+export function calculateEstimatedBurnRateMonPerDay(
+  sampledBurnWei: bigint,
+  sampledBlocks: bigint,
+  blockTimeSeconds?: number
+) {
+  if (sampledBlocks <= 0n || !blockTimeSeconds || blockTimeSeconds <= 0) return undefined;
+  const sampledBurnMon = Number(sampledBurnWei) / 1e18;
+  if (!Number.isFinite(sampledBurnMon) || sampledBurnMon < 0) return undefined;
+  const averageBurnPerBlock = sampledBurnMon / Number(sampledBlocks);
+  return averageBurnPerBlock * (86400 / blockTimeSeconds);
 }
 
 export function pickMonMarketStats(
@@ -495,6 +534,32 @@ async function fetchChainTvl() {
   return chains.find((chain) => chain.name === "Monad")?.tvl;
 }
 
+async function fetchDexTvlSummary(): Promise<DexTvlSummary> {
+  const protocols = await fetchJsonWithRetry<DefiLlamaProtocol[]>(DEFILLAMA_PROTOCOLS_URL, {
+    sourceName: "defillama-protocols-dex-tvl",
+    timeoutMs: 12_000,
+    retries: 1,
+  });
+
+  const rows = protocols
+    .filter((protocol) => protocol.category === "Dexs" && protocol.chains?.includes("Monad"))
+    .map((protocol) => ({
+      label: protocol.name || "Unknown",
+      value:
+        toNumber(protocol.currentChainTvls?.Monad) ??
+        toNumber(protocol.chainTvls?.Monad) ??
+        toNumber(protocol.tvl) ??
+        0,
+    }))
+    .filter((protocol) => protocol.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  return {
+    totalUsd: sum(rows.map((row) => row.value)),
+    protocols: rows,
+  };
+}
+
 async function fetchStakingApySummary() {
   const data = await fetchJsonWithRetry<DefiLlamaYieldResponse>(DEFILLAMA_YIELDS_URL, {
     sourceName: "defillama-yields-staking",
@@ -526,6 +591,15 @@ async function fetchStakingApySummary() {
   };
 }
 
+async function fetchOpenInterestUsd() {
+  const data = await fetchJsonWithRetry<MonscopeOpenInterestResponse>(MONSCOPE_OPEN_INTEREST_URL, {
+    sourceName: "monscope-open-interest",
+    timeoutMs: 8_000,
+    retries: 1,
+  });
+  return parseCompactUsd(data.openInterest);
+}
+
 async function fetchPriceTrend() {
   const now = Math.floor(Date.now() / 1000);
   const data = await fetchJsonWithRetry<{
@@ -553,6 +627,12 @@ async function fetchRpcSnapshot() {
     const sampleSize =
       blockNumber >= BLOCK_TIME_SAMPLE_SIZE ? BLOCK_TIME_SAMPLE_SIZE : blockNumber;
     const sampleBlockNumber = blockNumber - sampleSize;
+    const burnSampleSize =
+      blockNumber >= BURN_SAMPLE_SIZE ? BURN_SAMPLE_SIZE : blockNumber;
+    const burnBlockNumbers = Array.from(
+      { length: Number(burnSampleSize) },
+      (_, index) => blockNumber - BigInt(index)
+    );
     const [gasPrice, latestBlock, sampleBlock] = await Promise.all([
       monadClient.getGasPrice(),
       monadClient.getBlock({ blockNumber }),
@@ -564,10 +644,56 @@ async function fetchRpcSnapshot() {
         ? calculateAverageBlockTimeSeconds(latestBlock.timestamp, sampleBlock.timestamp, sampleSize)
         : undefined;
 
+    const burnBlocks = await Promise.all(
+      burnBlockNumbers.map((burnBlockNumber) =>
+        monadClient.getBlock({ blockNumber: burnBlockNumber }).catch(() => undefined)
+      )
+    );
+    const sampledBurnWei = burnBlocks.reduce<bigint>((total, block) => {
+      if (!block?.baseFeePerGas || !block.gasUsed) return total;
+      return total + block.baseFeePerGas * block.gasUsed;
+    }, 0n);
+    const sampledBlocks = BigInt(burnBlocks.filter(Boolean).length);
+    const burnRate24hMon = calculateEstimatedBurnRateMonPerDay(
+      sampledBurnWei,
+      sampledBlocks,
+      blockTimeSeconds
+    );
+
+    let epoch: number | undefined;
+    let inEpochDelayPeriod: boolean | undefined;
+    try {
+      const epochResult = await monadClient.readContract({
+        address: MONAD_STAKING_PRECOMPILE,
+        abi: [
+          {
+            type: "function",
+            name: "getEpoch",
+            stateMutability: "nonpayable",
+            inputs: [],
+            outputs: [
+              { name: "epoch", type: "uint64" },
+              { name: "inEpochDelayPeriod", type: "bool" },
+            ],
+          },
+        ],
+        functionName: "getEpoch",
+      });
+      const [epochValue, inDelay] = epochResult as readonly [bigint, boolean];
+      epoch = Number(epochValue);
+      inEpochDelayPeriod = inDelay;
+    } catch {
+      epoch = undefined;
+      inEpochDelayPeriod = undefined;
+    }
+
     return {
       blockHeight: Number(blockNumber),
       gasGwei: Number(gasPrice) / 1e9,
       blockTimeSeconds,
+      burnRate24hMon,
+      epoch,
+      inEpochDelayPeriod,
     };
   } catch {
     return {};
@@ -642,7 +768,9 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     dexOverview,
     feesOverview,
     chainTvl,
+    dexTvlSummary,
     stakingApySummary,
+    openInterestUsd,
   ] = await Promise.all([
     fetchCurrentMonPrice().catch(() => undefined),
     fetchPriceTrend().catch(() => []),
@@ -670,7 +798,9 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     fetchDexOverview().catch(() => ({} as DefiLlamaOverviewResponse)),
     fetchFeesOverview().catch(() => ({} as DefiLlamaOverviewResponse)),
     fetchChainTvl().catch(() => undefined),
+    fetchDexTvlSummary().catch(() => ({ totalUsd: 0, protocols: [] })),
     fetchStakingApySummary().catch(() => ({})),
+    fetchOpenInterestUsd().catch(() => undefined),
   ]);
 
   const markets = tokenMarkets.data || [];
@@ -716,8 +846,13 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  const topDexLiquidity = dexLiquidityByProtocol.slice(0, 6);
-  const dexTvlUsd = sum(dexLiquidityByProtocol.map((item) => item.value));
+  const topDexLiquidity =
+    dexTvlSummary.protocols.length > 0
+      ? dexTvlSummary.protocols.slice(0, 6)
+      : dexLiquidityByProtocol.slice(0, 6);
+  const dexTvlUsd =
+    dexTvlSummary.totalUsd ||
+    sum(dexLiquidityByProtocol.map((item) => item.value));
   const dexVolume24hUsd = toNumber(dexOverview.total24h);
   const dexFees24hUsd = toNumber(feesOverview.total24h);
   const dailyFeesUsd = dexFees24hUsd;
@@ -725,13 +860,24 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     typeof dailyFeesUsd === "number" ? dailyFeesUsd * 365 : undefined;
   const marketCapUsd = resolvedMonMarket.marketCapUsd;
   const monPriceUsd = monPrice ?? resolvedMonMarket.priceUsd;
+  const blockTimeSeconds = "blockTimeSeconds" in rpc ? rpc.blockTimeSeconds : undefined;
+  const estimatedBlocksPerDay =
+    blockTimeSeconds && blockTimeSeconds > 0 ? 86400 / blockTimeSeconds : undefined;
+  const grossEmission24hMon =
+    estimatedBlocksPerDay ? estimatedBlocksPerDay * MONAD_BLOCK_REWARD_MON : undefined;
+  const burnRate24hMon = "burnRate24hMon" in rpc ? rpc.burnRate24hMon : undefined;
+  const netEmission24hMon =
+    typeof grossEmission24hMon === "number"
+      ? grossEmission24hMon - (burnRate24hMon || 0)
+      : undefined;
+  const netEmissionYearMon =
+    typeof netEmission24hMon === "number" ? netEmission24hMon * 365 : undefined;
+  const inflationRatePct =
+    typeof netEmissionYearMon === "number"
+      ? (netEmissionYearMon / MONAD_INITIAL_SUPPLY_MON) * 100
+      : undefined;
 
-  const dailyVolume = markets
-    .slice(0, 30)
-    .map((market, index) => ({
-      timestamp: Math.floor(Date.now() / 1000) - (29 - index) * 86400,
-      value: market.volume24hUsd || 0,
-    }));
+  const dailyVolume = toPoints(dexOverview.totalDataChart).slice(-30);
 
   const activeStakeMon =
     decentralization.metrics?.stake?.totalStakeMON ||
@@ -762,6 +908,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       marketCapUsd,
       fdvUsd: resolvedMonMarket.fdvUsd,
       volume24hUsd: resolvedMonMarket.volume24hUsd ?? sum(markets.map((market) => market.volume24hUsd)),
+      openInterestUsd,
       priceTrend,
     },
     supply: {
@@ -785,6 +932,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
           ? activeStakeMon * monPriceUsd
           : undefined,
       activeNodes: activeValidators,
+      unbondingHours: MONAD_EPOCH_HOURS,
       ...stakingApySummary,
       meanCommissionPct: decentralization.metrics?.commission?.meanPct,
       medianCommissionPct: decentralization.metrics?.commission?.medianPct,
@@ -792,9 +940,16 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     },
     network: {
       ...rpc,
-      epoch: decentralization.epoch,
+      finalitySeconds: MONAD_FINALITY_SECONDS,
+      epoch: ("epoch" in rpc ? rpc.epoch : undefined) ?? decentralization.epoch,
+      inEpochDelayPeriod: "inEpochDelayPeriod" in rpc ? rpc.inEpochDelayPeriod : undefined,
     },
     economy: {
+      inflationRatePct,
+      burnRate24hMon,
+      blockRewardMon: MONAD_BLOCK_REWARD_MON,
+      netEmission24hMon,
+      netEmissionYearMon,
       dailyFeesUsd,
       annualizedFeesUsd,
       psRatio:
@@ -807,8 +962,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
           : undefined,
       feeTrend: toPoints(feesOverview.totalDataChart).slice(-30),
     },
-    unlocks: {},
-    flows: {},
     decentralization: {
       nakamotoLiveness: decentralization.metrics?.stake?.nakamoto?.liveness,
       nakamotoSafety: decentralization.metrics?.stake?.nakamoto?.safety,
