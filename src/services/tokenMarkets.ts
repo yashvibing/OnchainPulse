@@ -6,6 +6,7 @@ const TOKEN_MARKETS_CACHE_KEY = "token-markets:monad:v1";
 const TOKEN_MARKETS_TTL_MS = 5 * 60 * 1000;
 const TOKEN_MARKETS_STALE_TTL_MS = 30 * 60 * 1000;
 const PAGES_TO_SCAN = 10;
+const MIN_24H_VOLUME_USD = 100;
 
 interface GeckoToken {
   id: string;
@@ -70,6 +71,7 @@ export interface TokenMarket {
   poolAddress: string;
   poolName: string;
   poolUrl: string;
+  chartTokenSide: "base" | "quote";
   quoteSymbol?: string;
   poolCreatedAt?: string;
   source: "GeckoTerminal";
@@ -147,6 +149,7 @@ function poolToMarket(pool: GeckoPool, tokens: Map<string, GeckoToken>): TokenMa
     poolAddress,
     poolName: attrs.name || `${symbol} pool`,
     poolUrl: `https://www.geckoterminal.com/monad/pools/${poolAddress}`,
+    chartTokenSide: picked.side,
     quoteSymbol: picked.quote?.attributes?.symbol,
     poolCreatedAt: attrs.pool_created_at || undefined,
     source: "GeckoTerminal",
@@ -194,6 +197,7 @@ async function loadTokenMarkets() {
   });
 
   return [...deduped.values()]
+    .filter((market) => (market.volume24hUsd || 0) > MIN_24H_VOLUME_USD)
     .sort((a, b) => (b.volume24hUsd || 0) - (a.volume24hUsd || 0))
     .slice(0, 80);
 }
