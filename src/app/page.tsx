@@ -57,13 +57,6 @@ const FEATURE_CARDS = [
   },
 ];
 
-const ALERT_POINTS = [
-  "APR crosses a target you care about.",
-  "A new DeFi market appears.",
-  "The best displayed place for a token changes.",
-  "Important news, briefs, and startup highlights can be pushed to Telegram as the audience grows.",
-];
-
 export default async function HomePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const address = params.address;
@@ -128,31 +121,6 @@ export default async function HomePage({ searchParams }: PageProps) {
                 </div>
               </Link>
             ))}
-          </div>
-        </section>
-
-        <section className="border-t border-[var(--color-border)] py-10">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5">
-            <div className="label-caps text-[var(--color-accent-primary)]">
-              Telegram alerts
-            </div>
-            <h2 className="mt-3 text-[28px] font-bold tracking-[-0.01em] text-[var(--color-text-primary)]">
-              Useful updates without refreshing the app.
-            </h2>
-            <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-              Users can connect Telegram and get notified when market conditions
-              match what they care about.
-            </p>
-            <div className="mt-5 grid gap-2">
-              {ALERT_POINTS.map((point) => (
-                <div
-                  key={point}
-                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.035)] px-4 py-3 text-[13px] font-semibold text-[var(--color-text-secondary)]"
-                >
-                  {point}
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
