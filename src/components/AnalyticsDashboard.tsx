@@ -6,7 +6,6 @@ import type {
   AnalyticsPayload,
   AnalyticsPoint,
   AnalyticsStablecoin,
-  AnalyticsValidator,
 } from "@/services/analytics";
 
 function formatCurrency(value?: number, maximumFractionDigits = 2) {
@@ -170,51 +169,6 @@ function VolumeBars({ points }: { points: AnalyticsPoint[] }) {
           title={formatCurrency(point.value)}
         />
       ))}
-    </div>
-  );
-}
-
-function ValidatorTable({ validators }: { validators: AnalyticsValidator[] }) {
-  if (validators.length === 0) {
-    return <div className="text-[13px] text-[var(--color-text-muted)]">No validator data available.</div>;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[620px] text-left text-[13px]">
-        <thead>
-          <tr className="border-b border-[var(--color-border)] text-[var(--color-text-dim)]">
-            <th className="py-2 pr-3 font-semibold">Rank</th>
-            <th className="py-2 pr-3 font-semibold">Validator</th>
-            <th className="py-2 pr-3 text-right font-semibold">Stake</th>
-            <th className="py-2 pr-3 text-right font-semibold">Share</th>
-            <th className="py-2 pr-3 text-right font-semibold">Commission</th>
-          </tr>
-        </thead>
-        <tbody>
-          {validators.map((validator) => (
-            <tr key={`${validator.id}-${validator.rank}`} className="border-b border-[rgba(255,255,255,0.055)]">
-              <td className="py-3 pr-3 text-[var(--color-text-muted)]">{validator.rank}</td>
-              <td className="max-w-[240px] truncate py-3 pr-3 font-bold text-[var(--color-text-primary)]">
-                {validator.website ? (
-                  <a href={validator.website} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent-primary)]">
-                    {validator.name}
-                  </a>
-                ) : validator.name}
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {formatMon(validator.stakeMon)}
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {validator.sharePct.toFixed(2)}%
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {validator.commissionPct.toFixed(0)}%
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -473,22 +427,12 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="Top displayed rates">
-          <BarList
-            items={analytics.defi.topRates}
-            valueFormatter={(value) => `${value.toFixed(2)}% APR`}
-          />
-        </Panel>
-
-        <Panel title="Geography concentration" meta="stake weighted">
-          <BarList
-            items={analytics.decentralization.countries}
-            valueFormatter={(value) => `${value.toFixed(2)}%`}
-            maxValue={100}
-          />
-        </Panel>
-      </div>
+      <Panel title="Top displayed rates">
+        <BarList
+          items={analytics.defi.topRates}
+          valueFormatter={(value) => `${value.toFixed(2)}% APR`}
+        />
+      </Panel>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Stablecoins on Monad" meta="all time">
@@ -516,45 +460,31 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <Panel title="Validator set" meta={`${analytics.validators.length} shown`}>
-        <ValidatorTable validators={analytics.validators} />
-      </Panel>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="Infrastructure concentration" meta="stake weighted">
-          <BarList
-            items={analytics.decentralization.providers}
-            valueFormatter={(value) => `${value.toFixed(2)}%`}
-            maxValue={100}
-          />
-        </Panel>
-
-        <Panel title="Monad improvement proposals" meta="forum">
-          <div className="space-y-2">
-            {analytics.mips.length === 0 ? (
-              <div className="text-[13px] text-[var(--color-text-muted)]">No MIP data available.</div>
-            ) : analytics.mips.map((mip) => (
-              <a
-                key={mip.number}
-                href={mip.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3 hover:border-[var(--color-border-hover)]"
-              >
-                <div className="min-w-0">
-                  <div className="font-mono text-[13px] font-bold text-[var(--color-accent-secondary)]">
-                    MIP-{mip.number}
-                  </div>
-                  <div className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">
-                    {mip.title}
-                  </div>
+      <Panel title="Monad improvement proposals" meta="forum">
+        <div className="space-y-2">
+          {analytics.mips.length === 0 ? (
+            <div className="text-[13px] text-[var(--color-text-muted)]">No MIP data available.</div>
+          ) : analytics.mips.map((mip) => (
+            <a
+              key={mip.number}
+              href={mip.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3 hover:border-[var(--color-border-hover)]"
+            >
+              <div className="min-w-0">
+                <div className="font-mono text-[13px] font-bold text-[var(--color-accent-secondary)]">
+                  MIP-{mip.number}
                 </div>
-                <div className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{mip.activity}</div>
-              </a>
-            ))}
-          </div>
-        </Panel>
-      </div>
+                <div className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">
+                  {mip.title}
+                </div>
+              </div>
+              <div className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{mip.activity}</div>
+            </a>
+          ))}
+        </div>
+      </Panel>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3 text-[12px] text-[var(--color-text-muted)]">
         Sources: {sourceLine}. Last loaded {new Date(analytics.generatedAt).toLocaleString()}.
