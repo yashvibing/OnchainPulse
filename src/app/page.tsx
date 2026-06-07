@@ -8,18 +8,18 @@ interface PageProps {
 }
 
 export const metadata: Metadata = {
-  title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
+  title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
   description:
-    "A read-only interface for public portfolio tracking, displayed DeFi rates, latest news, Telegram alerts, and Monad ecosystem context.",
+    "Explore public portfolios, token markets, displayed DeFi rates, latest news, Telegram alerts, and Monad ecosystem context.",
   openGraph: {
-    title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
+    title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
     description:
-      "Inspect public portfolios, compare displayed DeFi rates, follow latest news, set Telegram alerts, and browse Monad ecosystem context.",
+      "Inspect public portfolios, scan token markets, compare displayed DeFi rates, follow latest news, set Telegram alerts, and browse Monad ecosystem context.",
     images: [{ url: "/api/og", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Onchain Pulse - Portfolio, DeFi Rates & Alerts",
+    title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
     images: ["/api/og"],
   },
 };
@@ -27,27 +27,32 @@ export const metadata: Metadata = {
 const FEATURE_CARDS = [
   {
     title: "Portfolio Tracker",
-    body: "Paste a wallet to inspect positions, trends, and CSV exports.",
+    body: "Paste a public wallet to inspect holdings, positions, trends, and CSV exports.",
     href: "/app",
   },
   {
+    title: "Token Markets",
+    body: "Scan Monad token prices, 24h movement, liquidity, market cap, and contracts.",
+    href: "/token-markets",
+  },
+  {
     title: "DeFi Rates",
-    body: "Compare lending, staking, LP, vault, and borrow markets.",
+    body: "Compare displayed lending, staking, LP, vault, and borrow opportunities.",
     href: "/defi-rates",
   },
   {
     title: "Latest News",
-    body: "Read curated Monad, DeFi, and ecosystem updates.",
+    body: "Read curated Monad, DeFi, and market updates, with briefs from tracked sources.",
     href: "/news",
   },
   {
     title: "Ecosystem",
-    body: "Browse DeltaV startups and continue to founder feedback.",
+    body: "Browse DeltaV startups and continue to founder feedback on DeltaV.",
     href: "/startups",
   },
   {
     title: "Telegram Alerts",
-    body: "Create rate watches, new-market alerts, and daily briefs.",
+    body: "Create rate watches, new-market alerts, and Telegram daily briefs.",
     href: "/alerts",
   },
 ];
@@ -69,11 +74,11 @@ export default async function HomePage({ searchParams }: PageProps) {
         <section className="border-b border-[var(--color-border)] pb-10 pt-8">
           <div>
             <h1 className="max-w-[900px] text-[42px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] md:text-[64px]">
-              Track portfolios, compare DeFi rates, and stay updated.
+              Portfolio tracking, token markets, DeFi rates, and alerts.
             </h1>
             <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-              Paste a public wallet, explore displayed Monad-related rates, follow
-              curated updates, and send alerts to Telegram without connecting a wallet.
+              Paste a public wallet, scan Monad token markets, compare displayed
+              DeFi opportunities, follow curated updates, and send useful alerts to Telegram.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -97,7 +102,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             </h2>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {FEATURE_CARDS.map((feature) => (
               <Link
                 key={feature.title}
