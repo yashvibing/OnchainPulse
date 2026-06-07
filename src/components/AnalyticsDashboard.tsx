@@ -66,10 +66,10 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 ${className}`}>
+    <section className={`min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 ${className}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="label-caps text-[var(--color-accent-primary)]">{title}</h2>
-        {meta && <span className="label-caps text-[var(--color-text-dim)]">{meta}</span>}
+        <h2 className="label-caps min-w-0 text-[var(--color-accent-primary)]">{title}</h2>
+        {meta && <span className="label-caps shrink-0 text-[var(--color-text-dim)]">{meta}</span>}
       </div>
       {children}
     </section>
@@ -78,9 +78,9 @@ function Panel({
 
 function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
+    <div className="min-w-0 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
       <div className="label-caps text-[var(--color-text-dim)]">{label}</div>
-      <div className="mt-2 text-[24px] font-black tracking-[-0.02em] text-[var(--color-text-primary)]">
+      <div className="mt-2 break-words text-[clamp(20px,1.8vw,24px)] font-black leading-tight tracking-[-0.01em] text-[var(--color-text-primary)]">
         {value}
       </div>
       {helper && <div className="mt-1 text-[12px] text-[var(--color-text-muted)]">{helper}</div>}
@@ -105,13 +105,13 @@ function BarList({
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <div key={item.label} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_auto] sm:items-center">
+        <div key={item.label} className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_120px_auto] sm:items-center">
           <div className="min-w-0">
             <div className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">
               {item.label}
             </div>
             {item.detail && (
-              <div className="text-[11px] text-[var(--color-text-muted)]">{item.detail}</div>
+              <div className="break-words text-[11px] text-[var(--color-text-muted)]">{item.detail}</div>
             )}
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
@@ -120,7 +120,7 @@ function BarList({
               style={{ width: `${Math.max(3, Math.min(100, (item.value / max) * 100))}%` }}
             />
           </div>
-          <div className="text-right font-mono text-[13px] text-[var(--color-text-secondary)]">
+          <div className="min-w-0 text-left font-mono text-[13px] text-[var(--color-text-secondary)] sm:text-right">
             {valueFormatter(item.value)}
           </div>
         </div>
@@ -179,8 +179,8 @@ function StablecoinTable({ stablecoins }: { stablecoins: AnalyticsStablecoin[] }
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[460px] text-left text-[13px]">
+    <div className="max-w-full overflow-x-auto">
+      <table className="w-full min-w-[420px] text-left text-[13px]">
         <thead>
           <tr className="border-b border-[var(--color-border)] text-[var(--color-text-dim)]">
             <th className="py-2 pr-3 font-semibold">Asset</th>
@@ -233,9 +233,9 @@ export function AnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 9 }).map((_, index) => (
-          <div key={index} className="h-44 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
+          <div key={index} className="h-36 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] sm:h-44" />
         ))}
       </div>
     );
@@ -253,9 +253,9 @@ export function AnalyticsDashboard() {
   const positive30 = (analytics.market.change30dPct || 0) >= 0;
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
-        <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+        <div className="grid min-w-0 gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="MON price" value={formatCurrency(analytics.market.priceUsd, 6)} />
           <MetricCard
             label="24 hr"
@@ -275,13 +275,13 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.55fr)]">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
         <Panel title="Price action" meta="MON / USD">
           <LineChart points={analytics.market.priceTrend} color="var(--color-accent-secondary)" />
         </Panel>
 
         <Panel title="Staking">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard label="Active validators" value={`${formatNumber(analytics.staking.activeValidators)} / ${formatNumber(analytics.staking.activeSetCap)}`} />
             <MetricCard label="Total active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
             <MetricCard label="Value staked" value={formatCurrency(analytics.staking.totalValueStakedUsd)} />
@@ -300,7 +300,7 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-3">
         <Panel title="Supply metrics">
           <div className="grid gap-3">
             <MetricCard label="Total supply" value={formatMon(analytics.supply.totalSupplyMon)} />
@@ -344,7 +344,7 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-3">
         <Panel title="Network">
           <div className="grid gap-3">
             <MetricCard label="Gas" value={`${formatNumber(analytics.network.gasGwei, 4)} gwei`} />
@@ -378,9 +378,9 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <Panel title="Chain fees & revenue">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard label="Daily fees" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
             <MetricCard label="Ann. fees" value={formatCurrency(analytics.economy.annualizedFeesUsd)} />
             <MetricCard label="P/S ratio" value={analytics.economy.psRatio ? `${formatNumber(analytics.economy.psRatio, 0)}x` : "-"} />
@@ -392,7 +392,7 @@ export function AnalyticsDashboard() {
         </Panel>
 
         <Panel title="DEX efficiency">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard label="24h volume" value={formatCurrency(analytics.dex.volume24hUsd)} />
             <MetricCard label="DEX TVL" value={formatCurrency(analytics.dex.tvlUsd)} />
             <MetricCard label="Vol / TVL" value={formatPercent(analytics.dex.volumeToTvlPct, 2)} />
@@ -403,9 +403,9 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <Panel title="DeFi TVL distribution" meta="displayed markets">
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <div className="mb-4 grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard label="Chain TVL" value={formatCurrency(analytics.defi.totalChainTvlUsd)} />
             <MetricCard label="Displayed TVL" value={formatCurrency(analytics.defi.totalTvlUsd)} />
           </div>
@@ -417,7 +417,7 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <Panel title="DEX liquidity">
           <BarList items={analytics.defi.topDexLiquidity} valueFormatter={formatCurrency} />
         </Panel>
@@ -434,7 +434,7 @@ export function AnalyticsDashboard() {
         />
       </Panel>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <Panel title="Stablecoins on Monad" meta="all time">
           <MetricCard label="Total" value={formatCurrency(analytics.stablecoins.totalUsd)} />
           <div className="mt-4">
@@ -442,7 +442,7 @@ export function AnalyticsDashboard() {
           </div>
         </Panel>
         <Panel title="Supply ratio">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard
               label="Staking ratio"
               value={
@@ -470,7 +470,7 @@ export function AnalyticsDashboard() {
               href={mip.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3 hover:border-[var(--color-border-hover)]"
+              className="flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3 hover:border-[var(--color-border-hover)]"
             >
               <div className="min-w-0">
                 <div className="font-mono text-[13px] font-bold text-[var(--color-accent-secondary)]">
