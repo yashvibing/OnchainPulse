@@ -2,10 +2,15 @@ import { withServerCache, type CacheResult } from "@/lib/serverCache";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 
 const OPENSEA_API_BASE = "https://api.opensea.io/api/v2";
-const NFT_COLLECTIONS_CACHE_KEY = "nft-collections:monad:v1";
+const NFT_COLLECTIONS_CACHE_KEY = "nft-collections:monad:v2";
 const NFT_COLLECTIONS_TTL_MS = 15 * 60 * 1000;
 const NFT_COLLECTIONS_STALE_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_COLLECTIONS = 40;
+const MONAD_COLLECTION_SEEDS = [
+  "monad-chonks",
+  "lilstarsblindbox",
+  "goldastro",
+];
 
 interface OpenSeaContract {
   address?: string;
@@ -26,6 +31,8 @@ interface OpenSeaCollection {
   is_nsfw?: boolean;
   opensea_url?: string;
   contracts?: OpenSeaContract[];
+  total_supply?: number;
+  unique_item_count?: number;
   stats?: unknown;
 }
 
@@ -133,7 +140,11 @@ function getCollectionSlug(collection: OpenSeaCollection) {
 }
 
 function getCollectionContract(collection: OpenSeaCollection) {
-  return collection.contracts?.find((contract) => contract.address)?.address;
+  return collection.contracts?.find((contract) => contract.chain === "monad" && contract.address)?.address;
+}
+
+function isMonadCollection(collection: OpenSeaCollection) {
+  return collection.contracts?.some((contract) => contract.chain === "monad") ?? false;
 }
 
 function collectionMarketplaceUrl(collection: OpenSeaCollection, slug: string) {
@@ -150,26 +161,38 @@ async function fetchOpenSeaJson<T>(path: string, sourceName: string) {
 }
 
 async function fetchTopMonadCollections() {
-  const queryVariants = [
-    "/collections/top?chains=monad&limit=40&sort_by=one_day_volume",
-    "/collections/top?chain=monad&limit=40&sort_by=one_day_volume",
-    "/collections?chain=monad&limit=40",
-  ];
+  const seeded = await Promise.all(
+    MONAD_COLLECTION_SEEDS.map((slug) =>
+      fetchOpenSeaJson<OpenSeaCollection>(
+        `/collections/${encodeURIComponent(slug)}`,
+        "opensea-nft-collection-detail"
+      ).catch(() => undefined)
+    )
+  );
+  const discovered: OpenSeaCollection[] = [];
+  let next: string | undefined;
 
-  let lastError: unknown;
-  for (const query of queryVariants) {
-    try {
-      const response = await fetchOpenSeaJson<OpenSeaCollectionsResponse>(
-        query,
-        "opensea-nft-collections"
-      );
-      if (response.collections?.length) return response.collections;
-    } catch (error) {
-      lastError = error;
-    }
+  for (let page = 0; page < 3; page++) {
+    const path = next
+      ? `/collections?chain=monad&limit=50&next=${encodeURIComponent(next)}`
+      : "/collections?chain=monad&limit=50";
+    const response = await fetchOpenSeaJson<OpenSeaCollectionsResponse>(
+      path,
+      "opensea-nft-collections"
+    );
+    discovered.push(...(response.collections || []));
+    next = response.next || undefined;
+    if (!next) break;
   }
 
-  throw lastError instanceof Error ? lastError : new Error("No Monad NFT collections returned");
+  const deduped = new Map<string, OpenSeaCollection>();
+  [...seeded, ...discovered].forEach((collection) => {
+    if (!collection || !isMonadCollection(collection)) return;
+    const slug = getCollectionSlug(collection);
+    if (slug) deduped.set(slug, collection);
+  });
+
+  return [...deduped.values()];
 }
 
 async function fetchCollectionStats(slug: string) {
@@ -226,17 +249,27 @@ function parseLastSale(response: OpenSeaEventsResponse) {
   const sale = response.asset_events?.[0];
   if (!sale) return {};
   const payment = (sale.payment || sale.payment_token || sale.total_price) as unknown;
+  const decimals = firstNumber(payment, ["decimals"]) ?? 18;
   const price =
     firstNumber(payment, ["quantity", "price", "value", "amount"]) ||
     firstNumber(sale, ["total_price", "price", "payment_amount"]);
+  const normalizedPrice =
+    typeof price === "number" && price > 1_000_000
+      ? price / 10 ** decimals
+      : price;
+  const timestamp = firstNumber(sale, ["event_timestamp", "created_date", "created_at"]);
+  const timestampString = firstString(sale, ["event_timestamp", "created_date", "created_at"]);
 
   return {
-    lastSalePrice: price,
+    lastSalePrice: normalizedPrice,
     lastSaleCurrency: normalizeCurrency(
       firstString(payment, ["symbol", "currency", "asset"]) ||
         firstString(sale, ["payment_token_symbol", "currency"])
     ),
-    lastSaleAt: firstString(sale, ["event_timestamp", "created_date", "created_at"]),
+    lastSaleAt:
+      typeof timestamp === "number"
+        ? new Date(timestamp * 1000).toISOString()
+        : timestampString,
   };
 }
 
@@ -284,7 +317,9 @@ function parseStats(stats: OpenSeaStatsResponse) {
 
 async function hydrateCollection(collection: OpenSeaCollection): Promise<NftCollection | undefined> {
   const slug = getCollectionSlug(collection);
-  if (!slug || collection.is_disabled || collection.is_nsfw) return undefined;
+  if (!slug || collection.is_disabled || collection.is_nsfw || !isMonadCollection(collection)) {
+    return undefined;
+  }
 
   const [stats, floor, offers, lastSale] = await Promise.all([
     fetchCollectionStats(slug),
@@ -298,6 +333,15 @@ async function hydrateCollection(collection: OpenSeaCollection): Promise<NftColl
   const parsedOffer = parseTopOffer(offers);
   const parsedLastSale = parseLastSale(lastSale);
   const floorPrice = parsedFloor.floorPrice ?? parsedStats.floorPrice;
+  const totalNfts =
+    parsedStats.totalNfts ??
+    toNumber(collection.total_supply) ??
+    toNumber(collection.unique_item_count);
+  const ownerRatioPct =
+    parsedStats.ownerRatioPct ??
+    (typeof parsedStats.uniqueOwners === "number" && typeof totalNfts === "number" && totalNfts > 0
+      ? (parsedStats.uniqueOwners / totalNfts) * 100
+      : undefined);
 
   return {
     id: slug,
@@ -313,11 +357,11 @@ async function hydrateCollection(collection: OpenSeaCollection): Promise<NftColl
     volume1d: parsedStats.volume1d,
     volumeCurrency: parsedStats.volumeCurrency || "MON",
     sales1d: parsedStats.sales1d,
-    totalNfts: parsedStats.totalNfts,
+    totalNfts,
     uniqueOwners: parsedStats.uniqueOwners,
     listedCount: parsedStats.listedCount,
     listedPct: parsedStats.listedPct,
-    ownerRatioPct: parsedStats.ownerRatioPct,
+    ownerRatioPct,
     marketplaceUrl: collectionMarketplaceUrl(collection, slug),
     ...parsedLastSale,
     source: "OpenSea",
