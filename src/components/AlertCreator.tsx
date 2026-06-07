@@ -49,6 +49,10 @@ type TelegramAuthPayload = {
 type TelegramAlertConfig = {
   configured: boolean;
   botUsername: string;
+  channel?: {
+    configured: boolean;
+    channelUrl: string;
+  };
 };
 
 const POPULAR_TOKENS = [
@@ -384,6 +388,7 @@ export function AlertCreator() {
       .then((data) => setAlertConfig({
         configured: Boolean(data.configured),
         botUsername: String(data.botUsername || ""),
+        channel: data.channel,
       }))
       .catch(() => setAlertConfig({ configured: false, botUsername: "" }));
     fetchYieldOpportunitiesWithClientMeta()
@@ -697,7 +702,7 @@ export function AlertCreator() {
           </div>
           <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">Set up Telegram updates</h2>
           <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Connect Telegram, then create a rate watch or daily brief.
+            Connect the bot for private alerts. Use the channel for public news and daily recaps.
           </p>
         </div>
         {connection ? <Badge tone="positive">Telegram connected</Badge> : <Badge tone="warning">Setup required</Badge>}
@@ -799,7 +804,7 @@ export function AlertCreator() {
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
               {connection && isNewsBrief
-                ? `Receive one Telegram message at ${localDeliveryTimes.news} with curated news titles, summaries, and source links.`
+                ? `Receive one private bot message at ${localDeliveryTimes.news} with curated news titles, summaries, and source links. Public news is still posted to the channel.`
                 : connection && isRatesDigest
                   ? `Receive one Telegram message at ${localDeliveryTimes.rates} with the top displayed DeFi rates.`
                 : connection
@@ -847,7 +852,7 @@ export function AlertCreator() {
                 Latest news daily brief
               </div>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-                Curated latest-news links in Telegram every day at {localDeliveryTimes.news}.
+                Optional private recap from the bot every day at {localDeliveryTimes.news}. The channel carries the public feed.
               </p>
             </button>
           </div>

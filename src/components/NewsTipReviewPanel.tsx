@@ -22,7 +22,7 @@ function formatTime(value: number) {
 function statusLabel(tip: NewsTip) {
   const states = [];
   if (tip.publishedAt) states.push("Added to news");
-  if (tip.sentAt) states.push("Sent to Telegram");
+  if (tip.sentAt) states.push("Posted to channel");
   return states.join(" / ") || "Pending";
 }
 
@@ -67,7 +67,7 @@ export function NewsTipReviewPanel() {
       if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
       if (action === "broadcast") {
-        setMessage(`Telegram sent to ${data.sent || 0} connected chats.`);
+        setMessage((data.sent || 0) > 0 ? "Posted to the Telegram channel." : "Nothing posted.");
       } else if (action === "publish") {
         setMessage("Added to Latest News.");
       } else {
@@ -90,7 +90,7 @@ export function NewsTipReviewPanel() {
             Review community tips
           </h2>
           <p className="mt-2 max-w-[760px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-            Publish useful links to Latest News or send urgent ones to Telegram.
+            Publish useful links to Latest News or post urgent ones to the public Telegram channel.
           </p>
         </div>
         <button
@@ -173,7 +173,7 @@ export function NewsTipReviewPanel() {
                   onClick={() => void reviewTip(tip.id, "broadcast")}
                   className="rounded-[var(--radius-md)] bg-[var(--color-accent-primary)] px-3 py-2 text-[12px] font-bold text-[#07110C] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Send Telegram
+                  Post channel
                 </button>
                 <button
                   type="button"

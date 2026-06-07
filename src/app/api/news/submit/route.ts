@@ -7,6 +7,10 @@ import {
 import { checkRateLimit, rateLimitResponse, withRateLimitHeaders } from "@/lib/rateLimit";
 import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 import { addCuratedNews, assertValidNewsRequestBody, type NewsSubmissionInput } from "@/lib/news";
+import {
+  getTelegramChannelConfig,
+  publishNewsArticleToTelegramChannel,
+} from "@/services/telegramAlerts";
 
 export const dynamic = "force-dynamic";
 
@@ -58,16 +62,30 @@ export async function POST(request: Request) {
   try {
     const raw = await request.text();
     assertValidNewsRequestBody(raw);
-    const body = JSON.parse(raw) as NewsSubmissionInput;
+    const body = JSON.parse(raw) as NewsSubmissionInput & {
+      postToTelegramChannel?: boolean;
+    };
+    if (body.postToTelegramChannel && !getTelegramChannelConfig().configured) {
+      throw new Error("Telegram channel is not configured.");
+    }
+
     const item = await addCuratedNews(body);
+    let channelSent = false;
+
+    if (body.postToTelegramChannel) {
+      await publishNewsArticleToTelegramChannel(item);
+      channelSent = true;
+    }
+
     logServerEvent("info", "news.submitted", {
       topic: item.topic,
       source: item.source,
       hasLink: Boolean(item.link),
+      channelSent,
     });
 
     return NextResponse.json(
-      { ok: true, item },
+      { ok: true, item, channelSent },
       { status: 201, headers: withRateLimitHeaders(undefined, rateLimit) }
     );
   } catch (error) {

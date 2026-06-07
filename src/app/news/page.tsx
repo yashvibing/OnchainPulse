@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { LatestNewsSection } from "@/components/LatestNewsSection";
 import { NewsTipSubmitForm } from "@/components/NewsTipSubmitForm";
+import { TelegramDistributionPanel } from "@/components/TelegramDistributionPanel";
 
 export const metadata: Metadata = {
   title: "Latest News - Onchain Pulse",
@@ -30,7 +31,8 @@ export default function NewsPage() {
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
           <LatestNewsSection />
-          <aside className="lg:sticky lg:top-24">
+          <aside className="grid gap-5 lg:sticky lg:top-24">
+            <TelegramDistributionPanel compact />
             <NewsTipSubmitForm />
           </aside>
         </div>

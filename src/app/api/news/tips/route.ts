@@ -16,11 +16,7 @@ import {
 } from "@/lib/newsTips";
 import { checkRateLimit, rateLimitResponse, withRateLimitHeaders } from "@/lib/rateLimit";
 import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
-import {
-  isTelegramNotificationCategoryEnabled,
-  listConnectedTelegramChatIds,
-  sendTelegramMessage,
-} from "@/services/telegramAlerts";
+import { sendTelegramChannelMessage } from "@/services/telegramAlerts";
 
 export const dynamic = "force-dynamic";
 
@@ -142,17 +138,10 @@ export async function PATCH(request: Request) {
     if (action === "broadcast") {
       const tip = await getNewsTip(id);
       if (!tip) throw new Error("Tip not found.");
-      const chatIds = await listConnectedTelegramChatIds();
-      let sent = 0;
-      for (const chatId of chatIds) {
-        const category = tip.category === "security" ? "securityUpdates" : "ecosystemUpdates";
-        if (!(await isTelegramNotificationCategoryEnabled(chatId, category))) continue;
-        await sendTelegramMessage(chatId, telegramMessageForTip(tip));
-        sent += 1;
-      }
+      await sendTelegramChannelMessage(telegramMessageForTip(tip));
       const updatedTip = await updateNewsTip(id, { sentAt: Date.now() });
       return NextResponse.json(
-        { ok: true, tip: updatedTip, sent },
+        { ok: true, tip: updatedTip, sent: 1 },
         { headers: withRateLimitHeaders(undefined, rateLimit) }
       );
     }

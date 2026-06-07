@@ -33,13 +33,13 @@ const PREFERENCE_ITEMS: Array<{
   },
   {
     key: "latestNewsBrief",
-    title: "Latest news brief",
-    description: "Daily Telegram summary for curated news.",
+    title: "Bot DM latest news brief",
+    description: "Optional private daily recap. The public channel remains the default news feed.",
   },
   {
     key: "ecosystemUpdates",
-    title: "Ecosystem updates",
-    description: "Important protocol, launch, and community updates.",
+    title: "Bot DM ecosystem updates",
+    description: "Optional private ecosystem updates. Public announcements should go to the channel.",
   },
   {
     key: "securityUpdates",
@@ -164,7 +164,7 @@ export function AlertPreferences() {
           Telegram categories
         </h2>
         <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-          Choose which Telegram messages this chat can receive.
+          Choose which private bot messages this chat can receive. Public news lives in the Telegram channel.
         </p>
       </div>
 

@@ -3,6 +3,7 @@ import { AlertCreator } from "@/components/AlertCreator";
 import { AlertManagement } from "@/components/AlertManagement";
 import { AlertPreferences } from "@/components/AlertPreferences";
 import { Header } from "@/components/Header";
+import { TelegramDistributionPanel } from "@/components/TelegramDistributionPanel";
 
 export const metadata: Metadata = {
   title: "Alerts - Onchain Pulse",
@@ -23,10 +24,13 @@ export default function AlertsPage() {
             Alerts
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Telegram alerts for APR thresholds, best-place changes, new markets, and daily briefs.
+            Public channel updates for news, plus private bot alerts for the signals that matter to you.
           </p>
         </section>
 
+        <div className="mb-6">
+          <TelegramDistributionPanel />
+        </div>
         <AlertCreator />
         <AlertPreferences />
         <AlertManagement />

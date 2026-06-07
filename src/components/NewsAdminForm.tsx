@@ -6,6 +6,7 @@ import type { NewsArticle } from "@/lib/news";
 interface SubmitResponse {
   ok: boolean;
   item?: NewsArticle;
+  channelSent?: boolean;
   error?: string;
 }
 
@@ -52,6 +53,7 @@ export function NewsAdminForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastItem, setLastItem] = useState<NewsArticle | null>(null);
+  const [postToTelegramChannel, setPostToTelegramChannel] = useState(false);
   const [weeklyForm, setWeeklyForm] = useState(emptyWeeklyForm);
   const [weeklySubmitting, setWeeklySubmitting] = useState(false);
   const [weeklyMessage, setWeeklyMessage] = useState<string | null>(null);
@@ -101,7 +103,10 @@ export function NewsAdminForm() {
           "content-type": "application/json",
         },
         credentials: "same-origin",
-        body: JSON.stringify(cleanPayload(form)),
+        body: JSON.stringify({
+          ...cleanPayload(form),
+          postToTelegramChannel,
+        }),
       });
       const data = (await response.json()) as SubmitResponse;
       if (!response.ok || !data.ok || !data.item) {
@@ -109,7 +114,11 @@ export function NewsAdminForm() {
       }
 
       setLastItem(data.item);
-      setMessage("News added. It should appear in the feed now.");
+      setMessage(
+        data.channelSent
+          ? "News added and posted to the Telegram channel."
+          : "News added. It should appear in the feed now."
+      );
       setForm((current) => ({
         ...emptyForm,
         topic: current.topic || "Monad",
@@ -241,6 +250,23 @@ export function NewsAdminForm() {
           </span>
         </label>
 
+        <label className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+          <input
+            type="checkbox"
+            checked={postToTelegramChannel}
+            onChange={(event) => setPostToTelegramChannel(event.target.checked)}
+            className="mt-1 h-4 w-4 accent-[var(--color-accent-primary)]"
+          />
+          <span>
+            <span className="block text-[13px] font-bold text-[var(--color-text-primary)]">
+              Post to Telegram channel
+            </span>
+            <span className="mt-1 block text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+              Publish this as a public channel update in addition to adding it to the web news feed.
+            </span>
+          </span>
+        </label>
+
         {error && (
           <div className="rounded-[var(--radius-md)] border border-[rgba(255,88,88,0.35)] bg-[rgba(255,88,88,0.08)] px-3 py-2 text-[12px] font-semibold text-[var(--color-danger)]">
             {error}
@@ -290,8 +316,8 @@ export function NewsAdminForm() {
           Weekly ecosystem update
         </h2>
         <p className="mt-2 max-w-[760px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-          Save the weekly Twitter/X link. Every connected Telegram user receives
-          this once per week by default.
+          Save the weekly Twitter/X link. The public channel receives it once
+          per week through the alert checker; bot users only need personal alerts.
         </p>
       </div>
 
@@ -330,7 +356,7 @@ export function NewsAdminForm() {
             {weeklySubmitting ? "Saving..." : "Save weekly update"}
           </button>
           <div className="text-[12px] font-medium text-[var(--color-text-dim)]">
-            Telegram message: {emptyWeeklyForm.title}
+            Channel message: {emptyWeeklyForm.title}
           </div>
         </div>
       </form>

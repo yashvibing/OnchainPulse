@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { getServerRedisClient } from "@/lib/serverCache";
-import { loadLatestNews } from "@/lib/news";
+import { loadLatestNews, type NewsArticle } from "@/lib/news";
 import { getErrorMessage, logServerEvent, shortHash } from "@/lib/serverLog";
 import {
   fetchCombinedYieldOpportunities,
@@ -107,6 +107,8 @@ const TELEGRAM_PREFERENCES_PREFIX = "onchain-pulse:telegram-preferences:";
 const TELEGRAM_OFFSET_KEY = "onchain-pulse:telegram:update-offset";
 const WEEKLY_ECOSYSTEM_UPDATE_KEY = "onchain-pulse:telegram:weekly-ecosystem-update";
 const WEEKLY_ECOSYSTEM_SENT_PREFIX = "onchain-pulse:telegram:weekly-ecosystem-sent:";
+const WEEKLY_ECOSYSTEM_CHANNEL_SENT_PREFIX = "onchain-pulse:telegram:weekly-ecosystem-channel-sent:";
+const DAILY_NEWS_CHANNEL_SENT_PREFIX = "onchain-pulse:telegram:daily-news-channel-sent:";
 const CONNECT_TTL_SECONDS = 15 * 60;
 const LOGIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const TELEGRAM_LOGIN_MAX_AGE_SECONDS = 60 * 60 * 24;
@@ -128,6 +130,8 @@ const memoryConnectedChats = new Set<string>();
 const memoryTelegramPreferences = new Map<string, TelegramNotificationPreferences>();
 let memoryWeeklyEcosystemUpdate: WeeklyEcosystemUpdate | null = null;
 const memoryWeeklyEcosystemSent = new Set<string>();
+const memoryWeeklyEcosystemChannelSent = new Set<string>();
+const memoryDailyNewsChannelSent = new Set<string>();
 let memoryTelegramOffset = 0;
 
 const DEFAULT_TELEGRAM_NOTIFICATION_PREFERENCES: TelegramNotificationPreferences = {
@@ -186,11 +190,41 @@ function getTelegramBotUsername() {
     .trim();
 }
 
+function getTelegramChannelChatId() {
+  const channelId = process.env.TELEGRAM_CHANNEL_ID?.trim();
+  if (channelId) return channelId;
+
+  const username = process.env.TELEGRAM_CHANNEL_USERNAME?.trim().replace(/^@/u, "");
+  return username ? `@${username}` : "";
+}
+
+function getTelegramChannelUrl() {
+  const explicit = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL?.trim();
+  if (explicit) return explicit;
+
+  const channelId = getTelegramChannelChatId();
+  if (!channelId.startsWith("@")) return "";
+
+  return `https://t.me/${channelId.slice(1)}`;
+}
+
+export function getTelegramChannelConfig() {
+  const channelUrl = getTelegramChannelUrl();
+  const channelChatId = getTelegramChannelChatId();
+
+  return {
+    configured: Boolean(getTelegramBotToken() && channelChatId),
+    channelUrl,
+  };
+}
+
 export function getTelegramAlertConfig() {
   const botUsername = getTelegramBotUsername();
+  const channel = getTelegramChannelConfig();
   return {
     configured: Boolean(getTelegramBotToken() && botUsername),
     botUsername,
+    channel,
   };
 }
 
@@ -742,6 +776,34 @@ export async function sendTelegramMessage(chatId: string, text: string) {
   }
 }
 
+export async function sendTelegramChannelMessage(text: string) {
+  const token = getTelegramBotToken();
+  const chatId = getTelegramChannelChatId();
+  if (!token) throw new Error("Telegram bot token is not configured");
+  if (!chatId) throw new Error("Telegram channel is not configured");
+
+  await sendTelegramMessage(chatId, text);
+}
+
+function buildNewsArticleTelegramMessage(article: NewsArticle) {
+  return [
+    `${article.topic || "Monad"} update`,
+    "",
+    article.title,
+    article.summary ? `\n${article.summary}` : "",
+    article.link ? `\nSource: ${article.link}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+export async function publishNewsArticleToTelegramChannel(article: NewsArticle) {
+  await sendTelegramChannelMessage(buildNewsArticleTelegramMessage(article));
+  logServerEvent("info", "news.telegram_channel_posted", {
+    itemId: shortHash(article.id),
+    topic: article.topic,
+    hasLink: Boolean(article.link),
+  });
+}
+
 function isValidHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -819,6 +881,41 @@ async function markWeeklyEcosystemUpdateSent(chatId: string, weekKey: string) {
   const redis = getServerRedisClient();
   if (!redis) return;
   await redis.set(key, "1", { ex: 60 * 60 * 24 * 21 });
+}
+
+function weeklyEcosystemChannelSentKey(weekKey: string) {
+  return `${WEEKLY_ECOSYSTEM_CHANNEL_SENT_PREFIX}${weekKey}`;
+}
+
+async function hasSentWeeklyEcosystemChannelUpdate(weekKey: string) {
+  const key = weeklyEcosystemChannelSentKey(weekKey);
+  const redis = getServerRedisClient();
+  if (!redis) return memoryWeeklyEcosystemChannelSent.has(key);
+  return Boolean(await redis.get(key));
+}
+
+async function markWeeklyEcosystemChannelUpdateSent(weekKey: string) {
+  const key = weeklyEcosystemChannelSentKey(weekKey);
+  memoryWeeklyEcosystemChannelSent.add(key);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.set(key, "1", { ex: 60 * 60 * 24 * 21 });
+}
+
+async function sendWeeklyEcosystemChannelUpdateIfNeeded() {
+  const update = await getWeeklyEcosystemUpdate();
+  if (!update?.twitterUrl || !getTelegramChannelConfig().configured) {
+    return { checked: 0, sent: 0 };
+  }
+
+  const weekKey = getIstWeekKey();
+  if (await hasSentWeeklyEcosystemChannelUpdate(weekKey)) {
+    return { checked: 1, sent: 0 };
+  }
+
+  await sendTelegramChannelMessage(`${update.title}\n${update.twitterUrl}`);
+  await markWeeklyEcosystemChannelUpdateSent(weekKey);
+  return { checked: 1, sent: 1 };
 }
 
 export async function sendWeeklyEcosystemUpdateIfNeeded() {
@@ -1072,6 +1169,40 @@ async function buildLatestNewsBriefMessage() {
   return `Daily latest news brief\n${lines.join("\n\n")}`;
 }
 
+function dailyNewsChannelSentKey(day: string) {
+  return `${DAILY_NEWS_CHANNEL_SENT_PREFIX}${day}`;
+}
+
+async function hasSentDailyNewsChannelBrief(day: string) {
+  const key = dailyNewsChannelSentKey(day);
+  const redis = getServerRedisClient();
+  if (!redis) return memoryDailyNewsChannelSent.has(key);
+  return Boolean(await redis.get(key));
+}
+
+async function markDailyNewsChannelBriefSent(day: string) {
+  const key = dailyNewsChannelSentKey(day);
+  memoryDailyNewsChannelSent.add(key);
+  const redis = getServerRedisClient();
+  if (!redis) return;
+  await redis.set(key, "1", { ex: 60 * 60 * 24 * 7 });
+}
+
+export async function sendDailyNewsChannelBriefIfNeeded() {
+  if (!getTelegramChannelConfig().configured) return { checked: 0, sent: 0 };
+
+  const { day, hour } = getDigestDateParts();
+  if (hour < DAILY_NEWS_BRIEF_HOUR_IST) return { checked: 1, sent: 0 };
+  if (await hasSentDailyNewsChannelBrief(day)) return { checked: 1, sent: 0 };
+
+  const news = await loadLatestNews();
+  if (news.items.length === 0) return { checked: 1, sent: 0 };
+
+  await sendTelegramChannelMessage(await buildLatestNewsBriefMessage());
+  await markDailyNewsChannelBriefSent(day);
+  return { checked: 1, sent: 1 };
+}
+
 async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOpportunity[], tokenMarkets: TokenMarket[] = []) {
   if (isTokenMarketAlert(alert.kind)) {
     const relevant = relevantTokenMarkets(tokenMarkets, alert);
@@ -1247,10 +1378,22 @@ export async function checkTelegramAlerts() {
     });
     return { checked: 0, sent: 0 };
   });
+  const weeklyEcosystemChannel = await sendWeeklyEcosystemChannelUpdateIfNeeded().catch((error) => {
+    logServerEvent("warn", "alerts.weekly_ecosystem_channel_check_failed", {
+      error: getErrorMessage(error),
+    });
+    return { checked: 0, sent: 0 };
+  });
+  const dailyNewsChannel = await sendDailyNewsChannelBriefIfNeeded().catch((error) => {
+    logServerEvent("warn", "alerts.daily_news_channel_check_failed", {
+      error: getErrorMessage(error),
+    });
+    return { checked: 0, sent: 0 };
+  });
 
   const alerts = await listActiveAlerts();
   if (alerts.length === 0) {
-    return { checked: 0, triggered: 0, weeklyEcosystem };
+    return { checked: 0, triggered: 0, weeklyEcosystem, weeklyEcosystemChannel, dailyNewsChannel };
   }
 
   const hasTokenAlerts = alerts.some((alert) => isTokenMarketAlert(alert.kind));
@@ -1303,7 +1446,7 @@ export async function checkTelegramAlerts() {
     }
   }
 
-  return { checked: alerts.length, triggered, weeklyEcosystem };
+  return { checked: alerts.length, triggered, weeklyEcosystem, weeklyEcosystemChannel, dailyNewsChannel };
 }
 
 async function findAlertForCommand(chatId: string, prefix: string) {

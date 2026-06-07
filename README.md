@@ -101,6 +101,8 @@ Telegram alerts:
 ```bash
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
+TELEGRAM_CHANNEL_ID=@your_channel_username
+NEXT_PUBLIC_TELEGRAM_CHANNEL_URL=https://t.me/your_channel_username
 ```
 
 News admin and cron:
@@ -167,4 +169,3 @@ test/                   Unit and regression tests
 - Inclusion of an asset, protocol, vault, startup, news item, or data source is not an endorsement.
 - The interface does not custody assets or execute transactions.
 - Keep Monad Foundation language precise: this project is independent and unaffiliated.
-
