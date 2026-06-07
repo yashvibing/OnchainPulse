@@ -7,7 +7,9 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/app", label: "Portfolio Tracker" },
   { href: "/token-markets", label: "Token Markets" },
-  { href: "/nfts", label: "NFT Markets" },
+  ...(process.env.NODE_ENV === "development"
+    ? [{ href: "/nfts", label: "NFT Markets" }]
+    : []),
   { href: "/defi-rates", label: "DeFi Rates" },
   { href: "/analytics", label: "Analytics" },
   { href: "/news", label: "Latest News" },

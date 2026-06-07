@@ -1460,6 +1460,13 @@ function commandAlertLabel(alert: PublicTelegramAlert) {
   return `${alert.id.slice(0, 8)} - ${alert.kind.replace(/_/g, " ")} ${alert.tokenSymbol}${suffix} (${alert.status})`;
 }
 
+async function markBotCommandChatConnected(chatId: string) {
+  await registerTelegramChat(chatId);
+  logServerEvent("info", "alerts.telegram_chat_connected_from_command", {
+    chatId: shortHash(chatId),
+  });
+}
+
 async function handleBotCommand(chatId: string, text: string) {
   const normalized = text.trim();
   const [command, arg] = normalized.split(/\s+/u);
@@ -1469,11 +1476,22 @@ async function handleBotCommand(chatId: string, text: string) {
       chatId,
       [
         "Onchain Pulse alert commands:",
+        "/connect - mark this Telegram chat ready for alerts",
         "/alerts - list your alerts",
         "/pause <alert id> - pause an alert",
         "/resume <alert id> - resume an alert",
+        "/delete <alert id> - delete an alert",
         "/help - show this message",
       ].join("\n")
+    );
+    return;
+  }
+
+  if (command === "/connect") {
+    await markBotCommandChatConnected(chatId);
+    await sendTelegramMessage(
+      chatId,
+      "This Telegram chat is ready for Onchain Pulse alerts. Use the Alerts page to create watches."
     );
     return;
   }
@@ -1500,6 +1518,22 @@ async function handleBotCommand(chatId: string, text: string) {
     const status = command === "/pause" ? "paused" : "active";
     await updateTelegramAlert(alert.id, chatId, { status });
     await sendTelegramMessage(chatId, `Alert ${alert.id.slice(0, 8)} is now ${status}.`);
+    return;
+  }
+
+  if (command === "/delete" && arg) {
+    const alert = await findAlertForCommand(chatId, arg);
+    if (!alert) {
+      await sendTelegramMessage(chatId, "Alert not found. Use /alerts to see alert IDs.");
+      return;
+    }
+    await deleteTelegramAlert(alert.id, chatId);
+    await sendTelegramMessage(chatId, `Alert ${alert.id.slice(0, 8)} was deleted.`);
+    return;
+  }
+
+  if (command.startsWith("/")) {
+    await sendTelegramMessage(chatId, "Unknown command. Use /help to see available alert commands.");
   }
 }
 

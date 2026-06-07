@@ -10,6 +10,10 @@ import { fetchNftCollections } from "@/services/nftCollections";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const startedAt = Date.now();
   const rateLimit = await checkRateLimit(request, {
     namespace: "nft-collections",

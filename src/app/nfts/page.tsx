@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { NftCollections } from "@/components/NftCollections";
 
@@ -9,6 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function NftsPage() {
+  if (process.env.NODE_ENV !== "development") {
+    notFound();
+  }
+
   return (
     <div className="min-h-screen">
       <Header />
