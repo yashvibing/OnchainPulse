@@ -185,7 +185,15 @@ function MiniTokenChart({ market, range }: { market: TokenMarket; range: ChartRa
   );
 }
 
-function ExpandedTokenChart({ market, range }: { market: TokenMarket; range: ChartRange }) {
+function ExpandedTokenChart({
+  market,
+  range,
+  onRangeChange,
+}: {
+  market: TokenMarket;
+  range: ChartRange;
+  onRangeChange: (range: ChartRange) => void;
+}) {
   const [points, setPoints] = useState<ChartPoint[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const gradientId = `token-chart-${market.id.replace(/[^a-z0-9]+/giu, "-")}-${range}`;
@@ -229,6 +237,24 @@ function ExpandedTokenChart({ market, range }: { market: TokenMarket; range: Cha
             Latest {latestPoint ? formatCurrency(latestPoint.value, 6) : formatCurrency(market.priceUsd, 6)}
           </div>
         </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(Object.keys(CHART_RANGE_LABELS) as ChartRange[]).map((nextRange) => (
+          <button
+            key={nextRange}
+            type="button"
+            onClick={() => onRangeChange(nextRange)}
+            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
+              range === nextRange
+                ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] text-[var(--color-accent-primary)]"
+                : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
+            }`}
+            aria-pressed={range === nextRange}
+          >
+            {CHART_RANGE_LABELS[nextRange]}
+          </button>
+        ))}
       </div>
 
       {status === "ready" ? (
@@ -276,8 +302,8 @@ export function TokenMarkets() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("volume");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [chartRange, setChartRange] = useState<ChartRange>("24h");
   const [expandedMarketId, setExpandedMarketId] = useState("");
+  const [chartRanges, setChartRanges] = useState<Record<string, ChartRange>>({});
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [copiedAddress, setCopiedAddress] = useState("");
   const [showFdv, setShowFdv] = useState(false);
@@ -376,6 +402,14 @@ export function TokenMarkets() {
     }
   }
 
+  function toggleExpandedMarket(marketId: string) {
+    setExpandedMarketId((current) => (current === marketId ? "" : marketId));
+  }
+
+  function setMarketChartRange(marketId: string, range: ChartRange) {
+    setChartRanges((current) => ({ ...current, [marketId]: range }));
+  }
+
   return (
     <section className="space-y-5">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
@@ -436,21 +470,6 @@ export function TokenMarkets() {
           Showing {filteredMarkets.length} token markets sorted by {activeSortLabel}.
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="label-caps text-[var(--color-text-dim)]">Chart</span>
-          {(Object.keys(CHART_RANGE_LABELS) as ChartRange[]).map((range) => (
-            <button
-              key={range}
-              type="button"
-              onClick={() => setChartRange(range)}
-              className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
-                chartRange === range
-                  ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
-              }`}
-            >
-              {CHART_RANGE_LABELS[range]}
-            </button>
-          ))}
           <button
             type="button"
             onClick={loadMarkets}
@@ -490,6 +509,7 @@ export function TokenMarkets() {
             const positive = typeof market.priceChange24h === "number" && market.priceChange24h >= 0;
             const isCopied = copiedAddress === market.tokenAddress;
             const isExpanded = expandedMarketId === market.id;
+            const expandedChartRange = chartRanges[market.id] || "24h";
 
             return (
               <article
@@ -499,24 +519,42 @@ export function TokenMarkets() {
                 <div
                   className={`grid gap-4 lg:items-center ${
                     showFdv
-                      ? "lg:grid-cols-[minmax(0,1.25fr)_repeat(6,minmax(82px,0.38fr))_minmax(116px,0.5fr)_auto_auto]"
-                      : "lg:grid-cols-[minmax(0,1.25fr)_repeat(5,minmax(82px,0.38fr))_minmax(116px,0.5fr)_auto_auto]"
+                      ? "lg:grid-cols-[minmax(0,1.25fr)_repeat(6,minmax(82px,0.38fr))_minmax(116px,0.5fr)_auto]"
+                      : "lg:grid-cols-[minmax(0,1.25fr)_repeat(5,minmax(82px,0.38fr))_minmax(116px,0.5fr)_auto]"
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <TokenIcon market={market} />
+                    <button
+                      type="button"
+                      onClick={() => toggleExpandedMarket(market.id)}
+                      className="rounded-full outline-none ring-offset-2 ring-offset-[var(--color-bg-card)] transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-[var(--color-accent-primary)]"
+                      aria-label={`${isExpanded ? "Hide" : "Show"} ${market.tokenSymbol} chart`}
+                      aria-expanded={isExpanded}
+                    >
+                      <TokenIcon market={market} />
+                    </button>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-[18px] font-bold text-[var(--color-text-primary)]">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandedMarket(market.id)}
+                          className="truncate text-left text-[18px] font-bold text-[var(--color-text-primary)] transition-colors hover:text-[var(--color-accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-primary)]"
+                          aria-expanded={isExpanded}
+                        >
                           {market.tokenSymbol}
-                        </h3>
+                        </button>
                         <span className="rounded-[var(--radius-sm)] bg-[rgba(0,245,204,0.1)] px-2 py-1 text-[9px] font-bold uppercase text-[var(--color-positive)]">
                           {market.dexLabel}
                         </span>
                       </div>
-                      <div className="mt-1 truncate text-[12px] text-[var(--color-text-muted)]">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedMarket(market.id)}
+                        className="mt-1 block max-w-full truncate text-left text-[12px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-primary)]"
+                        aria-expanded={isExpanded}
+                      >
                         {market.tokenName}
-                      </div>
+                      </button>
                       <button
                         type="button"
                         onClick={() => copyContract(market.tokenAddress)}
@@ -575,16 +613,7 @@ export function TokenMarkets() {
                     </div>
                   )}
 
-                  <MiniTokenChart market={market} range={chartRange} />
-
-                  <button
-                    type="button"
-                    onClick={() => setExpandedMarketId((current) => current === market.id ? "" : market.id)}
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-center text-[12px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded ? "Hide chart" : "Chart"}
-                  </button>
+                  <MiniTokenChart market={market} range="24h" />
 
                   <a
                     href={market.poolUrl}
@@ -595,7 +624,13 @@ export function TokenMarkets() {
                     Open
                   </a>
                 </div>
-                {isExpanded && <ExpandedTokenChart market={market} range={chartRange} />}
+                {isExpanded && (
+                  <ExpandedTokenChart
+                    market={market}
+                    range={expandedChartRange}
+                    onRangeChange={(range) => setMarketChartRange(market.id, range)}
+                  />
+                )}
               </article>
             );
           })}
