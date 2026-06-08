@@ -286,7 +286,7 @@ export function AnalyticsDashboard() {
             <MetricCard label="Total active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
             <MetricCard label="Value staked" value={formatCurrency(analytics.staking.totalValueStakedUsd)} />
             <MetricCard
-              label="Est. APY"
+              label="Est. reward rate"
               value={formatPercent(analytics.staking.estimatedApyPct, 1)}
               helper={
                 analytics.staking.minApyPct && analytics.staking.maxApyPct

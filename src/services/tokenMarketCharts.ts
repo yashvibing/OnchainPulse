@@ -7,6 +7,10 @@ export type TokenChartSide = "base" | "quote";
 export interface TokenChartPoint {
   timestamp: number;
   value: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
   volumeUsd?: number;
 }
 
@@ -55,12 +59,23 @@ async function loadTokenMarketChart(
   });
 
   return (response.data?.attributes?.ohlcv_list || [])
-    .map(([timestamp, , , , close, volumeUsd]) => ({
+    .map(([timestamp, open, high, low, close, volumeUsd]) => ({
       timestamp,
       value: Number(close),
+      open: Number(open),
+      high: Number(high),
+      low: Number(low),
+      close: Number(close),
       volumeUsd: Number(volumeUsd),
     }))
-    .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value))
+    .filter((point) =>
+      Number.isFinite(point.timestamp) &&
+      Number.isFinite(point.value) &&
+      Number.isFinite(point.open) &&
+      Number.isFinite(point.high) &&
+      Number.isFinite(point.low) &&
+      Number.isFinite(point.close)
+    )
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 

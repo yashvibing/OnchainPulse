@@ -1101,7 +1101,7 @@ export async function createTelegramAlert(input: {
 function alertTitle(alert: TelegramAlert) {
   if (alert.kind === "apr_above") return `${alert.tokenSymbol} APR crossed above ${alert.thresholdApr}%`;
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} APR dropped below ${alert.thresholdApr}%`;
-  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} best market changed`;
+  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} highest displayed rate changed`;
   if (alert.kind === "daily_digest") return alert.tokenSymbol === "ANY" ? "Daily DeFi rates digest" : `Daily ${alert.tokenSymbol} rates digest`;
   if (alert.kind === "daily_news_brief") return "Daily latest news brief";
   if (alert.kind === "token_volume_above") return `${alert.tokenSymbol} 24h volume crossed ${formatCompactUsd(alert.thresholdApr)}`;
@@ -1299,7 +1299,7 @@ async function maybeTriggerAlert(alert: TelegramAlert, opportunities: YieldOppor
 
   if (alert.kind === "best_market_change") {
     if (best && alert.state.lastBestOpportunityId && best.id !== alert.state.lastBestOpportunityId) {
-      message = `${alertTitle(alert)}\nNew top displayed place: ${opportunityLabel(best)} at ${best.apr.toFixed(2)}% APR.`;
+      message = `${alertTitle(alert)}\nNew highest displayed rate: ${opportunityLabel(best)} at ${best.apr.toFixed(2)}% APR.`;
     }
     nextState.lastBestOpportunityId = best?.id;
     nextState.lastApr = best?.apr;

@@ -37,7 +37,7 @@ interface ManagedAlert {
 const KIND_LABELS: Record<AlertKind, string> = {
   apr_above: "APR goes above",
   apr_below: "APR drops below",
-  best_market_change: "Best place changes",
+  best_market_change: "Highest displayed rate changes",
   new_market: "New market appears",
   daily_digest: "DeFi rates digest",
   daily_news_brief: "Latest news brief",
@@ -91,7 +91,7 @@ function describeAlert(alert: ManagedAlert) {
   const scope = protocolTitleScope(alert);
   if (alert.kind === "apr_above") return `${alert.tokenSymbol} above ${alert.thresholdApr}% APR on ${scope}`;
   if (alert.kind === "apr_below") return `${alert.tokenSymbol} below ${alert.thresholdApr}% APR on ${scope}`;
-  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} top displayed place changes on ${scope}`;
+  if (alert.kind === "best_market_change") return `${alert.tokenSymbol} highest displayed rate changes on ${scope}`;
   if (alert.kind === "daily_digest") return "Daily DeFi rates digest";
   if (alert.kind === "daily_news_brief") return "Daily latest news brief";
   if (alert.kind === "token_market_new") return alert.tokenSymbol === "ANY" ? "Any new token market" : `New ${alert.tokenSymbol} token market`;
@@ -110,7 +110,7 @@ function alertMetricLabel(alert: ManagedAlert) {
   if (alert.kind === "token_liquidity_above") return "Latest liquidity";
   if (alert.kind === "token_price_move") return "Latest move";
   if (alert.kind === "token_market_new") return "Known markets";
-  return "Current best";
+  return "Current displayed rate";
 }
 
 function alertMetricValue(alert: ManagedAlert) {

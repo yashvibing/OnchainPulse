@@ -7,10 +7,10 @@ It is not associated with, endorsed by, sponsored by, maintained by, or affiliat
 ## What It Does
 
 - **Portfolio Tracker** - paste a public wallet address and view token holdings, staking positions, lending, vaults, liquidity positions, MON price context, and CSV export.
-- **DeFi Rates** - compare displayed lending, staking, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
+- **DeFi Rates** - compare displayed lending, staking-rate, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
 - **Latest News** - curated updates with an admin review flow, X post ingestion, and optional Telegram distribution.
 - **Ecosystem / Startups** - browse curated DeltaV startup listings and continue to DeltaV to leave feedback.
-- **Telegram Alerts** - create APR threshold, best-place-change, new-market, and daily-brief alerts through Telegram.
+- **Telegram Alerts** - create APR threshold, displayed-rate-change, new-market, and brief alerts through Telegram.
 
 The app does not require wallet connection for the core experience. Users can paste public wallet addresses and opt into Telegram alerts separately.
 
@@ -35,7 +35,7 @@ Main routes:
 | --- | --- |
 | Portfolio balances | Monad RPC, token registry, protocol readers |
 | Token prices and MON chart | DefiLlama / configured market sources |
-| DeFi rates | Merkl, DefiLlama yields, protocol/source metadata |
+| DeFi rates | Merkl, DefiLlama rate data, protocol/source metadata |
 | Startup listings | Curated DeltaV data |
 | Latest news | Manual admin entries, submitted tips, tracked X accounts |
 | Alerts | Onchain Pulse rate/news data plus Telegram Bot API |

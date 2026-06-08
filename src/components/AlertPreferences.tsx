@@ -24,7 +24,7 @@ const PREFERENCE_ITEMS: Array<{
   {
     key: "defiRateAlerts",
     title: "DeFi rate alerts",
-    description: "APR thresholds, best-place changes, and new market watches.",
+    description: "APR thresholds, displayed-rate changes, and new market watches.",
   },
   {
     key: "dailyDefiBrief",

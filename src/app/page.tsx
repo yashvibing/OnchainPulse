@@ -52,7 +52,7 @@ const FEATURE_CARDS = [
   },
   {
     title: "Telegram Alerts",
-    body: "Create rate watches, new-market alerts, and best-place change alerts in Telegram.",
+    body: "Create rate watches, new-market alerts, and displayed-rate change alerts in Telegram.",
     href: "/alerts",
   },
 ];

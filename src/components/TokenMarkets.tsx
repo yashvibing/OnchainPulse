@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import type { TokenMarket } from "@/services/tokenMarkets";
 
 type SortKey = "volume" | "change" | "liquidity" | "marketCap" | "fdv";
@@ -10,6 +17,10 @@ type ChartRange = "24h" | "7d" | "30d";
 interface ChartPoint {
   timestamp: number;
   value: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
   volumeUsd?: number;
 }
 
@@ -88,6 +99,48 @@ function buildLinePath(points: ChartPoint[], width: number, height: number, padd
     .join(" ");
 }
 
+function chartTimestampMs(timestamp: number) {
+  return timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000;
+}
+
+function formatChartTime(timestamp: number, range: ChartRange) {
+  const date = new Date(chartTimestampMs(timestamp));
+  if (range === "24h") {
+    return date.toLocaleString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function candleHigh(point: ChartPoint) {
+  return typeof point.high === "number" ? point.high : point.value;
+}
+
+function candleLow(point: ChartPoint) {
+  return typeof point.low === "number" ? point.low : point.value;
+}
+
+function candleOpen(point: ChartPoint) {
+  return typeof point.open === "number" ? point.open : point.value;
+}
+
+function candleClose(point: ChartPoint) {
+  return typeof point.close === "number" ? point.close : point.value;
+}
+
+function closestChartIndex(clientX: number, rect: DOMRect, length: number) {
+  if (length <= 1) return 0;
+  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  return Math.round(ratio * (length - 1));
+}
+
 async function fetchChart(
   market: TokenMarket,
   range: ChartRange,
@@ -103,6 +156,26 @@ async function fetchChart(
   if (!response.ok) throw new Error("Chart unavailable");
   const data = await response.json();
   return Array.isArray(data.data) ? data.data : [];
+}
+
+async function fetchTokenMarketsWithRetry(attempts = 2) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch("/api/token-markets");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load token markets.");
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 800));
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 function TokenIcon({ market }: { market: TokenMarket }) {
@@ -196,11 +269,13 @@ function ExpandedTokenChart({
 }) {
   const [points, setPoints] = useState<ChartPoint[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const gradientId = `token-chart-${market.id.replace(/[^a-z0-9]+/giu, "-")}-${range}`;
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     setStatus("loading");
+    setPoints([]);
+    setActiveIndex(null);
     fetchChart(market, range, controller.signal)
       .then((nextPoints) => {
         setPoints(nextPoints);
@@ -213,10 +288,35 @@ function ExpandedTokenChart({
 
   const change = chartChange(points);
   const isPositive = (change || 0) >= 0;
-  const color = isPositive ? "var(--color-positive)" : "var(--color-negative)";
-  const linePath = buildLinePath(points, 100, 44, 2);
-  const areaPath = linePath ? `${linePath} L98,44 L2,44 Z` : "";
   const latestPoint = points[points.length - 1];
+  const activePoint = activeIndex === null ? latestPoint : points[activeIndex] || latestPoint;
+  const candleValues = points.flatMap((point) => [candleHigh(point), candleLow(point)]);
+  const minPrice = candleValues.length ? Math.min(...candleValues) : 0;
+  const maxPrice = candleValues.length ? Math.max(...candleValues) : 1;
+  const priceRange = maxPrice - minPrice || 1;
+  const chartWidth = 100;
+  const chartHeight = 48;
+  const chartPadding = 3;
+  const candleWidth = points.length ? Math.max(0.45, Math.min(2.2, (chartWidth - chartPadding * 2) / points.length * 0.62)) : 1;
+
+  function yForPrice(value: number) {
+    return chartHeight - chartPadding - ((value - minPrice) / priceRange) * (chartHeight - chartPadding * 2);
+  }
+
+  function setActiveFromClientX(clientX: number, rect: DOMRect) {
+    if (points.length === 0) return;
+    setActiveIndex(closestChartIndex(clientX, rect, points.length));
+  }
+
+  function handleChartMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
+    setActiveFromClientX(event.clientX, event.currentTarget.getBoundingClientRect());
+  }
+
+  function handleChartTouch(event: ReactTouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0] || event.changedTouches[0];
+    if (!touch) return;
+    setActiveFromClientX(touch.clientX, event.currentTarget.getBoundingClientRect());
+  }
 
   return (
     <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
@@ -239,6 +339,41 @@ function ExpandedTokenChart({
         </div>
       </div>
 
+      {activePoint && (
+        <div className="mb-4 grid gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[rgba(0,245,204,0.035)] px-3 py-2 sm:grid-cols-5">
+          <div>
+            <div className="label-caps text-[var(--color-text-dim)]">Time</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--color-text-primary)]">
+              {formatChartTime(activePoint.timestamp, range)}
+            </div>
+          </div>
+          <div>
+            <div className="label-caps text-[var(--color-text-dim)]">Close</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--color-accent-primary)]">
+              {formatCurrency(candleClose(activePoint), 6)}
+            </div>
+          </div>
+          <div>
+            <div className="label-caps text-[var(--color-text-dim)]">Open / High</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--color-text-primary)]">
+              {formatCurrency(candleOpen(activePoint), 6)} / {formatCurrency(candleHigh(activePoint), 6)}
+            </div>
+          </div>
+          <div>
+            <div className="label-caps text-[var(--color-text-dim)]">Low</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--color-text-primary)]">
+              {formatCurrency(candleLow(activePoint), 6)}
+            </div>
+          </div>
+          <div>
+            <div className="label-caps text-[var(--color-text-dim)]">Volume</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--color-text-primary)]">
+              {formatCurrency(activePoint.volumeUsd)}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-2">
         {(Object.keys(CHART_RANGE_LABELS) as ChartRange[]).map((nextRange) => (
           <button
@@ -258,15 +393,82 @@ function ExpandedTokenChart({
       </div>
 
       {status === "ready" ? (
-        <svg viewBox="0 0 100 44" className="h-28 w-full" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-              <stop offset="100%" stopColor={color} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d={areaPath} fill={`url(#${gradientId})`} />
-          <path d={linePath} fill="none" stroke={color} strokeWidth="0.9" />
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="h-32 w-full cursor-crosshair"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`${market.tokenSymbol} candlestick chart`}
+          onMouseMove={handleChartMouseMove}
+          onTouchStart={handleChartTouch}
+          onTouchMove={handleChartTouch}
+        >
+          {[0.25, 0.5, 0.75].map((ratio) => (
+            <line
+              key={ratio}
+              x1="0"
+              x2={chartWidth}
+              y1={chartPadding + ratio * (chartHeight - chartPadding * 2)}
+              y2={chartPadding + ratio * (chartHeight - chartPadding * 2)}
+              stroke="rgba(255,255,255,0.07)"
+              strokeWidth="0.25"
+            />
+          ))}
+          {points.map((point, index) => {
+            const open = candleOpen(point);
+            const close = candleClose(point);
+            const high = candleHigh(point);
+            const low = candleLow(point);
+            const x = chartPadding + (index / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2);
+            const wickTop = yForPrice(high);
+            const wickBottom = yForPrice(low);
+            const bodyTop = yForPrice(Math.max(open, close));
+            const bodyBottom = yForPrice(Math.min(open, close));
+            const bodyHeight = Math.max(0.6, bodyBottom - bodyTop);
+            const candleColor = close >= open ? "var(--color-positive)" : "var(--color-negative)";
+            const isActive = activeIndex === index || (activeIndex === null && index === points.length - 1);
+
+            return (
+              <g key={`${point.timestamp}-${index}`}>
+                <line
+                  x1={x}
+                  x2={x}
+                  y1={wickTop}
+                  y2={wickBottom}
+                  stroke={candleColor}
+                  strokeWidth={isActive ? 0.45 : 0.28}
+                  opacity={isActive ? 1 : 0.72}
+                />
+                <rect
+                  x={x - candleWidth / 2}
+                  y={bodyTop}
+                  width={candleWidth}
+                  height={bodyHeight}
+                  fill={candleColor}
+                  opacity={isActive ? 1 : 0.82}
+                  rx="0.12"
+                />
+                <rect
+                  x={x - Math.max(candleWidth, 1.2) / 2}
+                  y={0}
+                  width={Math.max(candleWidth, 1.2)}
+                  height={chartHeight}
+                  fill="transparent"
+                />
+              </g>
+            );
+          })}
+          {activePoint && (
+            <line
+              x1={chartPadding + ((activeIndex ?? points.length - 1) / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2)}
+              x2={chartPadding + ((activeIndex ?? points.length - 1) / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2)}
+              y1="0"
+              y2={chartHeight}
+              stroke="rgba(255,255,255,0.32)"
+              strokeDasharray="1 1"
+              strokeWidth="0.25"
+            />
+          )}
         </svg>
       ) : status === "loading" ? (
         <div className="h-28 animate-pulse rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.04)]" />
@@ -312,9 +514,7 @@ export function TokenMarkets() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/token-markets");
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not load token markets.");
+      const data = await fetchTokenMarketsWithRetry();
       setMarkets(Array.isArray(data.data) ? data.data : []);
       setUpdatedAt(Number(data.meta?.fetchedAt || Date.now()));
     } catch (loadError) {

@@ -691,7 +691,7 @@ export function YieldAggregator() {
         setLoading(false);
       })
       .catch(() => {
-        setError("Yield data is temporarily unavailable.");
+        setError("Rate data is temporarily unavailable.");
         setLoading(false);
       });
   }, []);

@@ -81,7 +81,7 @@ const ALERT_KIND_OPTIONS: { value: AlertKind; label: string }[] = [
   },
   {
     value: "best_market_change",
-    label: "Best place changes",
+    label: "Highest displayed rate changes",
   },
   {
     value: "new_market",
@@ -905,7 +905,7 @@ export function AlertCreator() {
               />
               {kind === "best_market_change" && (
                 <p className="mt-1 text-[10px] leading-relaxed text-[var(--color-text-dim)]">
-                  Best-place alerts compare every protocol for this token.
+                  This alert compares displayed rates across protocols for this token.
                 </p>
               )}
             </div>
