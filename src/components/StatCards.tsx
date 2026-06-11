@@ -25,7 +25,7 @@ export function StatCards({
         label={`EST. ${yieldEstimate.period.toUpperCase()} AMOUNT`}
         value={yieldEstimate.amount}
         format="usd-estimate"
-        sub="From staking reward rates, vault rates, and lending APR/APY"
+        sub="From staking APY, vault rates, and lending APR/APY"
         note="Estimate only. Rates and balances can change."
         accent="var(--color-positive)"
       />

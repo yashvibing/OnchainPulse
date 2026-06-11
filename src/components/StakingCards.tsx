@@ -35,14 +35,14 @@ export function StakingCards({ positions }: StakingCardsProps) {
               </div>
             </div>
             <span className="rounded-full bg-[rgba(20,184,166,0.1)] px-3 py-1 text-[12px] font-bold text-[var(--color-positive)]">
-              {pos.apy.toFixed(1)}% source reward rate
+              {pos.apy.toFixed(1)}% source APY
             </span>
           </div>
 
-          {/* Source-rate progress bar shows the reported staking rate as a visual reference. */}
+          {/* Source APY progress bar shows the reported staking rate as a visual reference. */}
           <div className="mb-4">
             <div className="mb-1 flex items-center justify-between text-[11px]">
-              <span className="text-[var(--color-text-dim)]">Source reward rate</span>
+              <span className="text-[var(--color-text-dim)]">Source APY</span>
               <span className="font-semibold text-[var(--color-positive)]">{pos.apy.toFixed(1)}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.04)]">

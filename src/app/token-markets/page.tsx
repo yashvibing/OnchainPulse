@@ -5,7 +5,7 @@ import { TokenMarkets } from "@/components/TokenMarkets";
 export const metadata: Metadata = {
   title: "Token Markets - Onchain Pulse",
   description:
-    "Track token markets on Monad, including price, 24h move, volume, liquidity, and active pools.",
+    "View public token market data relating to Monad, including price, 24h change, volume, liquidity, market cap, FDV, and chart snapshots.",
 };
 
 export default function TokenMarketsPage() {
@@ -16,13 +16,14 @@ export default function TokenMarketsPage() {
       <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
         <section className="mb-8 border-b border-[var(--color-border)] pb-8 pt-2">
           <div className="label-caps text-[var(--color-accent-primary)]">
-            Token terminal
+            Market snapshots
           </div>
           <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
             Token Markets
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Track Monad token markets by price, 24h movement, volume, liquidity, and active pools.
+            View public token market data relating to Monad, including price, 24h change,
+            volume, liquidity, market cap, FDV, and charts. Data can be delayed or incomplete.
           </p>
         </section>
 

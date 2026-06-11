@@ -1,12 +1,14 @@
 import { withServerCache, type CacheResult } from "@/lib/serverCache";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
+import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 
 const GECKO_MONAD_POOLS_URL = "https://api.geckoterminal.com/api/v2/networks/monad/pools";
 const TOKEN_MARKETS_CACHE_KEY = "token-markets:monad:v1";
 const TOKEN_MARKETS_TTL_MS = 5 * 60 * 1000;
 const TOKEN_MARKETS_STALE_TTL_MS = 30 * 60 * 1000;
-const PAGES_TO_SCAN = 10;
+const PAGES_TO_SCAN = 5;
 const MIN_24H_VOLUME_USD = 100;
+const PAGE_FETCH_DELAY_MS = 750;
 
 interface GeckoToken {
   id: string;
@@ -94,6 +96,10 @@ function dexLabelFromId(dexId?: string) {
     .replace(/\b\w/gu, (char) => char.toUpperCase());
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function tokenFromRelationship(pool: GeckoPool, tokens: Map<string, GeckoToken>, side: "base" | "quote") {
   const id = pool.relationships?.[`${side}_token`]?.data?.id;
   return id ? tokens.get(id) : undefined;
@@ -170,14 +176,31 @@ async function fetchGeckoPoolsPage(page: number) {
   return fetchJsonWithRetry<GeckoPoolsResponse>(url.toString(), {
     sourceName: "geckoterminal-token-markets",
     timeoutMs: 8_000,
-    retries: 1,
+    retries: 2,
+    retryDelayMs: 1_200,
   });
 }
 
 async function loadTokenMarkets() {
-  const pages = await Promise.all(
-    Array.from({ length: PAGES_TO_SCAN }, (_, index) => fetchGeckoPoolsPage(index + 1))
-  );
+  const pages: GeckoPoolsResponse[] = [];
+
+  for (let page = 1; page <= PAGES_TO_SCAN; page += 1) {
+    try {
+      pages.push(await fetchGeckoPoolsPage(page));
+    } catch (error) {
+      logServerEvent("warn", "token_markets.page_failed", {
+        page,
+        loadedPages: pages.length,
+        error: getErrorMessage(error),
+      });
+
+      if (pages.length === 0) throw error;
+      break;
+    }
+
+    if (page < PAGES_TO_SCAN) await sleep(PAGE_FETCH_DELAY_MS);
+  }
+
   const tokens = new Map<string, GeckoToken>();
   const deduped = new Map<string, TokenMarket>();
 

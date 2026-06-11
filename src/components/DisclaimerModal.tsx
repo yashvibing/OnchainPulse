@@ -13,7 +13,7 @@ const DISCLAIMER_ITEMS = [
   "Onchain Pulse does not custody assets, execute transactions, or provide legal, tax, investment, or financial advice.",
   "The Monad network is permissionless. Inclusion of any protocol, asset, vault, scenario, or data source on this interface does not constitute endorsement, approval, audit, verification, due diligence, or recommendation by Onchain Pulse.",
   "Data is sourced from third parties and public RPC providers. It may be incomplete, inaccurate, delayed, or change without notice.",
-  "References to rates, APR, APY, staking reward rates, liquidity, utilization, holdings, positions, protocols, or scenarios are informational snapshots only and should not be relied on as investment guidance.",
+  "References to rates, APR, APY, staking APY, liquidity, utilization, holdings, positions, protocols, or scenarios are informational snapshots only and should not be relied on as investment guidance.",
   "Do your own research. You are solely responsible for reviewing protocols and making any decisions based on this information.",
 ];
 

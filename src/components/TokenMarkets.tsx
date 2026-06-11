@@ -618,7 +618,7 @@ export function TokenMarkets() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Token, pool, exchange, or contract"
+            placeholder="Token, exchange, or contract"
             className="mt-2 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-4 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
           />
         </label>

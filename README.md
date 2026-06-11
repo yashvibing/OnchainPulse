@@ -7,7 +7,7 @@ It is not associated with, endorsed by, sponsored by, maintained by, or affiliat
 ## What It Does
 
 - **Portfolio Tracker** - paste a public wallet address and view token holdings, staking positions, lending, vaults, liquidity positions, MON price context, and CSV export.
-- **DeFi Rates** - compare displayed lending, staking-rate, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
+- **DeFi Rates** - compare displayed lending, staking APY, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
 - **Latest News** - curated updates with an admin review flow, X post ingestion, and optional Telegram distribution.
 - **Ecosystem / Startups** - browse curated DeltaV startup listings and continue to DeltaV to leave feedback.
 - **Telegram Alerts** - create APR threshold, displayed-rate-change, new-market, and brief alerts through Telegram.
