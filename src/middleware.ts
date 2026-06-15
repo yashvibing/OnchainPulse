@@ -49,6 +49,18 @@ function parseBasicAuth(header: string | null) {
 }
 
 export async function middleware(request: NextRequest) {
+  if (
+    request.nextUrl.pathname.startsWith("/nfts") &&
+    process.env.NODE_ENV === "production"
+  ) {
+    return new NextResponse("Not found.", {
+      status: 404,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
   const expectedUsername = getNewsAdminUsername();
   const expectedPassword = getNewsAdminSecret();
 
@@ -94,5 +106,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/news/admin/:path*"],
+  matcher: ["/news/admin/:path*", "/nfts/:path*"],
 };

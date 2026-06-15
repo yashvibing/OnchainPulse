@@ -3,10 +3,10 @@ import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 import { getErrorMessage, logServerEvent } from "@/lib/serverLog";
 
 const GECKO_MONAD_POOLS_URL = "https://api.geckoterminal.com/api/v2/networks/monad/pools";
-const TOKEN_MARKETS_CACHE_KEY = "token-markets:monad:v1";
+const TOKEN_MARKETS_CACHE_KEY = "token-markets:monad:v2";
 const TOKEN_MARKETS_TTL_MS = 5 * 60 * 1000;
 const TOKEN_MARKETS_STALE_TTL_MS = 30 * 60 * 1000;
-const PAGES_TO_SCAN = 5;
+const PAGES_TO_SCAN = 4;
 const MIN_24H_VOLUME_USD = 100;
 const PAGE_FETCH_DELAY_MS = 750;
 
