@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="bg-radial-glow min-h-screen antialiased">
         <Providers>{children}</Providers>
         <DisclaimerModal />
+        <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_ID} />
       </body>
     </html>
   );
