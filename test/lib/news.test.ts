@@ -77,4 +77,26 @@ describe("curated news feed", () => {
     expect(matches[0].id).toBe(newest.id);
     expect(matches[0].summary).toBe("Newest version.");
   });
+
+  it("rejects shortened source URLs", async () => {
+    await expect(
+      addCuratedNews({
+        url: "https://t.co/sgHudAYV91",
+        title: "Pendle is live on Monad",
+      })
+    ).rejects.toThrow("direct original link");
+  });
+
+  it("stores the direct link and strips short links from pasted text", async () => {
+    const item = await addCuratedNews({
+      url: "https://x.com/monad_eco/status/2067978668388065523",
+      title: "@monad_eco: JUST IN: @pendle_fi is now live on Monad https://t.co/sgHudAYV91",
+      summary: "JUST IN: @pendle_fi is now live on Monad https://t.co/sgHudAYV91",
+      source: "monad_eco",
+    });
+
+    expect(item.link).toBe("https://x.com/monad_eco/status/2067978668388065523");
+    expect(item.title).not.toContain("https://t.co");
+    expect(item.summary).not.toContain("https://t.co");
+  });
 });
