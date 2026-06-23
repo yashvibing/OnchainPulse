@@ -93,7 +93,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/app" className="btn-primary px-5 py-3 text-[13px]">
-                Open tracker
+                Open app
               </Link>
             </div>
           </div>
