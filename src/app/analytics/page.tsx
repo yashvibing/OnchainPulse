@@ -5,7 +5,7 @@ import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 export const metadata: Metadata = {
   title: "Analytics - Onchain Pulse",
   description:
-    "Monad network, validator, market, DeFi, and proposal analytics from public data sources.",
+    "Monad network, validator, market, DeFi, and liquidity analytics from public data sources.",
 };
 
 export default function AnalyticsPage() {
@@ -22,7 +22,8 @@ export default function AnalyticsPage() {
             Analytics
           </h1>
           <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Network, validators, DeFi markets, token activity, and proposal updates in one place.
+            A live command center for Monad market structure, staking, liquidity,
+            stablecoins, validator health, and DeFi rate activity.
           </p>
         </section>
 
