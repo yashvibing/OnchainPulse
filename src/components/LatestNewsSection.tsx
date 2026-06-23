@@ -35,10 +35,46 @@ function clampText(value: string, maxLength: number) {
   return `${(lastSpace > 48 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
 }
 
+const KNOWN_HANDLES: Record<string, string> = {
+  monad: "Monad",
+  monad_eco: "Monad Eco",
+  deltav_xyz: "DeltaV",
+  pendle_fi: "Pendle",
+  blend_money: "Blend Money",
+  portal_hq: "Portal HQ",
+  branchlesspay: "BranchlessPay",
+  leverup_xyz: "LeverUp",
+  mannyornothing: "Manny",
+};
+
+function titleCaseWord(value: string) {
+  if (!value) return value;
+  return `${value[0].toUpperCase()}${value.slice(1)}`;
+}
+
+function formatHandle(handle: string) {
+  const normalized = handle.replace(/^@/u, "").toLowerCase();
+  const known = KNOWN_HANDLES[normalized];
+  if (known) return known;
+
+  return normalized
+    .split(/[\s_-]+/u)
+    .filter(Boolean)
+    .map((part) => {
+      if (part === "fi") return "Fi";
+      if (part === "hq") return "HQ";
+      if (part === "xyz") return "XYZ";
+      return titleCaseWord(part);
+    })
+    .join(" ");
+}
+
 function cleanNewsText(value: string) {
   return value
     .replace(/https?:\/\/\S+/giu, "")
-    .replace(/@([a-z0-9_]{2,})/giu, "$1")
+    .replace(/@([a-z0-9_]{2,})/giu, (_, handle: string) => formatHandle(handle))
+    .replace(/\bJUST IN:\s*/giu, "")
+    .replace(/^[a-z0-9_ ]{2,28}:\s*/iu, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -57,18 +93,84 @@ function sourceLabel(article: NewsArticle) {
     .replace(/^@/u, "")
     .trim();
 
-  if (source && source.toLowerCase() !== "manual") return clampText(source, 24);
+  if (source && source.toLowerCase() !== "manual") return clampText(formatHandle(source), 24);
 
   try {
     const url = new URL(article.link);
     const [, handle] = url.pathname.split("/");
     if ((url.hostname === "x.com" || url.hostname === "twitter.com") && handle) {
-      return clampText(handle.replace(/_/gu, " "), 24);
+      return clampText(formatHandle(handle), 24);
     }
     return clampText(url.hostname.replace(/^www\./u, ""), 24);
   } catch {
     return "Curated";
   }
+}
+
+function extractHandleNames(value: string) {
+  const handles = value.match(/@([a-z0-9_]{2,})/giu) || [];
+  return [...new Set(handles.map(formatHandle))];
+}
+
+function firstSentence(value: string) {
+  const cleaned = cleanNewsText(value).replace(/\s+\.\.\.$/u, "").trim();
+  const [sentence] = cleaned.split(/(?<=[.!?])\s+/u);
+  return sentence || cleaned;
+}
+
+function includesAny(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+function buildReadableBrief(article: NewsArticle) {
+  const raw = `${article.title}. ${article.summary}`;
+  const lower = raw.toLowerCase();
+  const names = extractHandleNames(raw);
+  const primaryName = names.find((name) => !["Monad", "Monad Eco", "DeltaV"].includes(name)) || names[0];
+  const readable = firstSentence(article.summary || article.title);
+
+  let headline = clampText(readable, 110);
+  let whatChanged = clampText(cleanNewsText(article.summary || article.title), 210);
+  let whyItMatters = "Useful market context for reading portfolio moves, rates, and protocol activity.";
+
+  if (includesAny(lower, ["pendle"]) && includesAny(lower, ["live on monad", "now live on monad"])) {
+    headline = "Pendle markets are live on Monad.";
+    whatChanged = "Pendle launched Monad markets, adding routes for yield-bearing assets and yield-token trading.";
+    whyItMatters = "More yield markets can change where users route capital, hedge rates, and compare DeFi opportunities.";
+  } else if (includesAny(lower, ["portal_hq", "embedded wallet", "non-custodial embedded wallet"])) {
+    headline = "Portal HQ is pushing embedded wallet infrastructure.";
+    whatChanged = "Portal HQ is bringing non-custodial embedded wallets to apps so users can interact without seeing chain complexity.";
+    whyItMatters = "Cleaner wallet UX can make onchain apps feel closer to normal fintech products.";
+  } else if (includesAny(lower, ["blend_money", "blend money"]) && includesAny(lower, ["yield", "compliance", "neobank"])) {
+    headline = "Blend Money is packaging yield with compliance tooling.";
+    whatChanged = "Blend Money is positioning a yield and compliance stack for neobank-style onchain financial products.";
+    whyItMatters = "This points to Monad apps moving beyond raw trading into regulated financial workflows.";
+  } else if (includesAny(lower, ["yield is a commodity", "compliance is actually the real product"])) {
+    headline = "The signal is compliance over commodity yield.";
+    whatChanged = "The discussion frames yield as the easy-to-copy layer and compliance as the product that can create durable value.";
+    whyItMatters = "That is useful context when judging which DeFi teams may turn rates into real distribution.";
+  } else if (includesAny(lower, ["branchlesspay", "erp", "xero", "zoho", "wave"])) {
+    headline = "BranchlessPay shipped more business integrations.";
+    whatChanged = "BranchlessPay added ERP integrations and shared fresh usage metrics around volume, fees, and revenue.";
+    whyItMatters = "Integrations and operating metrics are stronger adoption signals than another generic ecosystem announcement.";
+  } else if (includesAny(lower, ["welcome to monad"]) && primaryName) {
+    headline = `${primaryName} joined the Monad ecosystem.`;
+    whatChanged = `${primaryName} is being welcomed into the Monad ecosystem, which usually signals a launch, integration, or partnership.`;
+    whyItMatters = "New ecosystem additions can expand available apps, liquidity venues, or user acquisition channels.";
+  } else if (includesAny(lower, ["introducing", "launched", "launching", "brings", "new markets"])) {
+    const subject = primaryName || "A Monad ecosystem team";
+    headline = `${subject} has a new ecosystem update.`;
+    whatChanged = clampText(readable, 210);
+    whyItMatters = includesAny(lower, ["market", "liquidity", "yield", "rates"])
+      ? "New market structure can affect liquidity, rates, and where users deploy capital."
+      : "This is a useful signal for tracking builder activity and ecosystem momentum.";
+  }
+
+  return {
+    headline,
+    whatChanged,
+    whyItMatters,
+  };
 }
 
 function SkeletonCard() {
@@ -89,16 +191,24 @@ function SkeletonCard() {
 
 function NewsCard({ article }: { article: NewsArticle }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const brief = buildReadableBrief(article);
   const title = clampText(cleanNewsText(article.title), 132);
-  const summary = clampText(cleanNewsText(article.summary), 180);
+  const summary = clampText(cleanNewsText(article.summary), 170);
   const titleKey = normalizeText(title);
   const summaryKey = normalizeText(summary);
-  const hasSummary = Boolean(summary && summaryKey !== titleKey && !summaryKey.startsWith(titleKey));
+  const briefKey = normalizeText(brief.whatChanged);
+  const hasSummary = Boolean(
+    summary &&
+      summaryKey !== titleKey &&
+      !summaryKey.startsWith(titleKey) &&
+      summaryKey !== briefKey &&
+      !briefKey.startsWith(summaryKey)
+  );
   const showImage = Boolean(article.imageUrl && !imageFailed);
   const source = sourceLabel(article);
   const meta = `${source} - ${formatRelativeTime(article.publishedAt)}`;
-  const content = (
-    <>
+  return (
+    <article className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4 transition-colors hover:border-[var(--color-border-hover)] hover:bg-[rgba(255,255,255,0.035)]">
       {showImage && (
         <div className="mb-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)]">
           {/* eslint-disable-next-line @next/next/no-img-element -- Remote news media can come from arbitrary hosts. */}
@@ -117,51 +227,51 @@ function NewsCard({ article }: { article: NewsArticle }) {
         <span className="rounded-full border border-[rgba(0,245,204,0.22)] bg-[rgba(0,245,204,0.07)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--color-positive)]">
           {article.topic}
         </span>
+        <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--color-text-muted)]">
+          Smart read
+        </span>
         <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--color-text-dim)]">
           {meta}
         </span>
       </div>
 
-      <h3 className="mt-3 text-[16px] font-bold leading-snug text-[var(--color-text-primary)]">
-        {title || source}
+      <h3 className="mt-3 text-[18px] font-bold leading-snug text-[var(--color-text-primary)]">
+        {brief.headline || title || source}
       </h3>
 
+      <div className="mt-3 grid gap-2 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.14)] bg-[rgba(0,245,204,0.035)] p-3">
+        <p className="text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+          <span className="font-bold text-[var(--color-text-primary)]">What happened: </span>
+          {brief.whatChanged}
+        </p>
+        <p className="text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+          <span className="font-bold text-[var(--color-text-secondary)]">Why it matters: </span>
+          {brief.whyItMatters}
+        </p>
+      </div>
+
       {hasSummary && (
-        <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
-          {summary}
+        <p className="mt-3 border-l border-[var(--color-border)] pl-3 text-[12px] leading-relaxed text-[var(--color-text-dim)]">
+          Original signal: {summary}
         </p>
       )}
 
       {article.link ? (
-        <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-[var(--color-accent-primary)]">
-          <span>Open source</span>
+        <a
+          href={article.link}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-flex items-center gap-2 text-[11px] font-semibold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-positive)]"
+        >
+          <span>Verify source</span>
           <span aria-hidden="true">-&gt;</span>
-        </div>
+        </a>
       ) : (
         <div className="mt-4 text-[11px] font-semibold text-[var(--color-text-dim)]">
           Added manually
         </div>
       )}
-    </>
-  );
-
-  if (!article.link) {
-    return (
-      <article className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
-        {content}
-      </article>
-    );
-  }
-
-  return (
-    <a
-      href={article.link}
-      target="_blank"
-      rel="noreferrer"
-      className="block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4 transition-colors hover:border-[var(--color-border-hover)] hover:bg-[rgba(255,255,255,0.04)]"
-    >
-      {content}
-    </a>
+    </article>
   );
 }
 
@@ -230,7 +340,7 @@ export function LatestNewsSection() {
             Curated signal feed
           </h2>
           <p className="mt-1 max-w-[680px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-            Cleaned-up Monad and DeFi updates for quick scanning.
+            Plain-English reads of Monad and DeFi updates, with sources one tap away.
           </p>
         </div>
 
