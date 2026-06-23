@@ -99,4 +99,20 @@ describe("curated news feed", () => {
     expect(item.title).not.toContain("https://t.co");
     expect(item.summary).not.toContain("https://t.co");
   });
+
+  it("stores image URLs as media instead of source links", async () => {
+    const item = await addCuratedNews({
+      url: "https://cdn.example.com/monad-update.jpg",
+      title: "Monad image update",
+      summary: "Chart image https://cdn.example.com/monad-update.jpg",
+      source: "Manual",
+    });
+
+    const feed = await loadLatestNews();
+    const stored = feed.items.find((entry) => entry.id === item.id);
+
+    expect(stored?.link).toBe("");
+    expect(stored?.imageUrl).toBe("https://cdn.example.com/monad-update.jpg");
+    expect(stored?.summary).toBe("Chart image");
+  });
 });
