@@ -85,9 +85,18 @@ Core:
 
 ```bash
 NEXT_PUBLIC_SITE_URL=https://onchainpulse.app
+ACCESS_GATE_SECRET=
+ACCESS_CODES=
 MONAD_RPC_URL=
 NEXT_PUBLIC_MONAD_RPC_URL=
 ```
+
+Private access:
+
+- Visitors must redeem a one-time access code before using app pages.
+- Codes are read from private `ACCESS_CODES` environment variable.
+- Used codes are stored in Upstash Redis when Redis env vars are configured.
+- `ACCESS_GATE_SECRET` should be a long random string used to sign access sessions.
 
 Redis cache:
 
