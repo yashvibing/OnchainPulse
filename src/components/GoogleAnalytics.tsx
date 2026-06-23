@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -17,15 +17,22 @@ interface GoogleAnalyticsProps {
 
 export function GoogleAnalytics({ measurementId }: GoogleAnalyticsProps) {
   const pathname = usePathname();
+  const [ready, setReady] = useState(false);
+  const sentPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!measurementId || !window.gtag) return;
+    if (!measurementId || !ready || !window.gtag) return;
+
+    const pagePath = `${window.location.pathname}${window.location.search}`;
+    if (sentPathRef.current === pagePath) return;
+
+    sentPathRef.current = pagePath;
 
     window.gtag("config", measurementId, {
       page_location: window.location.href,
-      page_path: `${window.location.pathname}${window.location.search}`,
+      page_path: pagePath,
     });
-  }, [measurementId, pathname]);
+  }, [measurementId, pathname, ready]);
 
   if (!measurementId) return null;
 
@@ -34,7 +41,6 @@ export function GoogleAnalytics({ measurementId }: GoogleAnalyticsProps) {
     function gtag(){window.dataLayer.push(arguments);}
     window.gtag = gtag;
     gtag('js', new Date());
-    gtag('config', ${JSON.stringify(measurementId)}, { send_page_view: false });
   `;
 
   return (
@@ -43,7 +49,11 @@ export function GoogleAnalytics({ measurementId }: GoogleAnalyticsProps) {
         src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`}
         strategy="afterInteractive"
       />
-      <Script id="google-analytics-init" strategy="afterInteractive">
+      <Script
+        id="google-analytics-init"
+        strategy="afterInteractive"
+        onReady={() => setReady(true)}
+      >
         {initScript}
       </Script>
     </>
