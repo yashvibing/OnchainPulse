@@ -39,6 +39,16 @@ function formatNumber(value?: number, digits = 0) {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
+function formatDateTime(value?: number) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function chartPath(points: AnalyticsPoint[], width = 100, height = 44, padding = 2) {
   if (points.length < 2) return "";
   const values = points.map((point) => point.value);
@@ -66,7 +76,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 ${className}`}>
+    <section className={`min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[linear-gradient(180deg,rgba(25,33,30,0.98),rgba(13,21,18,0.92))] p-5 shadow-[0_18px_48px_rgba(0,0,0,0.18)] ${className}`}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <h2 className="label-caps min-w-0 text-[var(--color-accent-primary)]">{title}</h2>
         {meta && <span className="label-caps shrink-0 text-[var(--color-text-dim)]">{meta}</span>}
@@ -78,13 +88,61 @@ function Panel({
 
 function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="min-w-0 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3">
+    <div className="min-w-0 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.34)] bg-[rgba(8,16,13,0.58)] px-4 py-3">
       <div className="label-caps text-[var(--color-text-dim)]">{label}</div>
       <div className="mt-2 break-words text-[clamp(20px,1.8vw,24px)] font-black leading-tight tracking-[-0.01em] text-[var(--color-text-primary)]">
         {value}
       </div>
       {helper && <div className="mt-1 text-[12px] text-[var(--color-text-muted)]">{helper}</div>}
     </div>
+  );
+}
+
+function HeroMetric({
+  label,
+  value,
+  helper,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  tone?: "neutral" | "positive" | "warning";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-[var(--color-positive)]"
+      : tone === "warning"
+        ? "text-[var(--color-warning)]"
+        : "text-[var(--color-text-primary)]";
+
+  return (
+    <div className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(8,16,13,0.72)] p-4">
+      <div className="label-caps text-[var(--color-text-dim)]">{label}</div>
+      <div className={`mt-2 text-[clamp(26px,3vw,40px)] font-black leading-none ${toneClass}`}>
+        {value}
+      </div>
+      {helper && (
+        <div className="mt-2 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+          {helper}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendBadge({ value }: { value?: number }) {
+  const positive = (value || 0) >= 0;
+  return (
+    <span
+      className={`rounded-[var(--radius-md)] border px-2.5 py-1 font-mono text-[12px] font-bold ${
+        positive
+          ? "border-[rgba(0,245,204,0.42)] bg-[rgba(0,245,204,0.08)] text-[var(--color-positive)]"
+          : "border-[rgba(255,180,171,0.42)] bg-[rgba(255,180,171,0.08)] text-[var(--color-negative)]"
+      }`}
+    >
+      {formatSignedPercent(value)}
+    </span>
   );
 }
 
@@ -116,7 +174,7 @@ function BarList({
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
             <div
-              className="h-full rounded-full bg-[var(--color-accent-primary)]"
+              className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-accent-primary),var(--color-accent-violet))]"
               style={{ width: `${Math.max(3, Math.min(100, (item.value / max) * 100))}%` }}
             />
           </div>
@@ -142,15 +200,16 @@ function LineChart({ points, color = "var(--color-accent-primary)" }: { points: 
   }
 
   return (
-    <svg viewBox="0 0 100 44" className="h-[220px] w-full" preserveAspectRatio="none">
+    <svg viewBox="0 0 100 44" className="h-[220px] w-full rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.35)]" preserveAspectRatio="none">
       <defs>
         <linearGradient id="analytics-line-fill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.18" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
+      <path d="M0,11 H100 M0,22 H100 M0,33 H100" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
       <path d={area} fill="url(#analytics-line-fill)" />
-      <path d={line} fill="none" stroke={color} strokeWidth="0.8" />
+      <path d={line} fill="none" stroke={color} strokeWidth="1.05" />
     </svg>
   );
 }
@@ -160,11 +219,11 @@ function VolumeBars({ points }: { points: AnalyticsPoint[] }) {
   if (points.length === 0) return <div className="text-[13px] text-[var(--color-text-muted)]">No volume data.</div>;
 
   return (
-    <div className="flex h-[120px] items-end gap-1 border-b border-[var(--color-border)] pb-1">
+    <div className="flex h-[120px] items-end gap-1 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.35)] px-2 pb-2 pt-3">
       {points.map((point) => (
         <div
           key={`${point.timestamp}-${point.value}`}
-          className="flex-1 rounded-t-sm bg-[var(--color-accent-secondary)] opacity-80"
+          className="flex-1 rounded-t-sm bg-[linear-gradient(180deg,var(--color-accent-secondary),rgba(0,245,204,0.22))] opacity-90"
           style={{ height: `${Math.max(6, (point.value / max) * 100)}%` }}
           title={formatCurrency(point.value)}
         />
@@ -254,33 +313,76 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="min-w-0 space-y-5">
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
-        <div className="grid min-w-0 gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="MON price" value={formatCurrency(analytics.market.priceUsd, 6)} />
-          <MetricCard
-            label="24 hr"
-            value={formatSignedPercent(analytics.market.change24hPct)}
-            helper={positive24 ? "price up" : "price down"}
-          />
-          <MetricCard
-            label="30 day"
-            value={formatSignedPercent(analytics.market.change30dPct)}
-            helper={positive30 ? "price up" : "price down"}
-          />
-          <MetricCard label="Market cap" value={formatCurrency(analytics.market.marketCapUsd)} />
-          <MetricCard label="FDV" value={formatCurrency(analytics.market.fdvUsd)} />
-          <MetricCard label="24 hr volume" value={formatCurrency(analytics.market.volume24hUsd)} />
-          <MetricCard label="Open interest" value={formatCurrency(analytics.market.openInterestUsd)} />
-          <MetricCard label="Block height" value={formatNumber(analytics.network.blockHeight)} />
+      <section className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[linear-gradient(135deg,rgba(0,245,204,0.1),rgba(220,184,255,0.07)_38%,rgba(13,21,18,0.98)_72%)] p-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="label-caps text-[var(--color-accent-primary)]">
+              Live network console
+            </div>
+            <h2 className="mt-3 text-[28px] font-black text-[var(--color-text-primary)] md:text-[42px]">
+              Monad pulse at a glance
+            </h2>
+            <p className="mt-2 max-w-[760px] text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+              Market structure, staking security, liquidity depth, fee flow,
+              and rate opportunities stitched together from public sources.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.38)] bg-[rgba(0,245,204,0.08)] px-3 py-2 text-[12px] font-bold text-[var(--color-positive)]">
+              RPC block {formatNumber(analytics.network.blockHeight)}
+            </span>
+            <span className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(8,16,13,0.55)] px-3 py-2 text-[12px] text-[var(--color-text-muted)]">
+              Updated {formatDateTime(analytics.generatedAt)}
+            </span>
+          </div>
         </div>
-      </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <HeroMetric
+            label="MON price"
+            value={formatCurrency(analytics.market.priceUsd, 6)}
+            helper="Native asset price"
+            tone={positive24 ? "positive" : "warning"}
+          />
+          <HeroMetric
+            label="24h move"
+            value={formatSignedPercent(analytics.market.change24hPct)}
+            helper={positive24 ? "Momentum is positive" : "Momentum is cooling"}
+            tone={positive24 ? "positive" : "warning"}
+          />
+          <HeroMetric
+            label="Chain TVL"
+            value={formatCurrency(analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd)}
+            helper="DefiLlama chain view"
+          />
+          <HeroMetric
+            label="Active stake"
+            value={formatMon(analytics.staking.totalActiveStakeMon)}
+            helper={`${formatNumber(analytics.staking.activeValidators)} validators`}
+          />
+        </div>
+      </section>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
-        <Panel title="Price action" meta="MON / USD">
+        <Panel
+          title="Price action"
+          meta={`24h ${formatSignedPercent(analytics.market.change24hPct)}`}
+        >
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <MetricCard label="Market cap" value={formatCurrency(analytics.market.marketCapUsd)} />
+            <MetricCard label="FDV" value={formatCurrency(analytics.market.fdvUsd)} />
+            <MetricCard label="Open interest" value={formatCurrency(analytics.market.openInterestUsd)} />
+          </div>
           <LineChart points={analytics.market.priceTrend} color="var(--color-accent-secondary)" />
         </Panel>
 
-        <Panel title="Staking">
+        <Panel title="Staking security" meta={positive30 ? "30d up" : "30d down"}>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <TrendBadge value={analytics.market.change30dPct} />
+            <span className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1 font-mono text-[12px] text-[var(--color-text-muted)]">
+              Epoch {formatNumber(analytics.network.epoch)}
+            </span>
+          </div>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MetricCard label="Active validators" value={`${formatNumber(analytics.staking.activeValidators)} / ${formatNumber(analytics.staking.activeSetCap)}`} />
             <MetricCard label="Total active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
@@ -460,34 +562,8 @@ export function AnalyticsDashboard() {
         </Panel>
       </div>
 
-      <Panel title="Monad improvement proposals" meta="forum">
-        <div className="space-y-2">
-          {analytics.mips.length === 0 ? (
-            <div className="text-[13px] text-[var(--color-text-muted)]">No MIP data available.</div>
-          ) : analytics.mips.map((mip) => (
-            <a
-              key={mip.number}
-              href={mip.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3 hover:border-[var(--color-border-hover)]"
-            >
-              <div className="min-w-0">
-                <div className="font-mono text-[13px] font-bold text-[var(--color-accent-secondary)]">
-                  MIP-{mip.number}
-                </div>
-                <div className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">
-                  {mip.title}
-                </div>
-              </div>
-              <div className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{mip.activity}</div>
-            </a>
-          ))}
-        </div>
-      </Panel>
-
-      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3 text-[12px] text-[var(--color-text-muted)]">
-        Sources: {sourceLine}. Last loaded {new Date(analytics.generatedAt).toLocaleString()}.
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+        Sources: {sourceLine}. Refreshed {formatDateTime(analytics.generatedAt)}.
       </div>
     </div>
   );
