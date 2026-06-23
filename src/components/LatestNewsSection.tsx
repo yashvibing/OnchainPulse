@@ -88,15 +88,31 @@ function SkeletonCard() {
 }
 
 function NewsCard({ article }: { article: NewsArticle }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const title = clampText(cleanNewsText(article.title), 132);
   const summary = clampText(cleanNewsText(article.summary), 180);
   const titleKey = normalizeText(title);
   const summaryKey = normalizeText(summary);
   const hasSummary = Boolean(summary && summaryKey !== titleKey && !summaryKey.startsWith(titleKey));
+  const showImage = Boolean(article.imageUrl && !imageFailed);
   const source = sourceLabel(article);
   const meta = `${source} - ${formatRelativeTime(article.publishedAt)}`;
   const content = (
     <>
+      {showImage && (
+        <div className="mb-4 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- Remote news media can come from arbitrary hosts. */}
+          <img
+            src={article.imageUrl}
+            alt={`${title || source} preview`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImageFailed(true)}
+            className="aspect-[16/9] w-full object-cover"
+          />
+        </div>
+      )}
+
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span className="rounded-full border border-[rgba(0,245,204,0.22)] bg-[rgba(0,245,204,0.07)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--color-positive)]">
           {article.topic}
