@@ -173,20 +173,20 @@ export function NewsAdminForm() {
           Add a curated update
         </h2>
         <p className="mt-2 max-w-[760px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-          Paste an article link, write your own update, or do both. The feed
-          only uses submitted items, so no outside headlines are auto-filled.
+          Paste the direct article or X post link, write your own update, or do both.
+          Shortened links are ignored so the feed stays readable.
         </p>
       </div>
 
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="grid gap-2">
-            <span className="label-caps text-[var(--color-text-muted)]">Article URL</span>
+            <span className="label-caps text-[var(--color-text-muted)]">Original URL</span>
             <input
               type="url"
               value={form.url}
               onChange={(event) => updateField("url", event.target.value)}
-              placeholder="https://..."
+              placeholder="https://x.com/.../status/... or https://..."
               className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
             />
           </label>
