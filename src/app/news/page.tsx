@@ -15,17 +15,16 @@ export default function NewsPage() {
     <div className="min-h-screen">
       <Header />
 
-      <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-10 md:px-6">
-        <section className="mb-8 border-b border-[var(--color-border)] pb-8 pt-2">
+      <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-8 md:px-6">
+        <section className="mb-6 border-b border-[var(--color-border)] pb-6 pt-2">
           <div className="label-caps text-[var(--color-accent-primary)]">
             Latest News
           </div>
-          <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
+          <h1 className="mt-3 text-[34px] font-bold text-[var(--color-text-primary)] md:text-[40px]">
             Market context
           </h1>
-          <p className="mt-3 max-w-[820px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-            Follow curated Monad, DeFi, and ecosystem updates separately from
-            portfolio tracking.
+          <p className="mt-2 max-w-[720px] text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
+            Curated Monad and DeFi updates, cleaned up for quick scanning.
           </p>
         </section>
 
