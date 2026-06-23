@@ -24,6 +24,7 @@ const emptyForm = {
   url: "",
   title: "",
   summary: "",
+  imageUrl: "",
   topic: "Monad",
   source: "",
   publishedAt: "",
@@ -40,6 +41,7 @@ function cleanPayload(form: typeof emptyForm) {
       url: form.url,
       title: form.title,
       summary: form.summary,
+      imageUrl: form.imageUrl,
       topic: form.topic,
       source: form.source,
       publishedAt: form.publishedAt,
@@ -223,6 +225,17 @@ export function NewsAdminForm() {
             />
           </label>
         </div>
+
+        <label className="grid gap-2">
+          <span className="label-caps text-[var(--color-text-muted)]">Image URL</span>
+          <input
+            type="url"
+            value={form.imageUrl}
+            onChange={(event) => updateField("imageUrl", event.target.value)}
+            placeholder="Optional direct image URL"
+            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] px-3 py-3 text-[14px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+          />
+        </label>
 
         <label className="grid gap-2">
           <span className="label-caps text-[var(--color-text-muted)]">Summary or text</span>
