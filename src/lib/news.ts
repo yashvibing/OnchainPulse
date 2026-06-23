@@ -63,6 +63,26 @@ function isValidHttpUrl(value: string) {
   }
 }
 
+function isShortenedUrl(value: string) {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./u, "").toLowerCase();
+    return [
+      "t.co",
+      "bit.ly",
+      "tinyurl.com",
+      "shorturl.at",
+      "goo.gl",
+      "ow.ly",
+    ].includes(host);
+  } catch {
+    return false;
+  }
+}
+
+function stripShortenedUrls(input: string) {
+  return input.replace(/https?:\/\/\S+/giu, (match) => (isShortenedUrl(match) ? "" : match));
+}
+
 function sourceFromUrl(value: string) {
   try {
     return new URL(value).hostname.replace(/^www\./u, "");
@@ -176,11 +196,14 @@ export function assertValidNewsRequestBody(raw: string) {
 export async function addCuratedNews(input: NewsSubmissionInput) {
   const link = cleanText(input.url || input.link || "");
   if (link && !isValidHttpUrl(link)) throw new Error("URL must start with http:// or https://");
+  if (link && isShortenedUrl(link)) {
+    throw new Error("Paste the direct original link instead of a shortened URL.");
+  }
 
   const metadata = link ? await fetchUrlMetadata(link) : null;
-  const fallbackText = input.text || input.summary || "";
-  const title = cleanText(input.title || metadata?.title || summarize(fallbackText, 90));
-  const summary = summarize(input.summary || input.text || metadata?.summary || "");
+  const fallbackText = stripShortenedUrls(input.text || input.summary || "");
+  const title = cleanText(stripShortenedUrls(input.title || metadata?.title || summarize(fallbackText, 90)));
+  const summary = summarize(stripShortenedUrls(input.summary || input.text || metadata?.summary || ""));
   const source = cleanText(input.source || metadata?.source || (link ? sourceFromUrl(link) : "Manual"));
   const topic = cleanText(input.topic || "Curated");
 
