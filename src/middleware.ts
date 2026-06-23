@@ -1,6 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  ACCESS_COOKIE,
+  isValidAccessSession,
+  redirectToAccess,
+} from "@/lib/accessGate";
+import {
   createNewsAdminSession,
   getNewsAdminSecret,
   getNewsAdminUsername,
@@ -11,6 +16,7 @@ import {
 } from "@/lib/newsAdminAuth";
 
 const REALM = "Onchain Pulse News Admin";
+const PUBLIC_FILE = /\.(.*)$/;
 
 function unauthorized() {
   return new NextResponse("Authentication required.", {
@@ -49,6 +55,27 @@ function parseBasicAuth(header: string | null) {
 }
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  if (
+    pathname === "/access" ||
+    pathname.startsWith("/api/access/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/robots") ||
+    pathname.startsWith("/sitemap") ||
+    PUBLIC_FILE.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
+  if (!pathname.startsWith("/api/")) {
+    const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+    if (!(await isValidAccessSession(accessToken))) {
+      return redirectToAccess(request);
+    }
+  }
+
   if (
     request.nextUrl.pathname.startsWith("/nfts") &&
     process.env.NODE_ENV === "production"
@@ -59,6 +86,10 @@ export async function middleware(request: NextRequest) {
         "Cache-Control": "no-store",
       },
     });
+  }
+
+  if (!request.nextUrl.pathname.startsWith("/news/admin")) {
+    return NextResponse.next();
   }
 
   const expectedUsername = getNewsAdminUsername();
@@ -106,5 +137,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/news/admin/:path*", "/nfts/:path*"],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
