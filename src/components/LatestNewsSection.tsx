@@ -27,87 +27,102 @@ function formatRelativeTime(value: string | number) {
   return rtf.format(-Math.round(diffSeconds / 86_400), "day");
 }
 
+function clampText(value: string, maxLength: number) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) return cleaned;
+  const cut = cleaned.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 48 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
+}
+
+function cleanNewsText(value: string) {
+  return value
+    .replace(/https?:\/\/\S+/giu, "")
+    .replace(/@([a-z0-9_]{2,})/giu, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeText(value: string) {
+  return cleanNewsText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, " ")
+    .trim();
+}
+
+function sourceLabel(article: NewsArticle) {
+  const source = article.source
+    .replace(/^source:\s*/iu, "")
+    .replace(/^x\s*\/\s*@?/iu, "")
+    .replace(/^@/u, "")
+    .trim();
+
+  if (source && source.toLowerCase() !== "manual") return clampText(source, 24);
+
+  try {
+    const url = new URL(article.link);
+    const [, handle] = url.pathname.split("/");
+    if ((url.hostname === "x.com" || url.hostname === "twitter.com") && handle) {
+      return clampText(handle.replace(/_/gu, " "), 24);
+    }
+    return clampText(url.hostname.replace(/^www\./u, ""), 24);
+  } catch {
+    return "Curated";
+  }
+}
+
 function SkeletonCard() {
   return (
-    <div className="card card-hover flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="h-5 w-24 animate-pulse rounded-full bg-[rgba(255,255,255,0.05)]" />
-        <div className="h-4 w-16 animate-pulse rounded-full bg-[rgba(255,255,255,0.05)]" />
+    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="h-5 w-20 animate-pulse rounded-full bg-[rgba(255,255,255,0.05)]" />
+        <div className="h-4 w-28 animate-pulse rounded-full bg-[rgba(255,255,255,0.04)]" />
       </div>
       <div className="space-y-2">
-        <div className="h-5 w-full animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
-        <div className="h-5 w-5/6 animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
+        <div className="h-5 w-11/12 animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
+        <div className="h-5 w-2/3 animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
+        <div className="h-4 w-5/6 animate-pulse rounded bg-[rgba(255,255,255,0.04)]" />
       </div>
-      <div className="space-y-2">
-        <div className="h-4 w-full animate-pulse rounded bg-[rgba(255,255,255,0.04)]" />
-        <div className="h-4 w-11/12 animate-pulse rounded bg-[rgba(255,255,255,0.04)]" />
-        <div className="h-4 w-2/3 animate-pulse rounded bg-[rgba(255,255,255,0.04)]" />
-      </div>
-      <div className="mt-auto h-4 w-28 animate-pulse rounded-full bg-[rgba(255,255,255,0.05)]" />
     </div>
   );
 }
 
-function getSignalText(topic: string) {
-  const normalized = topic.toLowerCase();
-  if (normalized.includes("defi")) {
-    return "May explain shifts in rates, liquidity, or protocol demand.";
-  }
-  if (normalized.includes("ecosystem")) {
-    return "May affect builder activity, launches, or user attention.";
-  }
-  return "Useful context before reading portfolio and market data.";
-}
-
 function NewsCard({ article }: { article: NewsArticle }) {
-  const normalizedTitle = article.title.trim().toLowerCase();
-  const normalizedSummary = article.summary.trim().toLowerCase();
-  const hasSummary = Boolean(normalizedSummary && normalizedSummary !== normalizedTitle);
+  const title = clampText(cleanNewsText(article.title), 132);
+  const summary = clampText(cleanNewsText(article.summary), 180);
+  const titleKey = normalizeText(title);
+  const summaryKey = normalizeText(summary);
+  const hasSummary = Boolean(summary && summaryKey !== titleKey && !summaryKey.startsWith(titleKey));
+  const source = sourceLabel(article);
+  const meta = `${source} - ${formatRelativeTime(article.publishedAt)}`;
   const content = (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-[var(--color-border)] bg-[rgba(0,245,204,0.06)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--color-positive)]">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="rounded-full border border-[rgba(0,245,204,0.22)] bg-[rgba(0,245,204,0.07)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--color-positive)]">
           {article.topic}
         </span>
-        <span className="text-[10px] font-semibold text-[var(--color-text-dim)]">
-          Source: {article.source} - {formatRelativeTime(article.publishedAt)}
+        <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--color-text-dim)]">
+          {meta}
         </span>
       </div>
 
-      <h3 className="text-[15px] font-bold leading-snug text-[var(--color-text-primary)]">
-        {article.title}
+      <h3 className="mt-3 text-[16px] font-bold leading-snug text-[var(--color-text-primary)]">
+        {title || source}
       </h3>
 
       {hasSummary && (
-        <>
-          <p
-            className="text-[12px] leading-relaxed text-[var(--color-text-secondary)]"
-            style={{
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 3,
-              overflow: "hidden",
-            }}
-          >
-            {article.summary}
-          </p>
-
-          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-            <span className="font-semibold text-[var(--color-text-secondary)]">
-              Why it matters:{" "}
-            </span>
-            {getSignalText(article.topic)}
-          </div>
-        </>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+          {summary}
+        </p>
       )}
 
       {article.link ? (
-        <div className="mt-auto flex items-center justify-between gap-3 text-[11px] text-[var(--color-text-muted)]">
-          <span>Read the full story</span>
+        <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-[var(--color-accent-primary)]">
+          <span>Open source</span>
           <span aria-hidden="true">-&gt;</span>
         </div>
       ) : (
-        <div className="mt-auto text-[11px] font-semibold text-[var(--color-text-dim)]">
+        <div className="mt-4 text-[11px] font-semibold text-[var(--color-text-dim)]">
           Added manually
         </div>
       )}
@@ -115,7 +130,11 @@ function NewsCard({ article }: { article: NewsArticle }) {
   );
 
   if (!article.link) {
-    return <div className="card card-hover flex h-full flex-col gap-3 p-4">{content}</div>;
+    return (
+      <article className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
+        {content}
+      </article>
+    );
   }
 
   return (
@@ -123,7 +142,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
       href={article.link}
       target="_blank"
       rel="noreferrer"
-      className="card card-hover flex h-full flex-col gap-3 p-4 transition-transform duration-150 hover:-translate-y-0.5"
+      className="block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4 transition-colors hover:border-[var(--color-border-hover)] hover:bg-[rgba(255,255,255,0.04)]"
     >
       {content}
     </a>
@@ -182,21 +201,20 @@ export function LatestNewsSection() {
 
   const fetchedAt = meta?.fetchedAt || meta?.generatedAt || 0;
   const freshnessLabel = fetchedAt ? formatRelativeTime(fetchedAt) : null;
-  const displayedItems = items.slice(0, 4);
+  const displayedItems = items.slice(0, 5);
 
   return (
-    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.9)] p-4 md:p-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[rgba(9,15,14,0.92)] p-4 md:p-5">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="label-caps text-[var(--color-accent-primary)]">
-            Curated Market Updates
+            Market Updates
           </div>
-          <h2 className="mt-2 text-[20px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-            Recent context added by your team
+          <h2 className="mt-2 text-[22px] font-bold text-[var(--color-text-primary)]">
+            Curated signal feed
           </h2>
-          <p className="mt-1 max-w-[760px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            A compact feed of submitted Monad, DeFi, and ecosystem updates. Use
-            it as context after checking wallets and rates, not as financial advice.
+          <p className="mt-1 max-w-[680px] text-[13px] leading-relaxed text-[var(--color-text-muted)]">
+            Cleaned-up Monad and DeFi updates for quick scanning.
           </p>
         </div>
 
@@ -218,19 +236,19 @@ export function LatestNewsSection() {
       </div>
 
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </div>
       ) : items.length > 0 ? (
         <>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3">
             {displayedItems.map((article) => (
               <NewsCard key={article.id || article.link || article.title} article={article} />
             ))}
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 text-[11px] text-[var(--color-text-dim)]">
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3 text-[11px] text-[var(--color-text-dim)]">
             <span>Showing {displayedItems.length} curated updates.</span>
           </div>
         </>
