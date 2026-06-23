@@ -24,7 +24,7 @@ export default function NewsPage() {
             Market context
           </h1>
           <p className="mt-2 max-w-[720px] text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
-            Curated Monad and DeFi updates, cleaned up for quick scanning.
+            Curated Monad and DeFi updates rewritten into quick reads before you open the source.
           </p>
         </section>
 
