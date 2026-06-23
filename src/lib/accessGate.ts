@@ -6,7 +6,11 @@ const ACCESS_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 const ACCESS_COOKIE_PREFIX = "onchain-pulse-access";
 
 function normalizeAccessCode(code: string) {
-  return code.trim().toUpperCase();
+  return code
+    .trim()
+    .toUpperCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, "");
 }
 
 function getConfiguredAccessCodes() {
