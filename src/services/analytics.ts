@@ -20,7 +20,6 @@ const MONAD_INITIAL_SUPPLY_MON = 100_000_000_000;
 const MONSCOPE_DECENTRALIZATION_URL = "https://monscope.xyz/api/v1/decentralization";
 const MONSCOPE_VALIDATORS_URL = "https://monscope.xyz/api/v1/validators";
 const MONSCOPE_OPEN_INTEREST_URL = "https://monscope.xyz/api/open-interest";
-const MONAD_FORUM_MIPS_URL = "https://forum.monad.xyz/c/mips/8.json";
 const DEFILLAMA_MON_PRICE_URL = "https://coins.llama.fi/prices/current/coingecko:monad";
 const COINGECKO_MON_URL =
   "https://api.coingecko.com/api/v3/coins/monad?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false";
@@ -68,13 +67,6 @@ export interface AnalyticsValidator {
   commissionPct: number;
   website?: string;
   x?: string;
-}
-
-export interface AnalyticsMip {
-  number: number;
-  title: string;
-  activity: string;
-  url: string;
 }
 
 export interface AnalyticsPayload {
@@ -168,7 +160,6 @@ export interface AnalyticsPayload {
     feeTrend: AnalyticsPoint[];
     topProtocols: AnalyticsBar[];
   };
-  mips: AnalyticsMip[];
   validators: AnalyticsValidator[];
 }
 
@@ -329,18 +320,6 @@ interface MonscopeValidatorsResponse {
     website?: string;
     x?: string;
   }>;
-}
-
-interface MonadForumMipsResponse {
-  topic_list?: {
-    topics?: Array<{
-      id?: number;
-      title?: string;
-      slug?: string;
-      created_at?: string;
-      last_posted_at?: string;
-    }>;
-  };
 }
 
 function toNumber(value: unknown) {
@@ -713,45 +692,6 @@ function trendChange(points: AnalyticsPoint[], lookback: "24h" | "30d") {
   return ((last.value - first.value) / first.value) * 100;
 }
 
-function shortDate(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}`;
-}
-
-function extractMipNumber(title?: string) {
-  const match = title?.match(/\bMIP[\s-]*(\d+)\b/iu);
-  return match ? Number(match[1]) : 0;
-}
-
-function cleanMipTitle(title: string, number: number) {
-  return title
-    .replace(new RegExp(`^\\s*MIP[\\s-]*${number}\\s*[-:]?\\s*`, "iu"), "")
-    .trim();
-}
-
-function extractMips(data: MonadForumMipsResponse): AnalyticsMip[] {
-  return (data.topic_list?.topics || [])
-    .map((item) => {
-      const title = item.title || "";
-      const number = extractMipNumber(title);
-      return {
-        number,
-        title: number > 0 ? cleanMipTitle(title, number) : title,
-        activity: shortDate(item.last_posted_at || item.created_at),
-        url:
-          item.id && item.slug
-            ? `https://forum.monad.xyz/t/${item.slug}/${item.id}`
-            : "https://forum.monad.xyz/c/mips/8",
-      };
-    })
-    .filter((item) => item.number > 0)
-    .sort((a, b) => b.number - a.number)
-    .slice(0, 8);
-}
-
 async function loadAnalytics(): Promise<AnalyticsPayload> {
   const [
     monPrice,
@@ -759,7 +699,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     rpc,
     decentralization,
     validators,
-    mips,
     tokenMarkets,
     coinGeckoMonStats,
     monMarketStats,
@@ -785,11 +724,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       timeoutMs: 8_000,
       retries: 1,
     }).catch(() => ({} as MonscopeValidatorsResponse)),
-    fetchJsonWithRetry<MonadForumMipsResponse>(MONAD_FORUM_MIPS_URL, {
-      sourceName: "monad-forum-mips",
-      timeoutMs: 8_000,
-      retries: 1,
-    }).catch(() => ({} as MonadForumMipsResponse)),
     fetchTokenMarkets().catch(() => ({ data: [] })),
     fetchCoinGeckoMonStats().catch(() => ({} as AnalyticsMarketStats)),
     fetchMonMarketStats().catch(() => ({} as AnalyticsMarketStats)),
@@ -892,7 +826,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     sources: [
       "Monscope API",
       "CoinGecko",
-      "Monad Forum",
       "DefiLlama",
       "GeckoTerminal",
       "Merkl",
@@ -1016,7 +949,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
           .sort((a, b) => b.value - a.value)
           .slice(0, 6) || [],
     },
-    mips: extractMips(mips),
     validators:
       validators.validators?.slice(0, 20).map((validator) => ({
         rank: Number(validator.rank || 0),
