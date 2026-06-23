@@ -18,6 +18,7 @@ beforeEach(() => {
             id: "news-test-1",
             title: "Monad lands new DeFi partnership",
             link: "https://example.com/article",
+            imageUrl: "https://cdn.example.com/monad-card.jpg",
             source: "The Block",
             summary: "Monad announced a new integration with a DeFi protocol.",
             publishedAt: "2026-05-25T10:00:00.000Z",
@@ -33,10 +34,15 @@ describe("LatestNewsSection", () => {
   it("renders a news card from the API response", async () => {
     render(<LatestNewsSection />);
 
-    expect(await screen.findByText("Curated Market Updates")).toBeInTheDocument();
+    expect(await screen.findByText("Curated signal feed")).toBeInTheDocument();
     expect(await screen.findByText("Monad lands new DeFi partnership")).toBeInTheDocument();
     expect(screen.getByText(/The Block/)).toBeInTheDocument();
-    expect(screen.getByText(/Why it matters:/)).toBeInTheDocument();
+    expect(screen.getByText("Monad announced a new integration with a DeFi protocol.")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Monad lands new DeFi partnership preview/u })).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/monad-card.jpg"
+    );
+    expect(screen.queryByText(/cdn\.example\.com/u)).not.toBeInTheDocument();
     expect(screen.queryByText("Add news")).not.toBeInTheDocument();
   });
 });
