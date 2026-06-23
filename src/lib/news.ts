@@ -187,6 +187,15 @@ function dedupeKey(item: Pick<NewsArticle, "link" | "title" | "source">) {
   return (item.link || `${item.title}|${item.source}`).trim().toLowerCase();
 }
 
+function sanitizeNewsArticle(item: NewsArticle): NewsArticle {
+  return {
+    ...item,
+    title: cleanText(stripShortenedUrls(item.title)),
+    summary: summarize(stripShortenedUrls(item.summary)),
+    link: isShortenedUrl(item.link) ? "" : item.link,
+  };
+}
+
 export function assertValidNewsRequestBody(raw: string) {
   if (raw.length > MAX_BODY_LENGTH) {
     throw new Error("News submission is too large.");
@@ -232,6 +241,7 @@ export async function addCuratedNews(input: NewsSubmissionInput) {
 
 export async function loadLatestNews() {
   const items = (await readCuratedNews())
+    .map(sanitizeNewsArticle)
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
     .slice(0, NEWS_LIMIT);
 
