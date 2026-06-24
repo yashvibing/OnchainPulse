@@ -67,7 +67,6 @@ function formatChartDate(value?: number) {
   return new Date(normalizeTimestampMs(value)).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
-    hour: "numeric",
     minute: "2-digit",
   });
 }
@@ -266,6 +265,10 @@ function TrendChart({
   const area = line ? `${line} L98,44 L2,44 Z` : "";
   const coordinates = useMemo(() => chartCoordinates(points), [points]);
   const activePoint = activeIndex !== null ? coordinates[activeIndex] : coordinates[coordinates.length - 1];
+  const tooltipLeft =
+    !activePoint ? "50%" : activePoint.x < 22 ? "12px" : activePoint.x > 78 ? "calc(100% - 12px)" : `${activePoint.x}%`;
+  const tooltipTransform =
+    !activePoint ? "translateX(-50%)" : activePoint.x < 22 ? "translateX(0)" : activePoint.x > 78 ? "translateX(-100%)" : "translateX(-50%)";
 
   if (!line) {
     return (
@@ -276,67 +279,74 @@ function TrendChart({
   }
 
   return (
-    <svg
-      viewBox="0 0 100 44"
-      className={`${heightClass} w-full rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.42)]`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label={`${label} chart`}
-      onPointerMove={(event) => {
-        if (coordinates.length === 0) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-        setActiveIndex(Math.round(ratio * (coordinates.length - 1)));
-      }}
-      onPointerLeave={() => setActiveIndex(null)}
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d="M0,11 H100 M0,22 H100 M0,33 H100" stroke="rgba(255,255,255,0.07)" strokeWidth="0.3" />
-      <path d={area} fill={`url(#${gradientId})`} className="transition-all duration-500 ease-out" />
-      <path
-        d={line}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.05"
-        vectorEffect="non-scaling-stroke"
-        className="[stroke-dasharray:180] [stroke-dashoffset:0] transition-all duration-700 ease-out"
-      />
+    <div className={`relative ${heightClass}`}>
+      <svg
+        viewBox="0 0 100 44"
+        className="h-full w-full rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.42)]"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`${label} chart`}
+        onPointerMove={(event) => {
+          if (coordinates.length === 0) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+          setActiveIndex(Math.round(ratio * (coordinates.length - 1)));
+        }}
+        onPointerLeave={() => setActiveIndex(null)}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M0,11 H100 M0,22 H100 M0,33 H100" stroke="rgba(255,255,255,0.07)" strokeWidth="0.3" />
+        <path d={area} fill={`url(#${gradientId})`} className="transition-all duration-500 ease-out" />
+        <path
+          d={line}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.05"
+          vectorEffect="non-scaling-stroke"
+          className="[stroke-dasharray:180] [stroke-dashoffset:0] transition-all duration-700 ease-out"
+        />
+        {activePoint && (
+          <g>
+            <line
+              x1={activePoint.x}
+              x2={activePoint.x}
+              y1="2"
+              y2="42"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="0.45"
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle
+              cx={activePoint.x}
+              cy={activePoint.y}
+              r="1.35"
+              fill="var(--color-bg-surface-solid)"
+              stroke={color}
+              strokeWidth="0.75"
+              vectorEffect="non-scaling-stroke"
+            />
+          </g>
+        )}
+      </svg>
       {activePoint && (
-        <g>
-          <line
-            x1={activePoint.x}
-            x2={activePoint.x}
-            y1="2"
-            y2="42"
-            stroke="rgba(255,255,255,0.25)"
-            strokeWidth="0.45"
-            vectorEffect="non-scaling-stroke"
-          />
-          <circle
-            cx={activePoint.x}
-            cy={activePoint.y}
-            r="1.35"
-            fill="var(--color-bg-surface-solid)"
-            stroke={color}
-            strokeWidth="0.75"
-            vectorEffect="non-scaling-stroke"
-          />
-        </g>
-      )}
-      {activePoint && (
-        <foreignObject x="4" y="3" width="42" height="14">
-          <div className="rounded border border-[rgba(255,255,255,0.16)] bg-[rgba(8,16,13,0.86)] px-1.5 py-1 text-[3px] font-bold leading-none text-[var(--color-text-primary)]">
-            <div>{valueFormatter(activePoint.value)}</div>
-            <div className="mt-0.5 text-[2.4px] font-semibold text-[var(--color-text-muted)]">{formatChartDate(activePoint.timestamp)}</div>
+        <div
+          className="pointer-events-none absolute top-3 z-[2] max-w-[calc(100%-24px)] rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.16)] bg-[rgba(8,16,13,0.9)] px-3 py-2 shadow-[0_14px_34px_rgba(0,0,0,0.38)] backdrop-blur"
+          style={{ left: tooltipLeft, transform: tooltipTransform }}
+        >
+          <div className="whitespace-nowrap font-mono text-[13px] font-black leading-none text-[var(--color-text-primary)]">
+            {valueFormatter(activePoint.value)}
           </div>
-        </foreignObject>
+          <div className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none text-[var(--color-text-muted)]">
+            {formatChartDate(activePoint.timestamp)}
+          </div>
+        </div>
       )}
-    </svg>
+    </div>
   );
 }
 
