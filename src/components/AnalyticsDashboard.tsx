@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, useId } from "react";
+import { useCallback, useEffect, useMemo, useState, useId } from "react";
 import type {
   AnalyticsBar,
   AnalyticsPayload,
   AnalyticsPoint,
   AnalyticsStablecoin,
-  AnalyticsValidator,
 } from "@/services/analytics";
 
 type Tone = "positive" | "negative" | "warning" | "neutral";
+type ChartRange = "7d" | "30d" | "all";
+
+const CHART_RANGES: Array<{ value: ChartRange; label: string }> = [
+  { value: "7d", label: "7D" },
+  { value: "30d", label: "30D" },
+  { value: "all", label: "All" },
+];
 
 function formatCurrency(value?: number, maximumFractionDigits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
@@ -44,12 +50,40 @@ function formatNumber(value?: number, digits = 0) {
 
 function formatDateTime(value?: number) {
   if (!value) return "-";
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(normalizeTimestampMs(value)).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function normalizeTimestampMs(value: number) {
+  return value < 10_000_000_000 ? value * 1000 : value;
+}
+
+function formatChartDate(value?: number) {
+  if (!value) return "-";
+  return new Date(normalizeTimestampMs(value)).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function rangeLabel(range: ChartRange) {
+  if (range === "7d") return "last 7 days";
+  if (range === "30d") return "last 30 days";
+  return "all available data";
+}
+
+function pointsForRange(points: AnalyticsPoint[], range: ChartRange) {
+  if (range === "all" || points.length === 0) return points;
+  const days = range === "7d" ? 7 : 30;
+  const latest = Math.max(...points.map((point) => normalizeTimestampMs(point.timestamp)));
+  const cutoff = latest - days * 86_400_000;
+  return points.filter((point) => normalizeTimestampMs(point.timestamp) >= cutoff);
 }
 
 function timeAgo(value?: number) {
@@ -63,18 +97,24 @@ function timeAgo(value?: number) {
 
 function chartPath(points: AnalyticsPoint[], width = 100, height = 44, padding = 2) {
   if (points.length < 2) return "";
+  return chartCoordinates(points, width, height, padding)
+    .map(({ x, y }, index) => `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
+    .join(" ");
+}
+
+function chartCoordinates(points: AnalyticsPoint[], width = 100, height = 44, padding = 2) {
+  if (points.length === 0) return [];
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
+  const denominator = Math.max(1, points.length - 1);
 
-  return points
-    .map((point, index) => {
-      const x = padding + (index / (points.length - 1)) * (width - padding * 2);
+  return points.map((point, index) => {
+      const x = padding + (index / denominator) * (width - padding * 2);
       const y = height - padding - ((point.value - min) / range) * (height - padding * 2);
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
+      return { ...point, x, y };
+    });
 }
 
 function toneClasses(tone: Tone) {
@@ -211,14 +251,21 @@ function TrendChart({
   points,
   color = "var(--color-accent-primary)",
   heightClass = "h-[260px]",
+  valueFormatter = formatCurrency,
+  label = "Trend",
 }: {
   points: AnalyticsPoint[];
   color?: string;
   heightClass?: string;
+  valueFormatter?: (value: number) => string;
+  label?: string;
 }) {
   const gradientId = useId();
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const line = chartPath(points);
   const area = line ? `${line} L98,44 L2,44 Z` : "";
+  const coordinates = useMemo(() => chartCoordinates(points), [points]);
+  const activePoint = activeIndex !== null ? coordinates[activeIndex] : coordinates[coordinates.length - 1];
 
   if (!line) {
     return (
@@ -234,7 +281,14 @@ function TrendChart({
       className={`${heightClass} w-full rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.42)]`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="Trend chart"
+      aria-label={`${label} chart`}
+      onPointerMove={(event) => {
+        if (coordinates.length === 0) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        setActiveIndex(Math.round(ratio * (coordinates.length - 1)));
+      }}
+      onPointerLeave={() => setActiveIndex(null)}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -243,14 +297,53 @@ function TrendChart({
         </linearGradient>
       </defs>
       <path d="M0,11 H100 M0,22 H100 M0,33 H100" stroke="rgba(255,255,255,0.07)" strokeWidth="0.3" />
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="1.05" vectorEffect="non-scaling-stroke" />
+      <path d={area} fill={`url(#${gradientId})`} className="transition-all duration-500 ease-out" />
+      <path
+        d={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.05"
+        vectorEffect="non-scaling-stroke"
+        className="[stroke-dasharray:180] [stroke-dashoffset:0] transition-all duration-700 ease-out"
+      />
+      {activePoint && (
+        <g>
+          <line
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1="2"
+            y2="42"
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth="0.45"
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle
+            cx={activePoint.x}
+            cy={activePoint.y}
+            r="1.35"
+            fill="var(--color-bg-surface-solid)"
+            stroke={color}
+            strokeWidth="0.75"
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
+      )}
+      {activePoint && (
+        <foreignObject x="4" y="3" width="42" height="14">
+          <div className="rounded border border-[rgba(255,255,255,0.16)] bg-[rgba(8,16,13,0.86)] px-1.5 py-1 text-[3px] font-bold leading-none text-[var(--color-text-primary)]">
+            <div>{valueFormatter(activePoint.value)}</div>
+            <div className="mt-0.5 text-[2.4px] font-semibold text-[var(--color-text-muted)]">{formatChartDate(activePoint.timestamp)}</div>
+          </div>
+        </foreignObject>
+      )}
     </svg>
   );
 }
 
 function VolumeBars({ points, heightClass = "h-[132px]" }: { points: AnalyticsPoint[]; heightClass?: string }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const max = Math.max(...points.map((point) => point.value), 1);
+  const activePoint = activeIndex !== null ? points[activeIndex] : points[points.length - 1];
   if (points.length === 0) {
     return (
       <div className={`flex ${heightClass} items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] text-[13px] text-[var(--color-text-muted)]`}>
@@ -260,15 +353,36 @@ function VolumeBars({ points, heightClass = "h-[132px]" }: { points: AnalyticsPo
   }
 
   return (
-    <div className={`flex ${heightClass} items-end gap-1 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.42)] px-2 pb-2 pt-3`}>
-      {points.map((point) => (
-        <div
-          key={`${point.timestamp}-${point.value}`}
-          className="flex-1 rounded-t-sm bg-[linear-gradient(180deg,var(--color-accent-secondary),rgba(220,184,255,0.28))] opacity-90"
-          style={{ height: `${Math.max(5, (point.value / max) * 100)}%` }}
-          title={formatCurrency(point.value)}
-        />
-      ))}
+    <div
+      className={`relative flex ${heightClass} items-end gap-1 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] bg-[rgba(8,16,13,0.42)] px-2 pb-2 pt-8`}
+      onPointerLeave={() => setActiveIndex(null)}
+    >
+      {activePoint && (
+        <div className="absolute left-3 top-2 z-[1] rounded border border-[rgba(255,255,255,0.12)] bg-[rgba(8,16,13,0.82)] px-2 py-1 text-[10px] font-bold text-[var(--color-text-primary)]">
+          {formatCurrency(activePoint.value)}
+          <span className="ml-2 font-semibold text-[var(--color-text-muted)]">{formatChartDate(activePoint.timestamp)}</span>
+        </div>
+      )}
+      {points.map((point, index) => {
+        const isActive = index === activeIndex || (activeIndex === null && index === points.length - 1);
+        return (
+          <button
+            key={`${point.timestamp}-${point.value}`}
+            type="button"
+            aria-label={`${formatCurrency(point.value)} on ${formatChartDate(point.timestamp)}`}
+            onPointerEnter={() => setActiveIndex(index)}
+            onFocus={() => setActiveIndex(index)}
+            onBlur={() => setActiveIndex(null)}
+            className={`min-w-0 flex-1 rounded-t-sm transition-all duration-300 ease-out ${
+              isActive
+                ? "bg-[linear-gradient(180deg,var(--color-accent-primary),rgba(0,245,204,0.34))] opacity-100"
+                : "bg-[linear-gradient(180deg,var(--color-accent-secondary),rgba(220,184,255,0.28))] opacity-75 hover:opacity-95"
+            }`}
+            style={{ height: `${Math.max(5, (point.value / max) * 100)}%` }}
+            title={formatCurrency(point.value)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -284,6 +398,7 @@ function BarList({
   maxValue?: number;
   limit?: number;
 }) {
+  const [activeLabel, setActiveLabel] = useState("");
   const visible = typeof limit === "number" ? items.slice(0, limit) : items;
   const max = maxValue || Math.max(...visible.map((item) => item.value), 1);
 
@@ -293,15 +408,28 @@ function BarList({
 
   return (
     <div className="space-y-3">
-      {visible.map((item) => (
-        <div key={item.label} className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_128px_auto] sm:items-center">
+      {visible.map((item) => {
+        const isActive = activeLabel === item.label;
+        return (
+        <div
+          key={item.label}
+          className={`grid min-w-0 gap-2 rounded-[var(--radius-sm)] px-2 py-1 transition-colors sm:grid-cols-[minmax(0,1fr)_128px_auto] sm:items-center ${
+            isActive ? "bg-[rgba(0,245,204,0.06)]" : "hover:bg-[rgba(255,255,255,0.025)]"
+          }`}
+          onPointerEnter={() => setActiveLabel(item.label)}
+          onPointerLeave={() => setActiveLabel("")}
+        >
           <div className="min-w-0">
             <div className="truncate text-[14px] font-bold text-[var(--color-text-primary)]">{item.label}</div>
             {item.detail && <div className="truncate text-[11px] text-[var(--color-text-muted)]">{item.detail}</div>}
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
             <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-accent-primary),var(--color-accent-violet))]"
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                isActive
+                  ? "bg-[linear-gradient(90deg,var(--color-accent-primary),var(--color-accent-secondary))]"
+                  : "bg-[linear-gradient(90deg,var(--color-accent-primary),var(--color-accent-violet))]"
+              }`}
               style={{ width: `${Math.max(3, Math.min(100, (item.value / max) * 100))}%` }}
             />
           </div>
@@ -309,7 +437,8 @@ function BarList({
             {valueFormatter(item.value)}
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 }
@@ -351,49 +480,6 @@ function StablecoinTable({ stablecoins }: { stablecoins: AnalyticsStablecoin[] }
   );
 }
 
-function ValidatorTable({ validators }: { validators: AnalyticsValidator[] }) {
-  const visible = validators.slice(0, 12);
-
-  if (visible.length === 0) {
-    return <div className="text-[13px] text-[var(--color-text-muted)]">No validator data available.</div>;
-  }
-
-  return (
-    <div className="max-w-full overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-[13px]">
-        <thead>
-          <tr className="border-b border-[var(--color-border)] text-[var(--color-text-dim)]">
-            <th className="py-2 pr-3 font-semibold">Rank</th>
-            <th className="py-2 pr-3 font-semibold">Validator</th>
-            <th className="py-2 pr-3 text-right font-semibold">Stake</th>
-            <th className="py-2 pr-3 text-right font-semibold">Share</th>
-            <th className="py-2 pr-3 text-right font-semibold">Commission</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((validator) => (
-            <tr key={`${validator.id}-${validator.name}`} className="border-b border-[rgba(255,255,255,0.055)]">
-              <td className="py-3 pr-3 font-mono text-[var(--color-text-muted)]">#{validator.rank || "-"}</td>
-              <td className="max-w-[280px] truncate py-3 pr-3 font-bold text-[var(--color-text-primary)]">
-                {validator.name}
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {formatMon(validator.stakeMon)}
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {formatPercent(validator.sharePct, 2)}
-              </td>
-              <td className="py-3 pr-3 text-right font-mono text-[var(--color-text-secondary)]">
-                {formatPercent(validator.commissionPct, 2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 async function loadAnalytics() {
   const response = await fetch("/api/analytics");
   const data = await response.json();
@@ -404,14 +490,33 @@ async function loadAnalytics() {
 export function AnalyticsDashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [chartRange, setChartRange] = useState<ChartRange>("30d");
+  const [lastFetchedAt, setLastFetchedAt] = useState(0);
+
+  const refreshAnalytics = useCallback((silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    setError("");
+
+    loadAnalytics()
+      .then((next) => {
+        setAnalytics(next);
+        setLastFetchedAt(Date.now());
+      })
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Could not load analytics."))
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  }, []);
 
   useEffect(() => {
-    loadAnalytics()
-      .then(setAnalytics)
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Could not load analytics."))
-      .finally(() => setLoading(false));
-  }, []);
+    refreshAnalytics();
+    const interval = window.setInterval(() => refreshAnalytics(true), 60_000);
+    return () => window.clearInterval(interval);
+  }, [refreshAnalytics]);
 
   const sourceLine = useMemo(() => analytics?.sources.join(" + ") || "", [analytics]);
 
@@ -440,42 +545,67 @@ export function AnalyticsDashboard() {
   const monthTone = percentTone(analytics.market.change30dPct);
   const tvl = analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd;
   const volumeToTvl = analytics.dex.volumeToTvlPct;
-  const stakingRatio =
-    analytics.supply.totalSupplyMon && analytics.supply.lockedOrStakedMon
-      ? (analytics.supply.lockedOrStakedMon / analytics.supply.totalSupplyMon) * 100
-      : undefined;
-  const top10Share = analytics.decentralization.top10SharePct;
   const dataAgeMinutes = Math.round((Date.now() - analytics.generatedAt) / 60000);
   const dataFresh = dataAgeMinutes <= 15;
   const sourceCount = analytics.sources.length;
+  const pricePoints = pointsForRange(analytics.market.priceTrend, chartRange);
+  const feePoints = pointsForRange(analytics.economy.feeTrend, chartRange);
+  const dexVolumePoints = pointsForRange(analytics.dex.volumeTrend, chartRange);
+  const defiVolumePoints = pointsForRange(analytics.defi.volume30dTrend, chartRange);
   const navItems = [
     ["Overview", "#overview"],
     ["Market", "#market"],
     ["Network", "#network"],
     ["DeFi", "#defi"],
-    ["Staking", "#staking"],
-    ["Validators", "#validators"],
   ];
 
   return (
     <div className="min-w-0 space-y-5">
       <div className="sticky top-0 z-10 -mx-1 border-b border-[rgba(132,148,142,0.22)] bg-[rgba(8,16,13,0.88)] px-1 py-3 backdrop-blur">
-        <div className="flex min-w-0 gap-2 overflow-x-auto">
-          {navItems.map(([label, href]) => (
-            <a
-              key={href}
-              href={href}
-              className="shrink-0 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(13,21,18,0.8)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 gap-2 overflow-x-auto">
+            {navItems.map(([label, href]) => (
+              <a
+                key={href}
+                href={href}
+                className="shrink-0 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(13,21,18,0.8)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div className="flex rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(13,21,18,0.8)] p-1">
+              {CHART_RANGES.map((range) => (
+                <button
+                  key={range.value}
+                  type="button"
+                  onClick={() => setChartRange(range.value)}
+                  className={`h-8 min-w-10 rounded-[var(--radius-sm)] px-2 text-[11px] font-black transition-colors ${
+                    chartRange === range.value
+                      ? "bg-[var(--color-accent-primary)] text-[#06110D]"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => refreshAnalytics(true)}
+              disabled={refreshing}
+              className="h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(13,21,18,0.8)] px-3 text-[11px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)] disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {label}
-            </a>
-          ))}
+              {refreshing ? "Syncing..." : "Refresh"}
+            </button>
+          </div>
         </div>
       </div>
 
       <section id="overview" className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <StatusChip label="Status" value={dataFresh ? "Live" : "Stale"} tone={dataFresh ? "positive" : "warning"} />
-        <StatusChip label="Updated" value={timeAgo(analytics.generatedAt)} />
+        <StatusChip label="Updated" value={timeAgo(lastFetchedAt || analytics.generatedAt)} />
         <StatusChip label="RPC block" value={formatNumber(analytics.network.blockHeight)} tone="positive" />
         <StatusChip label="Sources" value={`${sourceCount} connected`} />
         <StatusChip label="Epoch" value={formatNumber(analytics.network.epoch)} tone={analytics.network.inEpochDelayPeriod ? "warning" : "neutral"} />
@@ -509,7 +639,13 @@ export function AnalyticsDashboard() {
               <MiniMetric label="Open interest" value={formatCurrency(analytics.market.openInterestUsd)} />
               <MiniMetric label="Chain TVL" value={formatCurrency(tvl)} />
             </div>
-            <TrendChart points={analytics.market.priceTrend} color="var(--color-accent-secondary)" heightClass="h-[300px]" />
+            <TrendChart
+              points={pricePoints}
+              color="var(--color-accent-secondary)"
+              heightClass="h-[300px]"
+              valueFormatter={(value) => formatCurrency(value, 6)}
+              label={`MON price, ${rangeLabel(chartRange)}`}
+            />
           </div>
         </div>
       </section>
@@ -522,15 +658,15 @@ export function AnalyticsDashboard() {
           tone={typeof volumeToTvl === "number" && volumeToTvl >= 10 ? "positive" : "neutral"}
         />
         <InsightCard
-          label="Validator concentration"
-          value={formatPercent(top10Share, 2)}
-          detail="Stake controlled by the top 10 validators."
-          tone={typeof top10Share === "number" && top10Share > 50 ? "warning" : "neutral"}
+          label="Market momentum"
+          value={formatSignedPercent(analytics.market.change30dPct)}
+          detail="MON price movement over the last 30 days."
+          tone={monthTone}
         />
         <InsightCard
-          label="Staking ratio"
-          value={formatPercent(stakingRatio, 1)}
-          detail="Estimated locked or actively staked supply."
+          label="Fee run rate"
+          value={formatCurrency(analytics.economy.annualizedFeesUsd)}
+          detail="Annualized chain fees from recent fee data."
           tone="neutral"
         />
       </section>
@@ -545,7 +681,7 @@ export function AnalyticsDashboard() {
         </div>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
-          <VolumeBars points={analytics.economy.feeTrend} />
+          <VolumeBars points={feePoints} />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <MiniMetric label="Burn est. 24h" value={formatMon(analytics.economy.burnRate24hMon)} helper="recent blocks" />
             <MiniMetric label="Net emission 24h" value={formatMon(analytics.economy.netEmission24hMon)} />
@@ -562,6 +698,14 @@ export function AnalyticsDashboard() {
             <MiniMetric label="DEX TVL" value={formatCurrency(analytics.dex.tvlUsd)} />
           </div>
           <BarList items={analytics.defi.protocolTvl} valueFormatter={formatCurrency} limit={8} />
+          <div className="mt-5">
+            <TrendChart
+              points={defiVolumePoints}
+              color="var(--color-accent-primary)"
+              heightClass="h-[180px]"
+              label={`DeFi volume, ${rangeLabel(chartRange)}`}
+            />
+          </div>
         </SectionPanel>
 
         <SectionPanel eyebrow="DEX flow" title="Volume, fees, and efficiency">
@@ -572,7 +716,7 @@ export function AnalyticsDashboard() {
             <MiniMetric label="Volume / TVL" value={formatPercent(analytics.dex.volumeToTvlPct, 2)} />
           </div>
           <div className="mt-5">
-            <VolumeBars points={analytics.dex.volumeTrend} />
+            <VolumeBars points={dexVolumePoints} />
           </div>
         </SectionPanel>
       </div>
@@ -604,42 +748,6 @@ export function AnalyticsDashboard() {
           <StablecoinTable stablecoins={analytics.stablecoins.assets} />
         </SectionPanel>
       </div>
-
-      <div id="staking" className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <SectionPanel eyebrow="Staking and supply" title="Security budget and token float">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MiniMetric label="Active validators" value={`${formatNumber(analytics.staking.activeValidators)} / ${formatNumber(analytics.staking.activeSetCap)}`} />
-            <MiniMetric label="Active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
-            <MiniMetric label="Value staked" value={formatCurrency(analytics.staking.totalValueStakedUsd)} />
-            <MiniMetric label="Est. APY" value={formatPercent(analytics.staking.estimatedApyPct, 1)} />
-            <MiniMetric label="Total supply" value={formatMon(analytics.supply.totalSupplyMon)} />
-            <MiniMetric label="Circulating" value={formatMon(analytics.supply.circulatingSupplyMon)} helper={formatPercent(analytics.supply.circulatingPct, 2)} />
-          </div>
-        </SectionPanel>
-
-        <SectionPanel eyebrow="Decentralization" title="Validator concentration and distribution">
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MiniMetric label="Liveness Nakamoto" value={formatNumber(analytics.decentralization.nakamotoLiveness)} />
-            <MiniMetric label="Safety Nakamoto" value={formatNumber(analytics.decentralization.nakamotoSafety)} />
-            <MiniMetric label="Top 10 share" value={formatPercent(analytics.decentralization.top10SharePct)} />
-            <MiniMetric label="Gini / HHI" value={`${formatNumber(analytics.decentralization.gini, 3)} / ${formatNumber(analytics.decentralization.hhi, 0)}`} />
-          </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div>
-              <div className="mb-3 text-[13px] font-bold text-[var(--color-text-secondary)]">Countries</div>
-              <BarList items={analytics.decentralization.countries} valueFormatter={(value) => formatPercent(value, 1)} limit={6} />
-            </div>
-            <div>
-              <div className="mb-3 text-[13px] font-bold text-[var(--color-text-secondary)]">Infrastructure providers</div>
-              <BarList items={analytics.decentralization.providers} valueFormatter={(value) => formatPercent(value, 1)} limit={6} />
-            </div>
-          </div>
-        </SectionPanel>
-      </div>
-
-      <SectionPanel id="validators" eyebrow="Active set" title="Top validators">
-        <ValidatorTable validators={analytics.validators} />
-      </SectionPanel>
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-3 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
         <span className="font-bold text-[var(--color-text-secondary)]">Data sources:</span> {sourceLine || "Unavailable"}.
