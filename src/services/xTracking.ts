@@ -17,6 +17,9 @@ interface XUser {
 interface XTweet {
   id: string;
   text: string;
+  note_tweet?: {
+    text?: string;
+  };
   created_at?: string;
   public_metrics?: {
     like_count?: number;
@@ -228,7 +231,7 @@ async function fetchNewTweets(user: XUser, sinceId?: string) {
   const params = new URLSearchParams({
     max_results: String(MAX_RESULTS_PER_ACCOUNT),
     exclude: "retweets,replies",
-    "tweet.fields": "created_at,public_metrics",
+    "tweet.fields": "created_at,public_metrics,note_tweet,entities",
   });
   if (sinceId) params.set("since_id", sinceId);
 
@@ -247,7 +250,8 @@ function tweetUrl(username: string, tweetId: string) {
 }
 
 function scoreTweet(tweet: XTweet, account: TrackedAccount) {
-  const text = tweet.text.toLowerCase();
+  const fullText = fullTweetText(tweet);
+  const text = fullText.toLowerCase();
   let score = Math.max(0, account.priority - 3);
 
   const criticalKeywords = [
@@ -282,7 +286,7 @@ function scoreTweet(tweet: XTweet, account: TrackedAccount) {
 
   score += criticalKeywords.filter((keyword) => text.includes(keyword)).length * 3;
   score += strongKeywords.filter((keyword) => text.includes(keyword)).length * 2;
-  if (/https?:\/\//u.test(tweet.text)) score += 1;
+  if (/https?:\/\//u.test(fullText)) score += 1;
   if (lowSignalWords.some((word) => text === word || text.startsWith(`${word} `))) score -= 2;
 
   const metrics = tweet.public_metrics;
@@ -301,8 +305,20 @@ function scoreTweet(tweet: XTweet, account: TrackedAccount) {
 
 function titleForTweet(tweet: StoredTweet) {
   const clean = tweet.text.replace(/\s+/g, " ").trim();
-  const clipped = clean.length > 84 ? `${clean.slice(0, 81).trimEnd()}...` : clean;
+  const clipped = trimAtWord(clean, 84);
   return `@${tweet.username}: ${clipped}`;
+}
+
+function trimAtWord(value: string, maxLength: number) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) return cleaned;
+  const cut = cleaned.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
+}
+
+function fullTweetText(tweet: XTweet) {
+  return (tweet.note_tweet?.text || tweet.text || "").replace(/\s+/g, " ").trim();
 }
 
 function telegramMessageForTweet(tweet: StoredTweet) {
@@ -401,7 +417,7 @@ export async function ingestTrackedXTweets() {
         const stored: StoredTweet = {
           id: tweet.id,
           username: user.username || account.username,
-          text: tweet.text.trim(),
+          text: fullTweetText(tweet),
           url: tweetUrl(user.username || account.username, tweet.id),
           createdAt: tweet.created_at || new Date().toISOString(),
           score: scoreTweet(tweet, account),

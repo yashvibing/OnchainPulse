@@ -1148,25 +1148,99 @@ function buildDigestMessage(alert: TelegramAlert, opportunities: YieldOpportunit
   return `${alertTitle(alert)}\nTop displayed rates for ${scope}:\n${lines.join("\n")}`;
 }
 
-async function buildLatestNewsBriefMessage() {
-  const news = await loadLatestNews();
-  const items = news.items.slice(0, 5);
+function trimForTelegram(value: string, maxLength: number) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) return cleaned;
+  const cut = cleaned.slice(0, maxLength - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
+}
 
-  if (items.length === 0) {
-    return "Daily latest news brief\nNo curated news has been added yet.";
+function stripTelegramNoise(value: string) {
+  return value
+    .replace(/https?:\/\/\S+/giu, "")
+    .replace(/@([a-z0-9_]{2,})/giu, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeForComparison(value: string) {
+  return stripTelegramNoise(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, " ")
+    .trim();
+}
+
+function removeLeadingSourcePrefix(value: string) {
+  return value
+    .replace(/^@?[a-z0-9_]{2,}\s*:\s*/iu, "")
+    .replace(/^\s*X\s*\/\s*@?[a-z0-9_]{2,}\s*:\s*/iu, "")
+    .trim();
+}
+
+function meaningfulText(value: string) {
+  return normalizeForComparison(removeLeadingSourcePrefix(value).replace(/\.{3}$/u, ""));
+}
+
+function isSameNewsText(a: string, b: string) {
+  const left = meaningfulText(a);
+  const right = meaningfulText(b);
+  if (!left || !right) return false;
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length > right.length ? left : right;
+  return longer.startsWith(shorter) || longer.includes(shorter);
+}
+
+function newsSourceLabel(item: NewsArticle) {
+  const source = stripTelegramNoise(item.source || "");
+  if (source && source.toLowerCase() !== "manual") return trimForTelegram(source, 28);
+
+  try {
+    const url = new URL(item.link);
+    const [, handle] = url.pathname.split("/");
+    if ((url.hostname === "x.com" || url.hostname === "twitter.com") && handle) {
+      return trimForTelegram(handle.replace(/_/gu, " "), 28);
+    }
+    return trimForTelegram(url.hostname.replace(/^www\./u, ""), 28);
+  } catch {
+    return "Curated";
+  }
+}
+
+export function buildLatestNewsBriefText(items: NewsArticle[]) {
+  const selected = items.slice(0, 5);
+
+  if (selected.length === 0) {
+    return "Onchain Pulse daily brief\nNo curated news has been added yet.";
   }
 
-  const lines = items.map((item, index) => {
-    const summary = item.summary.trim();
-    const link = item.link.trim();
+  const lines = selected.map((item, index) => {
+    const source = newsSourceLabel(item);
+    const rawTitle = stripTelegramNoise(item.title);
+    const rawSummary = stripTelegramNoise(item.summary);
+    const titleBody = removeLeadingSourcePrefix(rawTitle);
+    const summaryAddsContext = rawSummary && !isSameNewsText(titleBody, rawSummary);
+    const body =
+      rawSummary && !summaryAddsContext
+        ? rawSummary
+        : titleBody || rawSummary || source;
+    const cleanedBody = trimForTelegram(body, 260);
+    const cleanedSummary = summaryAddsContext ? trimForTelegram(rawSummary, 180) : "";
+
     return [
-      `${index + 1}. ${item.title}`,
-      summary ? `Summary: ${summary}` : "",
-      link ? `Source: ${link}` : "",
+      `${index + 1}. ${source}`,
+      cleanedBody ? `   ${cleanedBody}` : "",
+      cleanedSummary ? `   ${cleanedSummary}` : "",
+      item.link ? `   ${source} - Read: ${item.link.trim()}` : `   ${source}`,
     ].filter(Boolean).join("\n");
   });
 
-  return `Daily latest news brief\n${lines.join("\n\n")}`;
+  return `Onchain Pulse daily brief\n${lines.join("\n\n")}`;
+}
+
+async function buildLatestNewsBriefMessage() {
+  const news = await loadLatestNews();
+  return buildLatestNewsBriefText(news.items);
 }
 
 function dailyNewsChannelSentKey(day: string) {
