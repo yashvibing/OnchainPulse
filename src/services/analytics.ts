@@ -6,7 +6,7 @@ import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 import { fetchTokenMarkets, type TokenMarket } from "@/services/tokenMarkets";
 import { fetchCombinedYieldOpportunitiesWithMeta } from "@/services/yields-aggregator";
 
-const ANALYTICS_CACHE_KEY = "analytics:monad:v5";
+const ANALYTICS_CACHE_KEY = "analytics:monad:v7";
 const ANALYTICS_TTL_MS = 5 * 60 * 1000;
 const ANALYTICS_STALE_TTL_MS = 30 * 60 * 1000;
 const BLOCK_TIME_SAMPLE_SIZE = 100n;
@@ -17,9 +17,7 @@ const MONAD_FINALITY_SECONDS = 0.8;
 const MONAD_EPOCH_HOURS = 5.5;
 const MONAD_INITIAL_SUPPLY_MON = 100_000_000_000;
 
-const MONSCOPE_DECENTRALIZATION_URL = "https://monscope.xyz/api/v1/decentralization";
-const MONSCOPE_VALIDATORS_URL = "https://monscope.xyz/api/v1/validators";
-const MONSCOPE_OPEN_INTEREST_URL = "https://monscope.xyz/api/open-interest";
+const GMONADS_BASE_URL = "https://www.gmonads.com/api/v1/public";
 const DEFILLAMA_MON_PRICE_URL = "https://coins.llama.fi/prices/current/coingecko:monad";
 const COINGECKO_MON_URL =
   "https://api.coingecko.com/api/v3/coins/monad?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false";
@@ -79,7 +77,6 @@ export interface AnalyticsPayload {
     marketCapUsd?: number;
     fdvUsd?: number;
     volume24hUsd?: number;
-    openInterestUsd?: number;
     priceTrend: AnalyticsPoint[];
   };
   supply: {
@@ -107,6 +104,9 @@ export interface AnalyticsPayload {
     blockHeight?: number;
     gasGwei?: number;
     blockTimeSeconds?: number;
+    tps?: number;
+    transactions1h?: number;
+    blocks1h?: number;
     finalitySeconds?: number;
     epoch?: number;
     inEpochDelayPeriod?: boolean;
@@ -259,67 +259,83 @@ interface DefiLlamaYieldResponse {
   }>;
 }
 
-interface MonscopeOpenInterestResponse {
-  openInterest?: string;
+interface GmonadsResponse<T> {
+  success?: boolean;
+  data?: T;
 }
 
-interface MonscopeDecentralizationResponse {
-  fetched_at?: string;
-  epoch?: number;
-  metrics?: {
-    stake?: {
-      totalStakeMON?: number;
-      gini?: number;
-      hhi?: number;
-      nakamoto?: {
-        liveness?: number;
-        safety?: number;
-      };
-      shares?: {
-        top10?: number;
-      };
-    };
-    commission?: {
-      meanPct?: number;
-      medianPct?: number;
-      atVdpCap?: number;
-    };
-    active_set?: {
-      active?: number;
-      activeCap?: number;
-    };
-    geo?: {
-      countries?: Array<{
-        label?: string;
-        validatorCount?: number;
-        stakePct?: number;
-      }>;
-    };
-    infra?: {
-      providers?: Array<{
-        label?: string;
-        validatorCount?: number;
-        stakePct?: number;
-      }>;
-    };
-  };
+interface GmonadsValidator {
+  epoch?: string | number;
+  val_index?: string | number;
+  stake?: string | number;
+  validator_set_type?: string;
+  commission?: string | number;
+  auth_address?: string;
+  ip_address?: string;
 }
 
-interface MonscopeValidatorsResponse {
+interface GmonadsValidatorGeo extends GmonadsValidator {
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  isp?: string;
+  as?: string;
+  connected?: boolean;
+}
+
+interface GmonadsValidatorMetadata {
+  val_index?: string | number;
+  name?: string;
+  moniker?: string;
+  validator_name?: string;
+  website?: string;
+  x?: string;
+  twitter?: string;
+}
+
+interface GmonadsBlockPoint {
+  bucket?: string;
+  timestamp?: string;
+  blocks?: string | number;
+  txs?: string | number;
+  avg_tps?: string | number;
+  avg_bps?: string | number;
+  avg_block_time_s?: string | number;
+  total_base_fee?: string | number;
+  total_priority_fee?: string | number;
+}
+
+interface GmonadsSnapshot {
+  validators: GmonadsValidator[];
+  geolocations: GmonadsValidatorGeo[];
+  metadata: GmonadsValidatorMetadata[];
+  blocks: GmonadsBlockPoint[];
+}
+
+interface ValidatorAnalyticsSummary {
   epoch?: number;
-  active_set_size?: number;
-  active_set_cap?: number;
-  total_active_stake_mon?: number;
-  validators?: Array<{
-    rank?: number;
-    id?: number;
-    name?: string;
-    stake_mon?: number;
-    share_pct?: number;
-    commission_pct?: number;
-    website?: string;
-    x?: string;
-  }>;
+  activeValidators?: number;
+  activeSetCap?: number;
+  totalActiveStakeMon?: number;
+  meanCommissionPct?: number;
+  medianCommissionPct?: number;
+  atCommissionCap?: number;
+  nakamotoLiveness?: number;
+  nakamotoSafety?: number;
+  gini?: number;
+  hhi?: number;
+  top10SharePct?: number;
+  countries: AnalyticsBar[];
+  providers: AnalyticsBar[];
+  validators: AnalyticsValidator[];
+}
+
+interface BlockStatsSummary {
+  blockTimeSeconds?: number;
+  tps?: number;
+  transactions1h?: number;
+  blocks1h?: number;
+  feeTrend: AnalyticsPoint[];
 }
 
 function toNumber(value: unknown) {
@@ -340,22 +356,6 @@ function toPoints(chart?: Array<[number, number]>) {
   return (chart || [])
     .map(([timestamp, value]) => ({ timestamp, value }))
     .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value));
-}
-
-function parseCompactUsd(value?: string) {
-  if (!value) return undefined;
-  const match = value.trim().match(/^\$?\s*([\d,.]+)\s*([KMBT])?$/iu);
-  if (!match) return undefined;
-  const amount = Number(match[1].replace(/,/gu, ""));
-  if (!Number.isFinite(amount)) return undefined;
-  const suffix = match[2]?.toUpperCase();
-  const multiplier =
-    suffix === "T" ? 1_000_000_000_000 :
-    suffix === "B" ? 1_000_000_000 :
-    suffix === "M" ? 1_000_000 :
-    suffix === "K" ? 1_000 :
-    1;
-  return amount * multiplier;
 }
 
 export function calculateAverageBlockTimeSeconds(
@@ -570,13 +570,221 @@ async function fetchStakingApySummary() {
   };
 }
 
-async function fetchOpenInterestUsd() {
-  const data = await fetchJsonWithRetry<MonscopeOpenInterestResponse>(MONSCOPE_OPEN_INTEREST_URL, {
-    sourceName: "monscope-open-interest",
-    timeoutMs: 8_000,
-    retries: 1,
-  });
-  return parseCompactUsd(data.openInterest);
+async function fetchGmonadsData<T>(path: string, sourceName: string) {
+  const data = await fetchJsonWithRetry<GmonadsResponse<T>>(
+    `${GMONADS_BASE_URL}${path}${path.includes("?") ? "&" : "?"}network=mainnet`,
+    {
+      sourceName,
+      timeoutMs: 10_000,
+      retries: 1,
+    }
+  );
+  return data.data;
+}
+
+async function fetchGmonadsSnapshot(): Promise<GmonadsSnapshot> {
+  const [validators, geolocations, metadata, blocks] = await Promise.all([
+    fetchGmonadsData<GmonadsValidator[]>("/validators/epoch", "gmonads-validators-epoch")
+      .catch(() => []),
+    fetchGmonadsData<GmonadsValidatorGeo[]>("/validators/geolocations", "gmonads-validators-geolocations")
+      .catch(() => []),
+    fetchGmonadsData<GmonadsValidatorMetadata[]>("/validators/metadata", "gmonads-validators-metadata")
+      .catch(() => []),
+    fetchGmonadsData<GmonadsBlockPoint[]>("/blocks/1m", "gmonads-blocks-1m")
+      .catch(() => []),
+  ]);
+
+  return {
+    validators: Array.isArray(validators) ? validators : [],
+    geolocations: Array.isArray(geolocations) ? geolocations : [],
+    metadata: Array.isArray(metadata) ? metadata : [],
+    blocks: Array.isArray(blocks) ? blocks : [],
+  };
+}
+
+function normalizeStakeMon(value: unknown) {
+  const stake = toNumber(value);
+  if (typeof stake !== "number") return 0;
+  return stake > 1e15 ? stake / 1e18 : stake;
+}
+
+function normalizeCommissionPct(value: unknown) {
+  const commission = toNumber(value);
+  if (typeof commission !== "number") return 0;
+  if (commission <= 100) return commission;
+  if (commission <= 10_000) return commission / 100;
+  return commission / 1e16;
+}
+
+function normalizeWeiToMon(value: unknown) {
+  const wei = toNumber(value);
+  if (typeof wei !== "number") return 0;
+  return wei / 1e18;
+}
+
+function median(values: number[]) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (sorted.length === 0) return undefined;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[middle - 1] || 0) + (sorted[middle] || 0)) / 2
+    : sorted[middle];
+}
+
+function gini(values: number[]) {
+  const sorted = values.filter((value) => value > 0).sort((a, b) => a - b);
+  const total = sum(sorted);
+  if (sorted.length === 0 || total === 0) return undefined;
+  const weighted = sorted.reduce((acc, value, index) => acc + (index + 1) * value, 0);
+  return ((2 * weighted) / (sorted.length * total)) - ((sorted.length + 1) / sorted.length);
+}
+
+function nakamotoCoefficient(stakes: number[], thresholdPct: number) {
+  const total = sum(stakes);
+  if (total <= 0) return undefined;
+  let running = 0;
+  const sorted = [...stakes].sort((a, b) => b - a);
+  for (let index = 0; index < sorted.length; index += 1) {
+    running += sorted[index] || 0;
+    if ((running / total) * 100 >= thresholdPct) return index + 1;
+  }
+  return sorted.length;
+}
+
+function aggregateByStake(
+  rows: Array<{ label?: string; stakeMon: number }>,
+  fallbackLabel: string
+): AnalyticsBar[] {
+  const totalStake = sum(rows.map((row) => row.stakeMon));
+  const grouped = rows.reduce((map, row) => {
+    const label = row.label || fallbackLabel;
+    const current = map.get(label) || { stakeMon: 0, count: 0 };
+    current.stakeMon += row.stakeMon;
+    current.count += 1;
+    map.set(label, current);
+    return map;
+  }, new Map<string, { stakeMon: number; count: number }>());
+
+  return [...grouped.entries()]
+    .map(([label, item]) => ({
+      label,
+      value: totalStake > 0 ? (item.stakeMon / totalStake) * 100 : item.count,
+      detail: `${item.count} validators`,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+}
+
+function buildValidatorAnalytics(snapshot: GmonadsSnapshot): ValidatorAnalyticsSummary {
+  const metadataByIndex = new Map(
+    snapshot.metadata.map((item) => [Number(item.val_index), item])
+  );
+  const geoByIndex = new Map(
+    snapshot.geolocations.map((item) => [Number(item.val_index), item])
+  );
+  const sourceValidators = snapshot.validators.length > 0
+    ? snapshot.validators
+    : snapshot.geolocations;
+  const active = sourceValidators
+    .filter((validator) => !validator.validator_set_type || validator.validator_set_type === "active")
+    .map((validator) => {
+      const id = Number(validator.val_index || 0);
+      const geo = geoByIndex.get(id);
+      const meta = metadataByIndex.get(id);
+      const stakeMon = normalizeStakeMon(validator.stake ?? geo?.stake);
+      const commissionPct = normalizeCommissionPct(validator.commission ?? geo?.commission);
+      return {
+        id,
+        stakeMon,
+        commissionPct,
+        epoch: toNumber(validator.epoch ?? geo?.epoch),
+        name:
+          meta?.name ||
+          meta?.moniker ||
+          meta?.validator_name ||
+          (validator.auth_address ? `${validator.auth_address.slice(0, 6)}...${validator.auth_address.slice(-4)}` : `Validator ${id}`),
+        website: meta?.website,
+        x: meta?.x || meta?.twitter,
+        country: geo?.country || geo?.countryCode,
+        provider: geo?.isp || geo?.as,
+      };
+    })
+    .filter((validator) => validator.stakeMon > 0)
+    .sort((a, b) => b.stakeMon - a.stakeMon);
+
+  const stakes = active.map((validator) => validator.stakeMon);
+  const totalActiveStakeMon = sum(stakes);
+  const commissions = active.map((validator) => validator.commissionPct);
+  const top10SharePct =
+    totalActiveStakeMon > 0 ? (sum(stakes.slice(0, 10)) / totalActiveStakeMon) * 100 : undefined;
+
+  return {
+    epoch: active.find((validator) => typeof validator.epoch === "number")?.epoch,
+    activeValidators: active.length || undefined,
+    activeSetCap: 200,
+    totalActiveStakeMon: totalActiveStakeMon || undefined,
+    meanCommissionPct: commissions.length ? sum(commissions) / commissions.length : undefined,
+    medianCommissionPct: median(commissions),
+    atCommissionCap: commissions.filter((commission) => commission >= 100).length,
+    nakamotoLiveness: nakamotoCoefficient(stakes, 66.67),
+    nakamotoSafety: nakamotoCoefficient(stakes, 33.34),
+    gini: gini(stakes),
+    hhi:
+      totalActiveStakeMon > 0
+        ? stakes.reduce((acc, stake) => acc + ((stake / totalActiveStakeMon) * 100) ** 2, 0)
+        : undefined,
+    top10SharePct,
+    countries: aggregateByStake(
+      active.map((validator) => ({ label: validator.country, stakeMon: validator.stakeMon })),
+      "Unknown"
+    ),
+    providers: aggregateByStake(
+      active.map((validator) => ({ label: validator.provider, stakeMon: validator.stakeMon })),
+      "Unknown"
+    ),
+    validators: active.slice(0, 20).map((validator, index) => ({
+      rank: index + 1,
+      id: validator.id,
+      name: validator.name,
+      stakeMon: validator.stakeMon,
+      sharePct: totalActiveStakeMon > 0 ? (validator.stakeMon / totalActiveStakeMon) * 100 : 0,
+      commissionPct: validator.commissionPct,
+      website: validator.website,
+      x: validator.x,
+    })),
+  };
+}
+
+function buildBlockStats(blocks: GmonadsBlockPoint[]): BlockStatsSummary {
+  const points = blocks
+    .map((point) => {
+      const timestamp = Date.parse(point.bucket || point.timestamp || "");
+      return {
+        timestamp: Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : 0,
+        blocks: toNumber(point.blocks) || 0,
+        txs: toNumber(point.txs) || 0,
+        tps: toNumber(point.avg_tps),
+        blockTimeSeconds: toNumber(point.avg_block_time_s),
+        feesMon:
+          normalizeWeiToMon(point.total_base_fee) +
+          normalizeWeiToMon(point.total_priority_fee),
+      };
+    })
+    .filter((point) => point.timestamp > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const latest = points.at(-1);
+  const lastHour = points.slice(-60);
+
+  return {
+    blockTimeSeconds: latest?.blockTimeSeconds,
+    tps: latest?.tps,
+    transactions1h: sum(lastHour.map((point) => point.txs)),
+    blocks1h: sum(lastHour.map((point) => point.blocks)),
+    feeTrend: points.map((point) => ({
+      timestamp: point.timestamp,
+      value: point.feesMon,
+    })),
+  };
 }
 
 async function fetchPriceTrend() {
@@ -697,8 +905,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     monPrice,
     priceTrend,
     rpc,
-    decentralization,
-    validators,
+    gmonads,
     tokenMarkets,
     coinGeckoMonStats,
     monMarketStats,
@@ -709,21 +916,16 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     chainTvl,
     dexTvlSummary,
     stakingApySummary,
-    openInterestUsd,
   ] = await Promise.all([
     fetchCurrentMonPrice().catch(() => undefined),
     fetchPriceTrend().catch(() => []),
     fetchRpcSnapshot(),
-    fetchJsonWithRetry<MonscopeDecentralizationResponse>(MONSCOPE_DECENTRALIZATION_URL, {
-      sourceName: "monscope-decentralization",
-      timeoutMs: 8_000,
-      retries: 1,
-    }).catch(() => ({} as MonscopeDecentralizationResponse)),
-    fetchJsonWithRetry<MonscopeValidatorsResponse>(MONSCOPE_VALIDATORS_URL, {
-      sourceName: "monscope-validators",
-      timeoutMs: 8_000,
-      retries: 1,
-    }).catch(() => ({} as MonscopeValidatorsResponse)),
+    fetchGmonadsSnapshot().catch(() => ({
+      validators: [],
+      geolocations: [],
+      metadata: [],
+      blocks: [],
+    })),
     fetchTokenMarkets().catch(() => ({ data: [] })),
     fetchCoinGeckoMonStats().catch(() => ({} as AnalyticsMarketStats)),
     fetchMonMarketStats().catch(() => ({} as AnalyticsMarketStats)),
@@ -734,11 +936,12 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     fetchChainTvl().catch(() => undefined),
     fetchDexTvlSummary().catch(() => ({ totalUsd: 0, protocols: [] })),
     fetchStakingApySummary().catch(() => ({})),
-    fetchOpenInterestUsd().catch(() => undefined),
   ]);
 
   const markets = tokenMarkets.data || [];
   const opportunities = yieldOpportunities.data || [];
+  const validatorAnalytics = buildValidatorAnalytics(gmonads);
+  const blockStats = buildBlockStats(gmonads.blocks);
   const monMarket =
     markets.find((market) => market.tokenSymbol === "MON") ||
     markets.find((market) => market.tokenSymbol === "WMON");
@@ -794,7 +997,8 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     typeof dailyFeesUsd === "number" ? dailyFeesUsd * 365 : undefined;
   const marketCapUsd = resolvedMonMarket.marketCapUsd;
   const monPriceUsd = monPrice ?? resolvedMonMarket.priceUsd;
-  const blockTimeSeconds = "blockTimeSeconds" in rpc ? rpc.blockTimeSeconds : undefined;
+  const blockTimeSeconds =
+    blockStats.blockTimeSeconds ?? ("blockTimeSeconds" in rpc ? rpc.blockTimeSeconds : undefined);
   const estimatedBlocksPerDay =
     blockTimeSeconds && blockTimeSeconds > 0 ? 86400 / blockTimeSeconds : undefined;
   const grossEmission24hMon =
@@ -813,18 +1017,13 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
 
   const dailyVolume = toPoints(dexOverview.totalDataChart).slice(-30);
 
-  const activeStakeMon =
-    decentralization.metrics?.stake?.totalStakeMON ||
-    validators.total_active_stake_mon;
-
-  const activeValidators =
-    decentralization.metrics?.active_set?.active ||
-    validators.active_set_size;
+  const activeStakeMon = validatorAnalytics.totalActiveStakeMon;
+  const activeValidators = validatorAnalytics.activeValidators;
 
   return {
     generatedAt: Date.now(),
     sources: [
-      "Monscope API",
+      "gmonads",
       "CoinGecko",
       "DefiLlama",
       "GeckoTerminal",
@@ -841,7 +1040,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       marketCapUsd,
       fdvUsd: resolvedMonMarket.fdvUsd,
       volume24hUsd: resolvedMonMarket.volume24hUsd ?? sum(markets.map((market) => market.volume24hUsd)),
-      openInterestUsd,
       priceTrend,
     },
     supply: {
@@ -856,9 +1054,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     },
     staking: {
       activeValidators,
-      activeSetCap:
-        decentralization.metrics?.active_set?.activeCap ||
-        validators.active_set_cap,
+      activeSetCap: validatorAnalytics.activeSetCap,
       totalActiveStakeMon: activeStakeMon,
       totalValueStakedUsd:
         activeStakeMon && monPriceUsd
@@ -867,14 +1063,18 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       activeNodes: activeValidators,
       unbondingHours: MONAD_EPOCH_HOURS,
       ...stakingApySummary,
-      meanCommissionPct: decentralization.metrics?.commission?.meanPct,
-      medianCommissionPct: decentralization.metrics?.commission?.medianPct,
-      atCommissionCap: decentralization.metrics?.commission?.atVdpCap,
+      meanCommissionPct: validatorAnalytics.meanCommissionPct,
+      medianCommissionPct: validatorAnalytics.medianCommissionPct,
+      atCommissionCap: validatorAnalytics.atCommissionCap,
     },
     network: {
       ...rpc,
+      blockTimeSeconds,
+      tps: blockStats.tps,
+      transactions1h: blockStats.transactions1h,
+      blocks1h: blockStats.blocks1h,
       finalitySeconds: MONAD_FINALITY_SECONDS,
-      epoch: ("epoch" in rpc ? rpc.epoch : undefined) ?? decentralization.epoch,
+      epoch: ("epoch" in rpc ? rpc.epoch : undefined) ?? validatorAnalytics.epoch,
       inEpochDelayPeriod: "inEpochDelayPeriod" in rpc ? rpc.inEpochDelayPeriod : undefined,
     },
     economy: {
@@ -896,24 +1096,14 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       feeTrend: toPoints(feesOverview.totalDataChart).slice(-30),
     },
     decentralization: {
-      nakamotoLiveness: decentralization.metrics?.stake?.nakamoto?.liveness,
-      nakamotoSafety: decentralization.metrics?.stake?.nakamoto?.safety,
-      gini: decentralization.metrics?.stake?.gini,
-      hhi: decentralization.metrics?.stake?.hhi,
-      top10SharePct: decentralization.metrics?.stake?.shares?.top10,
+      nakamotoLiveness: validatorAnalytics.nakamotoLiveness,
+      nakamotoSafety: validatorAnalytics.nakamotoSafety,
+      gini: validatorAnalytics.gini,
+      hhi: validatorAnalytics.hhi,
+      top10SharePct: validatorAnalytics.top10SharePct,
       activeValidators,
-      countries:
-        decentralization.metrics?.geo?.countries?.slice(0, 8).map((country) => ({
-          label: country.label || "Unknown",
-          value: country.stakePct || 0,
-          detail: `${country.validatorCount || 0} validators`,
-        })) || [],
-      providers:
-        decentralization.metrics?.infra?.providers?.slice(0, 8).map((provider) => ({
-          label: provider.label || "Unknown",
-          value: provider.stakePct || 0,
-          detail: `${provider.validatorCount || 0} validators`,
-        })) || [],
+      countries: validatorAnalytics.countries,
+      providers: validatorAnalytics.providers,
     },
     defi: {
       totalTvlUsd: sum(opportunities.map((opportunity) => opportunity.tvl)),
@@ -949,17 +1139,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
           .sort((a, b) => b.value - a.value)
           .slice(0, 6) || [],
     },
-    validators:
-      validators.validators?.slice(0, 20).map((validator) => ({
-        rank: Number(validator.rank || 0),
-        id: Number(validator.id || 0),
-        name: validator.name || "Unknown",
-        stakeMon: toNumber(validator.stake_mon) || 0,
-        sharePct: toNumber(validator.share_pct) || 0,
-        commissionPct: toNumber(validator.commission_pct) || 0,
-        website: validator.website,
-        x: validator.x,
-      })) || [],
+    validators: validatorAnalytics.validators,
   };
 }
 
