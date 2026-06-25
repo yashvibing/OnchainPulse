@@ -40,7 +40,7 @@ const SUGGESTED_TOKENS = ["USDC", "WETH", "AUSD"];
 const DEFI_TERMS = [
   ["APR", "Displayed yearly rate."],
   ["TVL", "Capital in the market."],
-  ["Supply", "Lend, stake, LP, or vault."],
+  ["Fixed yield", "Pendle PT-style maturity markets."],
   ["Borrow", "Debt against collateral."],
 ];
 
@@ -53,6 +53,20 @@ function formatUsd(value: number) {
 
 function formatRateLabel(apr: number) {
   return `${apr.toFixed(2)}% APR`;
+}
+
+function isPendleOpportunity(opp: YieldOpportunity) {
+  return opp.tags.includes("pendle") || opp.protocol.toLowerCase().includes("pendle");
+}
+
+function getRateTitle(opp: YieldOpportunity) {
+  if (opp.opportunityType === "Fixed Yield") return "Fixed APY";
+  return "Displayed APR";
+}
+
+function getRateLabel(opp: YieldOpportunity) {
+  if (opp.opportunityType === "Fixed Yield") return `${opp.apr.toFixed(2)}% fixed`;
+  return formatRateLabel(opp.apr);
 }
 
 function getDisplayProtocolIcon(iconUrl?: string) {
@@ -293,9 +307,10 @@ function protocolFilterKey(protocol: string) {
 
 function getOpportunityActionBadge(opp: YieldOpportunity): {
   label: string;
-  tone: "positive" | "blue" | "violet";
+  tone: "positive" | "blue" | "violet" | "warning";
 } {
   if (opp.action === "BORROW") return { label: "Borrow", tone: "blue" };
+  if (opp.opportunityType === "Fixed Yield") return { label: "Fixed", tone: "warning" };
   if (opp.opportunityType === "Stake") return { label: "Stake", tone: "positive" };
   if (opp.opportunityType === "LP") return { label: "LP", tone: "violet" };
   if (opp.opportunityType === "Vault") return { label: "Vault", tone: "violet" };
@@ -443,14 +458,19 @@ function OpportunityRow({
                 Supply/collateral: {collateralSymbols.join(", ")}
               </div>
             )}
+            {opp.opportunityType === "Fixed Yield" && (
+              <div className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                Pendle-style maturity market. Compare fixed yield with the floating APY before routing capital.
+              </div>
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 sm:grid-cols-3 md:bg-transparent md:px-0 md:py-0">
           <div>
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">Displayed APR</div>
+            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">{getRateTitle(opp)}</div>
             <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
-              {formatRateLabel(opp.apr)}
+              {getRateLabel(opp)}
             </div>
           </div>
           <div>
@@ -469,7 +489,7 @@ function OpportunityRow({
                   rel="noopener noreferrer"
                   className="mt-1 inline-flex items-center justify-end text-[12px] font-bold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-text-primary)]"
                 >
-                  Open
+                  {isPendleOpportunity(opp) ? "Trade" : "Open"}
                 </a>
               </>
             ) : (
@@ -482,6 +502,48 @@ function OpportunityRow({
         </div>
       </div>
     </div>
+  );
+}
+
+function PendleSpotlight({ opportunities }: { opportunities: YieldOpportunity[] }) {
+  const pendleOpps = opportunities.filter(isPendleOpportunity);
+  const totalTvl = pendleOpps.reduce((sum, opp) => sum + Math.max(opp.tvl, 0), 0);
+  const topFixed = [...pendleOpps].sort((a, b) => b.apr - a.apr)[0];
+
+  if (pendleOpps.length === 0) return null;
+
+  return (
+    <section className="mb-5 rounded-[var(--radius-lg)] border border-[rgba(255,184,0,0.28)] bg-[rgba(255,184,0,0.055)] px-4 py-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="warning">New on Monad</Badge>
+            <span className="text-[13px] font-bold text-[var(--color-text-primary)]">
+              Pendle fixed-yield markets
+            </span>
+          </div>
+          <p className="mt-2 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+            Pendle rows are maturity-based yield markets, so they sit beside lending and vault APYs but should be compared separately.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-right">
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(0,0,0,0.12)] px-3 py-2">
+            <div className="text-[9px] uppercase text-[var(--color-text-dim)]">Markets</div>
+            <div className="mt-1 font-mono text-[13px] font-bold text-[var(--color-text-primary)]">{pendleOpps.length}</div>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(0,0,0,0.12)] px-3 py-2">
+            <div className="text-[9px] uppercase text-[var(--color-text-dim)]">Top fixed</div>
+            <div className="mt-1 font-mono text-[13px] font-bold text-[var(--color-positive)]">
+              {topFixed ? getRateLabel(topFixed) : "-"}
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(0,0,0,0.12)] px-3 py-2">
+            <div className="text-[9px] uppercase text-[var(--color-text-dim)]">TVL</div>
+            <div className="mt-1 font-mono text-[13px] font-bold text-[var(--color-text-primary)]">{formatUsd(totalTvl)}</div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -795,6 +857,8 @@ export function YieldAggregator() {
         />
       </div>
 
+      <PendleSpotlight opportunities={allOpps} />
+
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--color-text-dim)]">
@@ -843,7 +907,7 @@ export function YieldAggregator() {
         <OpportunitySection
           title={`Borrow markets for ${borrowTokens.join(", ")}`}
           subtitle="Collateral hints shown where available."
-          emptyLabel="No borrow markets found for this token."
+          emptyLabel="No borrow markets found."
           opportunities={borrowOpps}
           onPickToken={(symbol) => setBorrowTokens([symbol])}
         />
