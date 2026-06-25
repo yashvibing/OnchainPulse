@@ -324,6 +324,39 @@ function preferredProtocolLabel(current: string | undefined, next: string) {
   return currentLooksLowercase && !nextLooksLowercase ? next : current;
 }
 
+function getOpportunitySearchText(opp: YieldOpportunity) {
+  return [
+    opp.name,
+    opp.protocol,
+    opp.source,
+    opp.status,
+    opp.opportunityType,
+    opp.action,
+    ...opp.tags,
+    ...opp.tokens.map((token) => token.symbol),
+    ...getOpportunityAssetSymbols(opp),
+    ...getBorrowCollateralSymbols(opp),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function filterOpportunitiesBySearch(opportunities: YieldOpportunity[], query: string) {
+  const terms = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter(Boolean);
+
+  if (terms.length === 0) return opportunities;
+
+  return opportunities.filter((opp) => {
+    const haystack = getOpportunitySearchText(opp);
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
 function ProtocolFilter({
   options,
   selected,
@@ -651,22 +684,51 @@ function OpportunitySection({
   subtitle,
   emptyLabel,
   opportunities,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
   onPickToken,
 }: {
   title: string;
   subtitle: string;
   emptyLabel: string;
   opportunities: YieldOpportunity[];
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
   onPickToken?: (symbol: string) => void;
 }) {
   return (
     <section className="flex-1">
-      <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">{title}</h2>
           <p className="mt-1 text-[11px] text-[var(--color-text-dim)]">{subtitle}</p>
         </div>
-        <Badge>{opportunities.length}</Badge>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          {onSearchChange && (
+            <label className="relative min-w-0 sm:w-[240px]">
+              <span className="sr-only">Search {title}</span>
+              <input
+                value={searchValue || ""}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder={searchPlaceholder || "Search markets"}
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 pr-9 text-[12px] font-semibold text-[var(--color-text-primary)] outline-none transition-colors placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-border-hover)]"
+              />
+              {searchValue && (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange("")}
+                  aria-label={`Clear ${title} search`}
+                  className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-[var(--radius-sm)] text-[13px] font-black text-[var(--color-text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--color-text-primary)]"
+                >
+                  x
+                </button>
+              )}
+            </label>
+          )}
+          <Badge>{opportunities.length}</Badge>
+        </div>
       </div>
       <div className="space-y-2 md:max-h-[620px] md:overflow-y-auto md:pr-1">
         {opportunities.slice(0, 30).map((opp, index) => (
@@ -734,6 +796,8 @@ export function YieldAggregator() {
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("apr");
   const [protocolFilter, setProtocolFilter] = useState("all");
+  const [lendSearch, setLendSearch] = useState("");
+  const [borrowSearch, setBorrowSearch] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -792,8 +856,14 @@ export function YieldAggregator() {
     activeProtocol === "all"
       ? opps
       : opps.filter((opp) => protocolFilterKey(opp.protocol) === activeProtocol);
-  const lendOpps = sortOpportunities(filterByProtocol(baseLendOpps), sortField);
-  const borrowOpps = sortOpportunities(filterByProtocol(baseBorrowOpps), sortField);
+  const lendOpps = sortOpportunities(
+    filterOpportunitiesBySearch(filterByProtocol(baseLendOpps), lendSearch),
+    sortField
+  );
+  const borrowOpps = sortOpportunities(
+    filterOpportunitiesBySearch(filterByProtocol(baseBorrowOpps), borrowSearch),
+    sortField
+  );
   const baseLoopStrategies = showLooping
     ? calculateLoopStrategies(allOpps, lendTokens, borrowTokens)
     : [];
@@ -840,7 +910,7 @@ export function YieldAggregator() {
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <TokenSelectorPanel
-          title="Supply / Deposit"
+          title="Earn / Supply"
           subtitle="Lending, staking, LP, and vaults."
           tone="positive"
           tokens={POPULAR_TOKENS}
@@ -877,10 +947,13 @@ export function YieldAggregator() {
       {!hasLendSelection && !hasBorrowSelection && (
         <div className="grid gap-6 md:grid-cols-2">
           <OpportunitySection
-            title="Supply / Deposit Opportunities"
+            title="Earn / Supply Opportunities"
             subtitle="Lending, staking, LP, and vault rows."
-            emptyLabel="No supply or deposit opportunities found."
+            emptyLabel="No earn or supply opportunities found."
             opportunities={lendOpps}
+            searchValue={lendSearch}
+            onSearchChange={setLendSearch}
+            searchPlaceholder="Search token, protocol, fixed..."
             onPickToken={(symbol) => setLendTokens([symbol])}
           />
           <OpportunitySection
@@ -888,6 +961,9 @@ export function YieldAggregator() {
             subtitle="Borrow rows include collateral hints where available."
             emptyLabel="No borrow markets found."
             opportunities={borrowOpps}
+            searchValue={borrowSearch}
+            onSearchChange={setBorrowSearch}
+            searchPlaceholder="Search token, protocol, collateral..."
             onPickToken={(symbol) => setBorrowTokens([symbol])}
           />
         </div>
@@ -895,10 +971,13 @@ export function YieldAggregator() {
 
       {showSupplyOnly && (
         <OpportunitySection
-          title={`Supply / deposit opportunities for ${lendTokens.join(", ")}`}
-          subtitle="Matching supply and deposit rows."
-          emptyLabel="No supply or deposit opportunities found for this token."
+          title={`Earn / supply opportunities for ${lendTokens.join(", ")}`}
+          subtitle="Matching earn and supply rows."
+          emptyLabel="No earn or supply opportunities found for this token."
           opportunities={lendOpps}
+          searchValue={lendSearch}
+          onSearchChange={setLendSearch}
+          searchPlaceholder="Search token, protocol, fixed..."
           onPickToken={(symbol) => setLendTokens([symbol])}
         />
       )}
@@ -907,8 +986,11 @@ export function YieldAggregator() {
         <OpportunitySection
           title={`Borrow markets for ${borrowTokens.join(", ")}`}
           subtitle="Collateral hints shown where available."
-          emptyLabel="No borrow markets found."
+          emptyLabel="No borrow markets found for this token."
           opportunities={borrowOpps}
+          searchValue={borrowSearch}
+          onSearchChange={setBorrowSearch}
+          searchPlaceholder="Search token, protocol, collateral..."
           onPickToken={(symbol) => setBorrowTokens([symbol])}
         />
       )}
