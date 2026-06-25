@@ -1176,7 +1176,7 @@ function newsSourceLabel(item: NewsArticle) {
     const url = new URL(item.link);
     const [, handle] = url.pathname.split("/");
     if ((url.hostname === "x.com" || url.hostname === "twitter.com") && handle) {
-      return trimForTelegram(`@${handle}`, 28);
+      return trimForTelegram(handle.replace(/^@/u, ""), 28);
     }
   } catch {
     // Fall through to the source field.
@@ -1184,9 +1184,10 @@ function newsSourceLabel(item: NewsArticle) {
 
   const source = stripTelegramNoise(item.source || "")
     .replace(/^X\s*\/\s*/iu, "")
+    .replace(/^@/u, "")
     .trim();
   if (source && source.toLowerCase() !== "manual") {
-    return trimForTelegram(source.startsWith("@") ? source : source, 28);
+    return trimForTelegram(source, 28);
   }
 
   try {
@@ -1315,9 +1316,8 @@ export function buildLatestNewsBriefText(items: NewsArticle[]) {
     const body = group.length > 1 ? threadSummaryLine(group) : newsBodyLine(firstItem);
 
     return [
-      `${index + 1}. ${source}`,
+      `${index + 1}. ${source}${firstItem.link ? ` - Read: ${firstItem.link.trim()}` : ""}`,
       body ? `   ${body}` : "",
-      firstItem.link ? `   Read: ${firstItem.link.trim()}` : "",
     ].filter(Boolean).join("\n");
   });
 

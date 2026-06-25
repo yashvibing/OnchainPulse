@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getInitialDailyDigestDay } from "@/services/telegramAlerts";
+import { buildLatestNewsBriefText, getInitialDailyDigestDay } from "@/services/telegramAlerts";
+import type { NewsArticle } from "@/lib/news";
 
 describe("telegram daily digest alerts", () => {
   it("keeps same-day delivery available when a digest is created before send time", () => {
@@ -30,5 +31,38 @@ describe("telegram daily digest alerts", () => {
     const afterNewsBriefWindow = new Date("2026-05-23T18:00:00.000Z"); // 11:30 PM IST
 
     expect(getInitialDailyDigestDay(afterNewsBriefWindow, 23)).toBe("2026-05-23");
+  });
+
+  it("formats daily news briefs as compact Telegram cards", () => {
+    const message = buildLatestNewsBriefText([
+      {
+        id: "item-1",
+        title:
+          "@DeltaV_xyz: Podcast notes from DeltaV Builder Stories EP.3 with @mannyornothing, co-founder of @blend_money https://t.co/MHJ1BWVIgR",
+        summary:
+          "Podcast notes from DeltaV Builder Stories EP.3 with @mannyornothing, co-founder of @blend_money Yield is a commodity, compliance is actually the real product. https://t.co/MHJ1BWVIgR",
+        source: "DeltaV_xyz",
+        link: "https://x.com/DeltaV_xyz/status/2067985763858538955",
+        topic: "Monad",
+        publishedAt: "2026-06-23T17:52:00.000Z",
+      },
+      {
+        id: "item-2",
+        title: "@monad_eco: JUST IN: @pendle_fi is now live on Monad https://t.co/sgHudAYV91",
+        summary: "JUST IN: @pendle_fi is now live on Monad https://t.co/sgHudAYV91",
+        source: "monad_eco",
+        link: "https://x.com/monad_eco/status/2067978668388065523",
+        topic: "Monad",
+        publishedAt: "2026-06-23T17:30:00.000Z",
+      },
+    ] satisfies NewsArticle[]);
+
+    expect(message).toContain("Onchain Pulse daily brief");
+    expect(message).not.toContain("Summary:");
+    expect(message).not.toContain("Source:");
+    expect(message).not.toContain("@DeltaV_xyz");
+    expect(message.match(/https:\/\/t\.co/gu)).toBeNull();
+    expect(message).toContain("DeltaV_xyz - Read: https://x.com/DeltaV_xyz/status/2067985763858538955");
+    expect(message).toContain("monad_eco - Read: https://x.com/monad_eco/status/2067978668388065523");
   });
 });
