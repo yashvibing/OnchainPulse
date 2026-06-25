@@ -236,7 +236,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
       </div>
 
       <h3 className="mt-3 text-[18px] font-bold leading-snug text-[var(--color-text-primary)]">
-        {brief.headline || title || source}
+        {title || brief.headline || source}
       </h3>
 
       <div className="mt-3 grid gap-2 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.14)] bg-[rgba(0,245,204,0.035)] p-3">
