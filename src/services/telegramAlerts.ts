@@ -114,6 +114,7 @@ const LOGIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const TELEGRAM_LOGIN_MAX_AGE_SECONDS = 60 * 60 * 24;
 const DAILY_RATES_DIGEST_HOUR_IST = 11;
 const DAILY_NEWS_BRIEF_HOUR_IST = 23;
+const NEWS_THREAD_WINDOW_MS = 45 * 60 * 1000;
 const WEEKLY_ECOSYSTEM_TITLE = "This week's ecosystem updates are out";
 const TOKEN_MARKET_ALERT_KINDS = new Set<AlertKind>([
   "token_market_new",
@@ -1196,12 +1197,104 @@ function newsSourceLabel(item: NewsArticle) {
   }
 }
 
+function xPostParts(item: NewsArticle) {
+  try {
+    const url = new URL(item.link);
+    const [handle, kind, id] = url.pathname.split("/").filter(Boolean);
+    if (
+      (url.hostname === "x.com" || url.hostname === "twitter.com") &&
+      handle &&
+      kind === "status" &&
+      id
+    ) {
+      return { handle: handle.toLowerCase(), id };
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function publishedAtMs(item: NewsArticle) {
+  const time = Date.parse(item.publishedAt);
+  return Number.isFinite(time) ? time : undefined;
+}
+
+function xStatusIdTimeDiffMs(a: string, b: string) {
+  try {
+    const delta = BigInt(a) > BigInt(b) ? BigInt(a) - BigInt(b) : BigInt(b) - BigInt(a);
+    return Number(delta / 4_194_304n);
+  } catch {
+    return undefined;
+  }
+}
+
+function areThreadLikePosts(a: NewsArticle, b: NewsArticle) {
+  const left = xPostParts(a);
+  const right = xPostParts(b);
+  if (!left || !right || left.handle !== right.handle) return false;
+
+  const leftPublishedAt = publishedAtMs(a);
+  const rightPublishedAt = publishedAtMs(b);
+  if (typeof leftPublishedAt === "number" && typeof rightPublishedAt === "number") {
+    return Math.abs(leftPublishedAt - rightPublishedAt) <= NEWS_THREAD_WINDOW_MS;
+  }
+
+  const idDiff = xStatusIdTimeDiffMs(left.id, right.id);
+  return typeof idDiff === "number" && idDiff <= NEWS_THREAD_WINDOW_MS;
+}
+
+function groupThreadLikeNews(items: NewsArticle[]) {
+  const groups: NewsArticle[][] = [];
+
+  items.forEach((item) => {
+    const previousGroup = groups[groups.length - 1];
+    const previousItem = previousGroup?.[previousGroup.length - 1];
+    if (previousItem && areThreadLikePosts(previousItem, item)) {
+      previousGroup.push(item);
+      return;
+    }
+    groups.push([item]);
+  });
+
+  return groups;
+}
+
 function isProbablyTruncated(value: string) {
   return /\.{3}$/u.test(value.trim()) || /…$/u.test(value.trim());
 }
 
-function newsBodyLine(title: string, summary: string) {
-  const titleBody = removeLeadingSourcePrefix(title);
+function newsBodyText(item: NewsArticle) {
+  const rawTitle = stripTelegramNoise(item.title);
+  const rawSummary = stripTelegramNoise(item.summary);
+  return {
+    titleBody: removeLeadingSourcePrefix(rawTitle),
+    summary: rawSummary,
+  };
+}
+
+function uniqueThreadParts(items: NewsArticle[]) {
+  const seen = new Set<string>();
+  return items
+    .map((item) => {
+      const { titleBody, summary } = newsBodyText(item);
+      return summary || titleBody;
+    })
+    .map((value) => value.replace(/\.{3}$/u, "").trim())
+    .filter((value) => {
+      const key = value.toLowerCase().replace(/[^a-z0-9]+/gu, " ").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function threadSummaryLine(items: NewsArticle[]) {
+  return `Summary: ${trimForTelegram(uniqueThreadParts(items).join(" "), 260)}`;
+}
+
+function newsBodyLine(item: NewsArticle) {
+  const { titleBody, summary } = newsBodyText(item);
   const preferred = summary || titleBody;
   const needsSummary = preferred.length > 230 || (!summary && isProbablyTruncated(titleBody));
   const maxLength = needsSummary ? 210 : 260;
@@ -1210,22 +1303,21 @@ function newsBodyLine(title: string, summary: string) {
 }
 
 export function buildLatestNewsBriefText(items: NewsArticle[]) {
-  const selected = items.slice(0, 5);
+  const selected = groupThreadLikeNews(items).slice(0, 5);
 
   if (selected.length === 0) {
     return "Onchain Pulse daily brief\nNo curated news has been added yet.";
   }
 
-  const lines = selected.map((item, index) => {
-    const source = newsSourceLabel(item);
-    const rawTitle = stripTelegramNoise(item.title);
-    const rawSummary = stripTelegramNoise(item.summary);
-    const body = newsBodyLine(rawTitle, rawSummary);
+  const lines = selected.map((group, index) => {
+    const firstItem = group[0];
+    const source = newsSourceLabel(firstItem);
+    const body = group.length > 1 ? threadSummaryLine(group) : newsBodyLine(firstItem);
 
     return [
       `${index + 1}. ${source}`,
       body ? `   ${body}` : "",
-      item.link ? `   Read: ${item.link.trim()}` : "",
+      firstItem.link ? `   Read: ${firstItem.link.trim()}` : "",
     ].filter(Boolean).join("\n");
   });
 
