@@ -10,7 +10,7 @@ export interface YieldOpportunity {
   id: string;
   action: "LEND" | "BORROW";
   source: "Merkl" | "DefiLlama" | "Both";
-  opportunityType?: "Lending" | "Borrow" | "LP" | "Vault" | "Stake";
+  opportunityType?: "Lending" | "Borrow" | "LP" | "Vault" | "Stake" | "Fixed Yield";
   name: string;
   protocol: string;
   protocolIcon: string;
@@ -106,6 +106,7 @@ function humanizeProjectSlug(slug: string) {
 
 function normalizeProtocolForKey(protocol: string) {
   const normalized = protocol.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (normalized.includes("pendle")) return "pendle";
   if (normalized.includes("morpho")) return "morpho";
   if (normalized.includes("townsquare")) return "townsquare";
   if (normalized.includes("neverland")) return "neverland";
@@ -141,11 +142,16 @@ function isStakingOpportunity(protocol: string, name: string, tokenSymbols: stri
 }
 
 function getOpportunityNamePrefix(type: OpportunityType) {
+  if (type === "Fixed Yield") return "Fixed yield";
   if (type === "Stake") return "Stake";
   if (type === "LP") return "LP";
   if (type === "Vault") return "Vault";
   if (type === "Borrow") return "Borrow";
   return "Supply";
+}
+
+function isPendleMarket(protocol: string, symbol: string) {
+  return normalizeProtocolForKey(protocol) === "pendle" || /\b(?:PT|YT|SY)-/iu.test(symbol);
 }
 
 function inferPositiveRateOpportunityType(
@@ -161,7 +167,8 @@ function inferDefiLlamaPoolType(
   symbol: string,
   tokenSymbols: string[],
   protocol: string
-): "Lending" | "LP" | "Vault" | "Stake" {
+): "Lending" | "LP" | "Vault" | "Stake" | "Fixed Yield" {
+  if (isPendleMarket(protocol, symbol)) return "Fixed Yield";
   if (/[-/,+]/u.test(symbol) && tokenSymbols.length > 1) return "LP";
 
   const normalized = symbol.toUpperCase();
@@ -186,6 +193,7 @@ function normalizeDefiLlamaDisplaySymbols(symbol: string) {
   const parts = splitDefiLlamaSymbols(symbol.toUpperCase());
 
   return parts.map((part) => {
+    if (part === "PT" || part === "YT" || part === "SY") return part;
     if (part === "WNUSDC") return "USDC";
     if (part === "WNUSDT0") return "USDT0";
     if (part === "WNAUSD") return "AUSD";
@@ -195,6 +203,23 @@ function normalizeDefiLlamaDisplaySymbols(symbol: string) {
     if (part.endsWith("BTC") || part.includes("BTC")) return "WBTC";
     return part;
   });
+}
+
+function normalizePendleDisplaySymbols(symbol: string) {
+  const upper = symbol.toUpperCase();
+  const parts = splitDefiLlamaSymbols(upper);
+  const prefix = parts[0];
+  const underlying = parts
+    .slice(prefix === "PT" || prefix === "YT" || prefix === "SY" ? 1 : 0)
+    .filter((part) => !/^\d{6,8}$/u.test(part))
+    .filter((part) => !/^(EXPIRY|MATURITY)$/u.test(part));
+
+  if (prefix === "PT" || prefix === "YT" || prefix === "SY") {
+    const firstUnderlying = normalizeDefiLlamaDisplaySymbols(underlying[0] || "")[0];
+    return [`${prefix}-${firstUnderlying || "YIELD"}`];
+  }
+
+  return normalizeDefiLlamaDisplaySymbols(symbol);
 }
 
 function opportunityMergeKey(opportunity: YieldOpportunity) {
@@ -282,7 +307,9 @@ async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
       const project = pool.project || "unknown";
       const protocol = humanizeProjectSlug(project);
       const symbol = (pool.symbol || "UNKNOWN").toUpperCase();
-      const displaySymbols = normalizeDefiLlamaDisplaySymbols(symbol);
+      const displaySymbols = isPendleMarket(protocol, symbol)
+        ? normalizePendleDisplaySymbols(symbol)
+        : normalizeDefiLlamaDisplaySymbols(symbol);
       const poolType = inferDefiLlamaPoolType(symbol, displaySymbols, protocol);
       const tokens = displaySymbols.map((tokenSymbol) => ({
         symbol: tokenSymbol,
@@ -309,7 +336,9 @@ async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
         tokens,
         depositUrl: pool.url || `https://defillama.com/yields/pool/${pool.pool}`,
         status: "LIVE",
-        tags: ["defillama-yield"],
+        tags: isPendleMarket(protocol, symbol)
+          ? ["defillama-yield", "pendle", "fixed-yield"]
+          : ["defillama-yield"],
         baseApr,
         rewardApr,
       };
