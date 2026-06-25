@@ -900,6 +900,16 @@ function trendChange(points: AnalyticsPoint[], lookback: "24h" | "30d") {
   return ((last.value - first.value) / first.value) * 100;
 }
 
+function opportunityAnalyticsLabel(name: string, protocol: string) {
+  const trimmedName = name.trim();
+  const trimmedProtocol = protocol.trim();
+  if (!trimmedProtocol) return trimmedName;
+  if (trimmedName.toLowerCase().endsWith(` on ${trimmedProtocol.toLowerCase()}`)) {
+    return trimmedName;
+  }
+  return `${trimmedName} on ${trimmedProtocol}`;
+}
+
 async function loadAnalytics(): Promise<AnalyticsPayload> {
   const [
     monPrice,
@@ -970,7 +980,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     .sort((a, b) => b.apr - a.apr)
     .slice(0, 6)
     .map((opportunity) => ({
-      label: `${opportunity.name} on ${opportunity.protocol}`,
+      label: opportunityAnalyticsLabel(opportunity.name, opportunity.protocol),
       value: opportunity.apr,
       detail: opportunity.opportunityType || opportunity.action,
     }));
