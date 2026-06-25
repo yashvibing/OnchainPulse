@@ -1159,15 +1159,7 @@ function trimForTelegram(value: string, maxLength: number) {
 function stripTelegramNoise(value: string) {
   return value
     .replace(/https?:\/\/\S+/giu, "")
-    .replace(/@([a-z0-9_]{2,})/giu, "$1")
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeForComparison(value: string) {
-  return stripTelegramNoise(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, " ")
     .trim();
 }
 
@@ -1178,33 +1170,43 @@ function removeLeadingSourcePrefix(value: string) {
     .trim();
 }
 
-function meaningfulText(value: string) {
-  return normalizeForComparison(removeLeadingSourcePrefix(value).replace(/\.{3}$/u, ""));
-}
-
-function isSameNewsText(a: string, b: string) {
-  const left = meaningfulText(a);
-  const right = meaningfulText(b);
-  if (!left || !right) return false;
-  const shorter = left.length <= right.length ? left : right;
-  const longer = left.length > right.length ? left : right;
-  return longer.startsWith(shorter) || longer.includes(shorter);
-}
-
 function newsSourceLabel(item: NewsArticle) {
-  const source = stripTelegramNoise(item.source || "");
-  if (source && source.toLowerCase() !== "manual") return trimForTelegram(source, 28);
-
   try {
     const url = new URL(item.link);
     const [, handle] = url.pathname.split("/");
     if ((url.hostname === "x.com" || url.hostname === "twitter.com") && handle) {
-      return trimForTelegram(handle.replace(/_/gu, " "), 28);
+      return trimForTelegram(`@${handle}`, 28);
     }
+  } catch {
+    // Fall through to the source field.
+  }
+
+  const source = stripTelegramNoise(item.source || "")
+    .replace(/^X\s*\/\s*/iu, "")
+    .trim();
+  if (source && source.toLowerCase() !== "manual") {
+    return trimForTelegram(source.startsWith("@") ? source : source, 28);
+  }
+
+  try {
+    const url = new URL(item.link);
     return trimForTelegram(url.hostname.replace(/^www\./u, ""), 28);
   } catch {
     return "Curated";
   }
+}
+
+function isProbablyTruncated(value: string) {
+  return /\.{3}$/u.test(value.trim()) || /…$/u.test(value.trim());
+}
+
+function newsBodyLine(title: string, summary: string) {
+  const titleBody = removeLeadingSourcePrefix(title);
+  const preferred = summary || titleBody;
+  const needsSummary = preferred.length > 230 || (!summary && isProbablyTruncated(titleBody));
+  const maxLength = needsSummary ? 210 : 260;
+  const body = trimForTelegram(preferred, maxLength);
+  return needsSummary ? `Summary: ${body}` : body;
 }
 
 export function buildLatestNewsBriefText(items: NewsArticle[]) {
@@ -1218,20 +1220,12 @@ export function buildLatestNewsBriefText(items: NewsArticle[]) {
     const source = newsSourceLabel(item);
     const rawTitle = stripTelegramNoise(item.title);
     const rawSummary = stripTelegramNoise(item.summary);
-    const titleBody = removeLeadingSourcePrefix(rawTitle);
-    const summaryAddsContext = rawSummary && !isSameNewsText(titleBody, rawSummary);
-    const body =
-      rawSummary && !summaryAddsContext
-        ? rawSummary
-        : titleBody || rawSummary || source;
-    const cleanedBody = trimForTelegram(body, 260);
-    const cleanedSummary = summaryAddsContext ? trimForTelegram(rawSummary, 180) : "";
+    const body = newsBodyLine(rawTitle, rawSummary);
 
     return [
       `${index + 1}. ${source}`,
-      cleanedBody ? `   ${cleanedBody}` : "",
-      cleanedSummary ? `   ${cleanedSummary}` : "",
-      item.link ? `   ${source} - Read: ${item.link.trim()}` : `   ${source}`,
+      body ? `   ${body}` : "",
+      item.link ? `   Read: ${item.link.trim()}` : "",
     ].filter(Boolean).join("\n");
   });
 
