@@ -99,6 +99,36 @@ function isLikelyImageUrl(value: string) {
   }
 }
 
+function isDecorativeNewsImage(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./u, "").toLowerCase();
+    const path = decodeURIComponent(url.pathname).toLowerCase();
+    const socialAvatarHost =
+      host === "abs.twimg.com" ||
+      host === "ton.twimg.com" ||
+      host === "unavatar.io";
+
+    return (
+      socialAvatarHost ||
+      path.includes("/profile_images/") ||
+      path.includes("/profile_banners/") ||
+      path.includes("default_profile") ||
+      path.includes("favicon") ||
+      path.includes("apple-touch-icon") ||
+      /(?:^|[-_/])(avatar|logo|icon)(?:[-_. /]|$)/iu.test(path)
+    );
+  } catch {
+    return true;
+  }
+}
+
+function newsImageUrl(value: string) {
+  const cleaned = cleanText(value);
+  if (!cleaned || isShortenedUrl(cleaned) || isDecorativeNewsImage(cleaned)) return "";
+  return cleaned;
+}
+
 function stripImageUrls(input: string) {
   return input.replace(/https?:\/\/\S+/giu, (match) => (isLikelyImageUrl(match) ? "" : match));
 }
@@ -180,16 +210,18 @@ async function fetchUrlMetadata(url: string) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
 
+    const metadataImage = resolveMetadataUrl(
+      url,
+      findMeta(html, "og:image") ||
+        findMeta(html, "og:image:url") ||
+        findMeta(html, "twitter:image")
+    );
+
     return {
       title: cleanText(findMeta(html, "og:title") || findTitle(html)),
       summary: summarize(findMeta(html, "og:description") || findMeta(html, "description")),
       source: cleanText(findMeta(html, "og:site_name") || sourceFromUrl(url)),
-      imageUrl: resolveMetadataUrl(
-        url,
-        findMeta(html, "og:image") ||
-          findMeta(html, "og:image:url") ||
-          findMeta(html, "twitter:image")
-      ),
+      imageUrl: newsImageUrl(metadataImage),
     };
   } catch (error) {
     logServerEvent("warn", "news.metadata_fetch_failed", {
@@ -236,7 +268,7 @@ function sanitizeNewsArticle(item: NewsArticle): NewsArticle {
     title: cleanText(stripHiddenUrls(item.title)),
     summary: summarize(stripHiddenUrls(item.summary)),
     link: isShortenedUrl(item.link) || isLikelyImageUrl(item.link) ? "" : item.link,
-    imageUrl: imageUrl && !isShortenedUrl(imageUrl) ? imageUrl : undefined,
+    imageUrl: newsImageUrl(imageUrl) || undefined,
   };
 }
 
@@ -271,7 +303,7 @@ export async function addCuratedNews(input: NewsSubmissionInput) {
   const fallbackText = stripHiddenUrls(input.text || input.summary || "");
   const title = cleanText(stripHiddenUrls(input.title || metadata?.title || summarize(fallbackText, 90)));
   const summary = summarize(stripHiddenUrls(input.summary || input.text || metadata?.summary || ""));
-  const imageUrl = cleanText(input.imageUrl || metadata?.imageUrl || directImageUrl);
+  const imageUrl = newsImageUrl(input.imageUrl || metadata?.imageUrl || directImageUrl);
   const source = cleanText(input.source || metadata?.source || (link ? sourceFromUrl(link) : "Manual"));
   const topic = cleanText(input.topic || "Curated");
 
@@ -281,7 +313,7 @@ export async function addCuratedNews(input: NewsSubmissionInput) {
     id: randomUUID(),
     title,
     link,
-    imageUrl: imageUrl && !isShortenedUrl(imageUrl) ? imageUrl : undefined,
+    imageUrl: imageUrl || undefined,
     source,
     summary,
     publishedAt: parsePublishedAt(input.publishedAt),
