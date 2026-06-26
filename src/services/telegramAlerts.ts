@@ -1326,8 +1326,9 @@ export function buildLatestNewsBriefText(items: NewsArticle[]) {
     const body = group.length > 1 ? threadSummaryLine(group) : newsBodyLine(firstItem);
 
     return [
-      `${index + 1}. ${source}${firstItem.link ? ` - Read: ${firstItem.link.trim()}` : ""}`,
+      `${index + 1}. ${source}`,
       body ? `   ${body}` : "",
+      firstItem.link ? `   Read: ${firstItem.link.trim()}` : "",
     ].filter(Boolean).join("\n");
   });
 

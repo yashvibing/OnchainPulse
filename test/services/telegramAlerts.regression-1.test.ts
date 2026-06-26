@@ -74,7 +74,9 @@ describe("telegram daily digest alerts", () => {
     expect(message).not.toContain("Source:");
     expect(message).not.toContain("@DeltaV_xyz");
     expect(message.match(/https:\/\/t\.co/gu)).toBeNull();
-    expect(message).toContain("DeltaV_xyz - Read: https://x.com/DeltaV_xyz/status/2067985763858538955");
-    expect(message).toContain("monad_eco - Read: https://x.com/monad_eco/status/2067978668388065523");
+    expect(message).toContain("1. DeltaV_xyz\n");
+    expect(message).toContain("   Read: https://x.com/DeltaV_xyz/status/2067985763858538955");
+    expect(message).toContain("2. monad_eco\n");
+    expect(message).toContain("   Read: https://x.com/monad_eco/status/2067978668388065523");
   });
 });
