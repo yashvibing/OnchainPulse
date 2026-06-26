@@ -79,4 +79,24 @@ describe("telegram daily digest alerts", () => {
     expect(message).toContain("2. monad_eco\n");
     expect(message).toContain("   Read: https://x.com/monad_eco/status/2067978668388065523");
   });
+
+  it("labels already-truncated long posts as summaries", () => {
+    const message = buildLatestNewsBriefText([
+      {
+        id: "item-1",
+        title:
+          "@DeltaV_xyz: An ecosystem of founders who ship every week @branchlesspay anchored 1,820 real transactions...",
+        summary:
+          "An ecosystem of founders who ship every week @branchlesspay anchored 1,820 real transactions, protected 63,262 in revenue, connected 17 platforms, and submitted Shopify and Clover apps. @surfcashx reached 9.5K...",
+        source: "DeltaV_xyz",
+        link: "https://x.com/DeltaV_xyz/status/2070132310134210790",
+        topic: "Monad",
+        publishedAt: "2026-06-25T18:53:00.000Z",
+      },
+    ] satisfies NewsArticle[]);
+
+    expect(message).toContain("1. DeltaV_xyz");
+    expect(message).toContain("   Summary:");
+    expect(message).toContain("   Read: https://x.com/DeltaV_xyz/status/2070132310134210790");
+  });
 });

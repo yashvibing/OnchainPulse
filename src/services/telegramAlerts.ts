@@ -1307,7 +1307,10 @@ function threadSummaryLine(items: NewsArticle[]) {
 function newsBodyLine(item: NewsArticle) {
   const { titleBody, summary } = newsBodyText(item);
   const preferred = summary || titleBody;
-  const needsSummary = preferred.length > 230 || (!summary && isProbablyTruncated(titleBody));
+  const needsSummary =
+    preferred.length > 230 ||
+    isProbablyTruncated(preferred) ||
+    (!summary && isProbablyTruncated(titleBody));
   const maxLength = needsSummary ? 210 : 260;
   const body = trimForTelegram(preferred, maxLength);
   return needsSummary ? `Summary: ${body}` : body;
