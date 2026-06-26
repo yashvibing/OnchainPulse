@@ -79,13 +79,6 @@ function cleanNewsText(value: string) {
     .trim();
 }
 
-function normalizeText(value: string) {
-  return cleanNewsText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, " ")
-    .trim();
-}
-
 function sourceLabel(article: NewsArticle) {
   const source = article.source
     .replace(/^source:\s*/iu, "")
@@ -107,72 +100,6 @@ function sourceLabel(article: NewsArticle) {
   }
 }
 
-function extractHandleNames(value: string) {
-  const handles = value.match(/@([a-z0-9_]{2,})/giu) || [];
-  return [...new Set(handles.map(formatHandle))];
-}
-
-function firstSentence(value: string) {
-  const cleaned = cleanNewsText(value).replace(/\s+\.\.\.$/u, "").trim();
-  const [sentence] = cleaned.split(/(?<=[.!?])\s+/u);
-  return sentence || cleaned;
-}
-
-function includesAny(value: string, terms: string[]) {
-  return terms.some((term) => value.includes(term));
-}
-
-function buildReadableBrief(article: NewsArticle) {
-  const raw = `${article.title}. ${article.summary}`;
-  const lower = raw.toLowerCase();
-  const names = extractHandleNames(raw);
-  const primaryName = names.find((name) => !["Monad", "Monad Eco", "DeltaV"].includes(name)) || names[0];
-  const readable = firstSentence(article.summary || article.title);
-
-  let headline = clampText(readable, 110);
-  let whatChanged = clampText(cleanNewsText(article.summary || article.title), 210);
-  let whyItMatters = "Useful market context for reading portfolio moves, rates, and protocol activity.";
-
-  if (includesAny(lower, ["pendle"]) && includesAny(lower, ["live on monad", "now live on monad"])) {
-    headline = "Pendle markets are live on Monad.";
-    whatChanged = "Pendle launched Monad markets, adding routes for yield-bearing assets and yield-token trading.";
-    whyItMatters = "More yield markets can change where users route capital, hedge rates, and compare DeFi opportunities.";
-  } else if (includesAny(lower, ["portal_hq", "embedded wallet", "non-custodial embedded wallet"])) {
-    headline = "Portal HQ is pushing embedded wallet infrastructure.";
-    whatChanged = "Portal HQ is bringing non-custodial embedded wallets to apps so users can interact without seeing chain complexity.";
-    whyItMatters = "Cleaner wallet UX can make onchain apps feel closer to normal fintech products.";
-  } else if (includesAny(lower, ["blend_money", "blend money"]) && includesAny(lower, ["yield", "compliance", "neobank"])) {
-    headline = "Blend Money is packaging yield with compliance tooling.";
-    whatChanged = "Blend Money is positioning a yield and compliance stack for neobank-style onchain financial products.";
-    whyItMatters = "This points to Monad apps moving beyond raw trading into regulated financial workflows.";
-  } else if (includesAny(lower, ["yield is a commodity", "compliance is actually the real product"])) {
-    headline = "The signal is compliance over commodity yield.";
-    whatChanged = "The discussion frames yield as the easy-to-copy layer and compliance as the product that can create durable value.";
-    whyItMatters = "That is useful context when judging which DeFi teams may turn rates into real distribution.";
-  } else if (includesAny(lower, ["branchlesspay", "erp", "xero", "zoho", "wave"])) {
-    headline = "BranchlessPay shipped more business integrations.";
-    whatChanged = "BranchlessPay added ERP integrations and shared fresh usage metrics around volume, fees, and revenue.";
-    whyItMatters = "Integrations and operating metrics are stronger adoption signals than another generic ecosystem announcement.";
-  } else if (includesAny(lower, ["welcome to monad"]) && primaryName) {
-    headline = `${primaryName} joined the Monad ecosystem.`;
-    whatChanged = `${primaryName} is being welcomed into the Monad ecosystem, which usually signals a launch, integration, or partnership.`;
-    whyItMatters = "New ecosystem additions can expand available apps, liquidity venues, or user acquisition channels.";
-  } else if (includesAny(lower, ["introducing", "launched", "launching", "brings", "new markets"])) {
-    const subject = primaryName || "A Monad ecosystem team";
-    headline = `${subject} has a new ecosystem update.`;
-    whatChanged = clampText(readable, 210);
-    whyItMatters = includesAny(lower, ["market", "liquidity", "yield", "rates"])
-      ? "New market structure can affect liquidity, rates, and where users deploy capital."
-      : "This is a useful signal for tracking builder activity and ecosystem momentum.";
-  }
-
-  return {
-    headline,
-    whatChanged,
-    whyItMatters,
-  };
-}
-
 function SkeletonCard() {
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
@@ -189,21 +116,27 @@ function SkeletonCard() {
   );
 }
 
+function isProbablyTruncated(value: string) {
+  return /\.{3}$/u.test(value.trim()) || /…$/u.test(value.trim());
+}
+
+function isLikelyThread(article: NewsArticle) {
+  return /\bthread\b|\b1\/\d+\b|\b\d+\/\d+\b/iu.test(`${article.title} ${article.summary}`);
+}
+
+function bodyTextForArticle(article: NewsArticle) {
+  const title = cleanNewsText(article.title);
+  const summary = cleanNewsText(article.summary);
+  const text = summary || title;
+  const shouldSummarize = text.length > 280 || isProbablyTruncated(title) || isLikelyThread(article);
+  const body = clampText(text, shouldSummarize ? 240 : 360);
+  return shouldSummarize ? `Summary: ${body}` : body;
+}
+
 function NewsCard({ article }: { article: NewsArticle }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const brief = buildReadableBrief(article);
   const title = clampText(cleanNewsText(article.title), 132);
-  const summary = clampText(cleanNewsText(article.summary), 170);
-  const titleKey = normalizeText(title);
-  const summaryKey = normalizeText(summary);
-  const briefKey = normalizeText(brief.whatChanged);
-  const hasSummary = Boolean(
-    summary &&
-      summaryKey !== titleKey &&
-      !summaryKey.startsWith(titleKey) &&
-      summaryKey !== briefKey &&
-      !briefKey.startsWith(summaryKey)
-  );
+  const body = bodyTextForArticle(article);
   const showImage = Boolean(article.imageUrl && !imageFailed);
   const source = sourceLabel(article);
   const meta = `${source} - ${formatRelativeTime(article.publishedAt)}`;
@@ -228,7 +161,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
           {article.topic}
         </span>
         <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--color-text-muted)]">
-          Smart read
+          Source
         </span>
         <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--color-text-dim)]">
           {meta}
@@ -236,23 +169,12 @@ function NewsCard({ article }: { article: NewsArticle }) {
       </div>
 
       <h3 className="mt-3 text-[18px] font-bold leading-snug text-[var(--color-text-primary)]">
-        {title || brief.headline || source}
+        {title || source}
       </h3>
 
-      <div className="mt-3 grid gap-2 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.14)] bg-[rgba(0,245,204,0.035)] p-3">
-        <p className="text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
-          <span className="font-bold text-[var(--color-text-primary)]">What happened: </span>
-          {brief.whatChanged}
-        </p>
-        <p className="text-[13px] leading-relaxed text-[var(--color-text-muted)]">
-          <span className="font-bold text-[var(--color-text-secondary)]">Why it matters: </span>
-          {brief.whyItMatters}
-        </p>
-      </div>
-
-      {hasSummary && (
-        <p className="mt-3 border-l border-[var(--color-border)] pl-3 text-[12px] leading-relaxed text-[var(--color-text-dim)]">
-          Original signal: {summary}
+      {body && (
+        <p className="mt-3 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.14)] bg-[rgba(0,245,204,0.035)] p-3 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+          {body}
         </p>
       )}
 
