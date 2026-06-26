@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildLatestNewsBriefText, getInitialDailyDigestDay } from "@/services/telegramAlerts";
+import {
+  buildLatestNewsBriefText,
+  getInitialDailyDigestDay,
+  getMissedDigestSendDay,
+} from "@/services/telegramAlerts";
 import type { NewsArticle } from "@/lib/news";
 
 describe("telegram daily digest alerts", () => {
@@ -31,6 +35,14 @@ describe("telegram daily digest alerts", () => {
     const afterNewsBriefWindow = new Date("2026-05-23T18:00:00.000Z"); // 11:30 PM IST
 
     expect(getInitialDailyDigestDay(afterNewsBriefWindow, 23)).toBe("2026-05-23");
+  });
+
+  it("keeps channel news briefs eligible after the 11 PM IST hour is missed", () => {
+    const justBeforeWindow = new Date("2026-06-24T17:25:00.000Z"); // 10:55 PM IST
+    const afterMidnight = new Date("2026-06-24T19:09:00.000Z"); // 12:39 AM IST next day
+
+    expect(getMissedDigestSendDay(justBeforeWindow, 23)).toBe("2026-06-23");
+    expect(getMissedDigestSendDay(afterMidnight, 23)).toBe("2026-06-24");
   });
 
   it("formats daily news briefs as compact Telegram cards", () => {

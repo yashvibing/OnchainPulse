@@ -1129,6 +1129,16 @@ function getDigestDateParts(date = new Date()) {
   };
 }
 
+function previousIstDay(date: Date) {
+  const previous = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+  return getDigestDateParts(previous).day;
+}
+
+export function getMissedDigestSendDay(date = new Date(), sendHour = DAILY_RATES_DIGEST_HOUR_IST) {
+  const { day, hour } = getDigestDateParts(date);
+  return hour >= sendHour ? day : previousIstDay(date);
+}
+
 export function getInitialDailyDigestDay(createdAt = new Date(), sendHour = DAILY_RATES_DIGEST_HOUR_IST) {
   const { day, hour } = getDigestDateParts(createdAt);
   return hour >= sendHour ? day : undefined;
@@ -1351,8 +1361,7 @@ async function markDailyNewsChannelBriefSent(day: string) {
 export async function sendDailyNewsChannelBriefIfNeeded() {
   if (!getTelegramChannelConfig().configured) return { checked: 0, sent: 0 };
 
-  const { day, hour } = getDigestDateParts();
-  if (hour < DAILY_NEWS_BRIEF_HOUR_IST) return { checked: 1, sent: 0 };
+  const day = getMissedDigestSendDay(undefined, DAILY_NEWS_BRIEF_HOUR_IST);
   if (await hasSentDailyNewsChannelBrief(day)) return { checked: 1, sent: 0 };
 
   const news = await loadLatestNews();
