@@ -12,6 +12,7 @@ import type {
 type Tone = "positive" | "negative" | "warning" | "neutral";
 type ChartRange = "7d" | "30d" | "all";
 type ChartMetricId = "price" | "dexVolume" | "fees" | "defiFlow";
+type DetailTab = "defi" | "yield" | "validators";
 
 interface ChartMetric {
   id: ChartMetricId;
@@ -21,6 +22,19 @@ interface ChartMetric {
   color: string;
   points: AnalyticsPoint[];
   formatter: (value: number) => string;
+}
+
+interface AnalyticsMeta {
+  cache?: string;
+  ageMs?: number;
+  fetchedAt?: number;
+  durationMs?: number;
+  sources?: string[];
+}
+
+interface AnalyticsApiResponse {
+  data: AnalyticsPayload;
+  meta?: AnalyticsMeta;
 }
 
 const CHART_RANGES: Array<{ value: ChartRange; label: string; days?: number }> = [
@@ -78,6 +92,14 @@ function formatFreshness(value?: number) {
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes}m ago`;
   return `${Math.round(minutes / 60)}h ago`;
+}
+
+function formatCacheStatus(meta?: AnalyticsMeta) {
+  if (!meta?.cache) return "Fresh snapshot";
+  if (meta.cache === "stale") return "Stale fallback";
+  if (meta.cache === "hit") return "Cached";
+  if (meta.cache === "miss") return "Fresh snapshot";
+  return meta.cache;
 }
 
 function toneForPercent(value?: number): Tone {
@@ -252,9 +274,9 @@ function buildInsights(analytics: AnalyticsPayload) {
 
 async function loadAnalytics() {
   const response = await fetch("/api/analytics");
-  const data = await response.json();
+  const data = await response.json() as AnalyticsApiResponse & { error?: string };
   if (!response.ok) throw new Error(data.error || "Could not load analytics.");
-  return data.data as AnalyticsPayload;
+  return data as AnalyticsApiResponse;
 }
 
 function ShellPanel({
@@ -365,11 +387,37 @@ function RangeButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={`h-8 rounded-[var(--radius-md)] border px-3 font-mono text-[11px] font-black transition-colors ${
         active
           ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)] text-[#031713]"
           : "border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] text-[var(--color-text-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DetailTabButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`h-9 rounded-[var(--radius-md)] border px-4 text-[12px] font-black transition-colors ${
+        active
+          ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.1)] text-[var(--color-accent-primary)]"
+          : "border-[rgba(132,148,142,0.2)] bg-[rgba(255,255,255,0.018)] text-[var(--color-text-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
       }`}
     >
       {children}
@@ -384,6 +432,10 @@ function TrendChart({ metric }: { metric: ChartMetric }) {
   const activePoint = activeIndex !== null ? coordinates[activeIndex] : coordinates.at(-1);
   const path = metric.points.length >= 2 ? chartPath(metric.points) : "";
   const areaPath = path ? `${path} L98,42 L2,42 Z` : "";
+  const sortedMetricPoints = sortedPoints(metric.points);
+  const firstPoint = sortedMetricPoints[0];
+  const middlePoint = sortedMetricPoints[Math.floor(sortedMetricPoints.length / 2)];
+  const lastPoint = sortedMetricPoints.at(-1);
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (coordinates.length === 0 || !chartRef.current) return;
@@ -420,7 +472,13 @@ function TrendChart({ metric }: { metric: ChartMetric }) {
         </div>
       </div>
 
-      <svg viewBox="0 0 100 42" preserveAspectRatio="none" className="h-[240px] w-full overflow-visible" aria-label={`${metric.label} trend`}>
+      <svg
+        viewBox="0 0 100 42"
+        preserveAspectRatio="none"
+        className="h-[240px] w-full overflow-visible"
+        role="img"
+        aria-label={`${metric.label} trend`}
+      >
         <defs>
           <linearGradient id={`area-${metric.id}`} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={metric.color} stopOpacity="0.26" />
@@ -444,6 +502,11 @@ function TrendChart({ metric }: { metric: ChartMetric }) {
           />
         )}
       </svg>
+      <div className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px] font-bold text-[var(--color-text-dim)]">
+        <span>{formatShortDate(firstPoint?.timestamp)}</span>
+        <span className="text-center">{formatShortDate(middlePoint?.timestamp)}</span>
+        <span className="text-right">{formatShortDate(lastPoint?.timestamp)}</span>
+      </div>
     </div>
   );
 }
@@ -539,8 +602,8 @@ function LoadingState() {
   return (
     <div className="grid gap-4">
       <div className="h-24 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)]" />
-      <div className="grid gap-3 md:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="h-32 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
         ))}
       </div>
@@ -551,17 +614,20 @@ function LoadingState() {
 
 export function AnalyticsDashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
+  const [meta, setMeta] = useState<AnalyticsMeta | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [chartRange, setChartRange] = useState<ChartRange>("30d");
   const [activeMetricId, setActiveMetricId] = useState<ChartMetricId>("dexVolume");
+  const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("defi");
 
   useEffect(() => {
     let cancelled = false;
 
     loadAnalytics()
-      .then((payload) => {
+      .then((result) => {
         if (cancelled) return;
-        setAnalytics(payload);
+        setAnalytics(result.data);
+        setMeta(result.meta);
         setError(null);
       })
       .catch((loadError) => {
@@ -594,7 +660,8 @@ export function AnalyticsDashboard() {
   const tvl = analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd;
   const stableLeader = analytics.stablecoins.assets[0];
   const topRate = analytics.defi.topRates[0];
-  const sourceLine = analytics.sources.join(" + ");
+  const sourceLine = (meta?.sources || analytics.sources).join(" + ");
+  const freshnessAnchor = meta?.fetchedAt || analytics.generatedAt;
 
   return (
     <div className="space-y-4">
@@ -606,12 +673,12 @@ export function AnalyticsDashboard() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[var(--color-text-muted)]">
-          <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1">Updated {formatFreshness(analytics.generatedAt)}</span>
-          <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1">Rolling windows only</span>
+          <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1">Updated {formatFreshness(freshnessAnchor)}</span>
+          <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1">{formatCacheStatus(meta)}</span>
         </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <PulseCard
           label="MON price"
           value={formatCurrency(analytics.market.priceUsd, 6)}
@@ -640,12 +707,6 @@ export function AnalyticsDashboard() {
           helper={stableLeader ? `${stableLeader.symbol} ${formatPercent(stableLeader.sharePct)}` : "tracked stables"}
           color="var(--color-warning)"
         />
-        <PulseCard
-          label="Active stake"
-          value={formatMon(analytics.staking.totalActiveStakeMon)}
-          helper={`${formatNumber(analytics.staking.activeValidators)} active validators`}
-          color="var(--color-accent-primary)"
-        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_420px]">
@@ -669,6 +730,7 @@ export function AnalyticsDashboard() {
               <button
                 key={metric.id}
                 type="button"
+                aria-pressed={activeMetric.id === metric.id}
                 onClick={() => setActiveMetricId(metric.id)}
                 className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
                   activeMetric.id === metric.id
@@ -692,71 +754,92 @@ export function AnalyticsDashboard() {
         </ShellPanel>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Liquidity" title="DeFi depth" />
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <Metric label="TVL" value={formatCurrency(tvl)} />
-            <Metric label="Vol / TVL" value={formatPercent(analytics.dex.volumeToTvlPct)} />
+      <ShellPanel className="p-4">
+        <div className="mb-4 flex flex-col gap-3 border-b border-[rgba(132,148,142,0.18)] pb-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="label-caps text-[var(--color-accent-primary)]">Details</div>
+            <h2 className="mt-2 text-[18px] font-black leading-none text-[var(--color-text-primary)]">
+              {activeDetailTab === "defi" ? "DeFi depth" : activeDetailTab === "yield" ? "Displayed yield" : "Validator distribution"}
+            </h2>
           </div>
-          <BarList items={analytics.defi.protocolTvl} formatter={formatCurrency} />
-        </ShellPanel>
-
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Trading" title="DEX leaders" />
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <Metric label="24h volume" value={formatCurrency(analytics.dex.volume24hUsd)} />
-            <Metric label="24h fees" value={formatCurrency(analytics.dex.fees24hUsd ?? analytics.economy.dailyFeesUsd)} />
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Analytics detail sections">
+            <DetailTabButton active={activeDetailTab === "defi"} onClick={() => setActiveDetailTab("defi")}>
+              DeFi
+            </DetailTabButton>
+            <DetailTabButton active={activeDetailTab === "yield"} onClick={() => setActiveDetailTab("yield")}>
+              Yield
+            </DetailTabButton>
+            <DetailTabButton active={activeDetailTab === "validators"} onClick={() => setActiveDetailTab("validators")}>
+              Validators
+            </DetailTabButton>
           </div>
-          <BarList items={analytics.dex.topProtocols} formatter={formatCurrency} limit={6} />
-        </ShellPanel>
+        </div>
 
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Stables" title="Liquidity base" />
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <Metric label="Total" value={formatCurrency(analytics.stablecoins.totalUsd)} />
-            <Metric label="Largest" value={stableLeader?.symbol || "-"} helper={stableLeader ? formatCurrency(stableLeader.valueUsd) : undefined} />
+        {activeDetailTab === "defi" && (
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div>
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <Metric label="TVL" value={formatCurrency(tvl)} />
+                <Metric label="Vol / TVL" value={formatPercent(analytics.dex.volumeToTvlPct)} />
+              </div>
+              <BarList items={analytics.defi.protocolTvl} formatter={formatCurrency} />
+            </div>
+            <div>
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <Metric label="24h volume" value={formatCurrency(analytics.dex.volume24hUsd)} />
+                <Metric label="24h fees" value={formatCurrency(analytics.dex.fees24hUsd ?? analytics.economy.dailyFeesUsd)} />
+              </div>
+              <BarList items={analytics.dex.topProtocols} formatter={formatCurrency} limit={6} />
+            </div>
+            <div>
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <Metric label="Stables" value={formatCurrency(analytics.stablecoins.totalUsd)} />
+                <Metric label="Largest" value={stableLeader?.symbol || "-"} helper={stableLeader ? formatCurrency(stableLeader.valueUsd) : undefined} />
+              </div>
+              <StablecoinRows stablecoins={analytics.stablecoins.assets} />
+            </div>
           </div>
-          <StablecoinRows stablecoins={analytics.stablecoins.assets} />
-        </ShellPanel>
-      </div>
+        )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Yield" title="Displayed rates" />
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <Metric label="Top rate" value={topRate ? `${topRate.value.toFixed(2)}%` : "-"} helper={topRate?.label} tone={topRate && topRate.value > 15 ? "positive" : "neutral"} />
-            <Metric label="Staking range" value={`${formatPercent(analytics.staking.minApyPct)} - ${formatPercent(analytics.staking.maxApyPct)}`} />
+        {activeDetailTab === "yield" && (
+          <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <Metric label="Top rate" value={topRate ? `${topRate.value.toFixed(2)}%` : "-"} helper={topRate?.label} tone={topRate && topRate.value > 15 ? "positive" : "neutral"} />
+              <Metric label="Staking range" value={`${formatPercent(analytics.staking.minApyPct)} - ${formatPercent(analytics.staking.maxApyPct)}`} />
+              <Metric label="30d DeFi flow" value={formatCurrency(analytics.dex.volume30dUsd)} helper="DEX volume" />
+            </div>
+            <BarList items={analytics.defi.topRates} formatter={(value) => `${value.toFixed(2)}% APR`} limit={7} />
           </div>
-          <BarList items={analytics.defi.topRates} formatter={(value) => `${value.toFixed(2)}% APR`} limit={7} />
-        </ShellPanel>
+        )}
 
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Validators" title="Stake distribution" />
-          <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-            <Metric label="Active" value={formatNumber(analytics.staking.activeValidators)} helper={`${formatNumber(analytics.staking.activeSetCap)} cap`} />
-            <Metric label="Nakamoto 1/3" value={formatNumber(analytics.decentralization.nakamotoSafety)} />
-            <Metric label="Top 10 stake" value={formatPercent(analytics.decentralization.top10SharePct)} tone={analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral"} />
-            <Metric label="Commission" value={formatPercent(analytics.staking.medianCommissionPct)} helper="median" />
+        {activeDetailTab === "validators" && (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+              <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                <Metric label="Active" value={formatNumber(analytics.staking.activeValidators)} helper={`${formatNumber(analytics.staking.activeSetCap)} cap`} />
+                <Metric label="Active stake" value={formatMon(analytics.staking.totalActiveStakeMon)} />
+                <Metric label="Nakamoto 1/3" value={formatNumber(analytics.decentralization.nakamotoSafety)} />
+                <Metric label="Top 10 stake" value={formatPercent(analytics.decentralization.top10SharePct)} tone={analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral"} />
+              </div>
+              <ValidatorRows validators={analytics.validators} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+              <div>
+                <div className="mb-2 text-[12px] font-black text-[var(--color-text-secondary)]">Countries</div>
+                <BarList items={analytics.decentralization.countries} formatter={(value) => formatPercent(value, 1)} limit={5} />
+              </div>
+              <div>
+                <div className="mb-2 text-[12px] font-black text-[var(--color-text-secondary)]">Infrastructure</div>
+                <BarList items={analytics.decentralization.providers} formatter={(value) => formatPercent(value, 1)} limit={5} />
+              </div>
+            </div>
           </div>
-          <ValidatorRows validators={analytics.validators} />
-        </ShellPanel>
-      </div>
+        )}
+      </ShellPanel>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <ShellPanel className="p-4 xl:col-span-2">
-          <SectionHeader eyebrow="Network aggregate" title="Rolling activity" />
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Metric label="Transactions 1h" value={formatNumber(analytics.network.transactions1h)} helper="rolling aggregate" />
-            <Metric label="Blocks 1h" value={formatNumber(analytics.network.blocks1h)} helper="rolling aggregate" />
-            <Metric label="Finality target" value={`${formatNumber(analytics.network.finalitySeconds, 1)}s`} helper="protocol reference" />
-          </div>
-        </ShellPanel>
-
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Sources" title="Provider memory" />
-          <div className="text-[12px] leading-relaxed text-[var(--color-text-muted)]">{sourceLine}</div>
-        </ShellPanel>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgba(132,148,142,0.18)] pt-3 text-[11px] text-[var(--color-text-dim)]">
+        <span>{sourceLine}</span>
+        {typeof meta?.durationMs === "number" && <span>{formatNumber(meta.durationMs)}ms API</span>}
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import { withServerCache, type CacheResult } from "@/lib/serverCache";
-import { monadClient } from "@/lib/client";
 import { CONTRACTS } from "@/config/chain";
 import { STAKING_PROTOCOLS } from "@/config/protocols";
 import { fetchJsonWithRetry } from "@/lib/sourceFetch";
@@ -9,13 +8,7 @@ import { fetchCombinedYieldOpportunitiesWithMeta } from "@/services/yields-aggre
 const ANALYTICS_CACHE_KEY = "analytics:monad:v7";
 const ANALYTICS_TTL_MS = 5 * 60 * 1000;
 const ANALYTICS_STALE_TTL_MS = 30 * 60 * 1000;
-const BLOCK_TIME_SAMPLE_SIZE = 100n;
-const BURN_SAMPLE_SIZE = 100n;
-const MONAD_STAKING_PRECOMPILE = "0x0000000000000000000000000000000000001000" as const;
-const MONAD_BLOCK_REWARD_MON = 25;
-const MONAD_FINALITY_SECONDS = 0.8;
 const MONAD_EPOCH_HOURS = 5.5;
-const MONAD_INITIAL_SUPPLY_MON = 100_000_000_000;
 
 const GMONADS_BASE_URL = "https://www.gmonads.com/api/v1/public";
 const DEFILLAMA_MON_PRICE_URL = "https://coins.llama.fi/prices/current/coingecko:monad";
@@ -99,27 +92,16 @@ export interface AnalyticsPayload {
     meanCommissionPct?: number;
     medianCommissionPct?: number;
     atCommissionCap?: number;
-  };
-  network: {
-    blockHeight?: number;
-    gasGwei?: number;
-    blockTimeSeconds?: number;
-    tps?: number;
-    transactions1h?: number;
-    blocks1h?: number;
-    finalitySeconds?: number;
-    epoch?: number;
-    inEpochDelayPeriod?: boolean;
-  };
-  economy: {
-    inflationRatePct?: number;
-    burnRate24hMon?: number;
-    blockRewardMon?: number;
-    netEmission24hMon?: number;
-    netEmissionYearMon?: number;
-    dailyFeesUsd?: number;
-    annualizedFeesUsd?: number;
-    psRatio?: number;
+	  };
+	  network: {
+	    transactions1h?: number;
+	    blocks1h?: number;
+	    epoch?: number;
+	  };
+	  economy: {
+	    dailyFeesUsd?: number;
+	    annualizedFeesUsd?: number;
+	    psRatio?: number;
     pfRatio?: number;
     feeTrend: AnalyticsPoint[];
   };
@@ -331,8 +313,6 @@ interface ValidatorAnalyticsSummary {
 }
 
 interface BlockStatsSummary {
-  blockTimeSeconds?: number;
-  tps?: number;
   transactions1h?: number;
   blocks1h?: number;
   feeTrend: AnalyticsPoint[];
@@ -763,21 +743,16 @@ function buildBlockStats(blocks: GmonadsBlockPoint[]): BlockStatsSummary {
         timestamp: Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : 0,
         blocks: toNumber(point.blocks) || 0,
         txs: toNumber(point.txs) || 0,
-        tps: toNumber(point.avg_tps),
-        blockTimeSeconds: toNumber(point.avg_block_time_s),
         feesMon:
           normalizeWeiToMon(point.total_base_fee) +
           normalizeWeiToMon(point.total_priority_fee),
       };
-    })
-    .filter((point) => point.timestamp > 0)
-    .sort((a, b) => a.timestamp - b.timestamp);
-  const latest = points.at(-1);
-  const lastHour = points.slice(-60);
+	    })
+	    .filter((point) => point.timestamp > 0)
+	    .sort((a, b) => a.timestamp - b.timestamp);
+	  const lastHour = points.slice(-60);
 
   return {
-    blockTimeSeconds: latest?.blockTimeSeconds,
-    tps: latest?.tps,
     transactions1h: sum(lastHour.map((point) => point.txs)),
     blocks1h: sum(lastHour.map((point) => point.blocks)),
     feeTrend: points.map((point) => ({
@@ -808,85 +783,6 @@ async function fetchPriceTrend() {
     .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value));
 }
 
-async function fetchRpcSnapshot() {
-  try {
-    const blockNumber = await monadClient.getBlockNumber();
-    const sampleSize =
-      blockNumber >= BLOCK_TIME_SAMPLE_SIZE ? BLOCK_TIME_SAMPLE_SIZE : blockNumber;
-    const sampleBlockNumber = blockNumber - sampleSize;
-    const burnSampleSize =
-      blockNumber >= BURN_SAMPLE_SIZE ? BURN_SAMPLE_SIZE : blockNumber;
-    const burnBlockNumbers = Array.from(
-      { length: Number(burnSampleSize) },
-      (_, index) => blockNumber - BigInt(index)
-    );
-    const [gasPrice, latestBlock, sampleBlock] = await Promise.all([
-      monadClient.getGasPrice(),
-      monadClient.getBlock({ blockNumber }),
-      sampleSize > 0n ? monadClient.getBlock({ blockNumber: sampleBlockNumber }) : undefined,
-    ]);
-
-    const blockTimeSeconds =
-      latestBlock && sampleBlock
-        ? calculateAverageBlockTimeSeconds(latestBlock.timestamp, sampleBlock.timestamp, sampleSize)
-        : undefined;
-
-    const burnBlocks = await Promise.all(
-      burnBlockNumbers.map((burnBlockNumber) =>
-        monadClient.getBlock({ blockNumber: burnBlockNumber }).catch(() => undefined)
-      )
-    );
-    const sampledBurnWei = burnBlocks.reduce<bigint>((total, block) => {
-      if (!block?.baseFeePerGas || !block.gasUsed) return total;
-      return total + block.baseFeePerGas * block.gasUsed;
-    }, 0n);
-    const sampledBlocks = BigInt(burnBlocks.filter(Boolean).length);
-    const burnRate24hMon = calculateEstimatedBurnRateMonPerDay(
-      sampledBurnWei,
-      sampledBlocks,
-      blockTimeSeconds
-    );
-
-    let epoch: number | undefined;
-    let inEpochDelayPeriod: boolean | undefined;
-    try {
-      const epochResult = await monadClient.readContract({
-        address: MONAD_STAKING_PRECOMPILE,
-        abi: [
-          {
-            type: "function",
-            name: "getEpoch",
-            stateMutability: "nonpayable",
-            inputs: [],
-            outputs: [
-              { name: "epoch", type: "uint64" },
-              { name: "inEpochDelayPeriod", type: "bool" },
-            ],
-          },
-        ],
-        functionName: "getEpoch",
-      });
-      const [epochValue, inDelay] = epochResult as readonly [bigint, boolean];
-      epoch = Number(epochValue);
-      inEpochDelayPeriod = inDelay;
-    } catch {
-      epoch = undefined;
-      inEpochDelayPeriod = undefined;
-    }
-
-    return {
-      blockHeight: Number(blockNumber),
-      gasGwei: Number(gasPrice) / 1e9,
-      blockTimeSeconds,
-      burnRate24hMon,
-      epoch,
-      inEpochDelayPeriod,
-    };
-  } catch {
-    return {};
-  }
-}
-
 function trendChange(points: AnalyticsPoint[], lookback: "24h" | "30d") {
   if (points.length < 2) return undefined;
   const seconds = lookback === "24h" ? 24 * 3600 : 30 * 86400;
@@ -910,11 +806,18 @@ function opportunityAnalyticsLabel(name: string, protocol: string) {
   return `${trimmedName} on ${trimmedProtocol}`;
 }
 
+function compactUsdLabel(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
 async function loadAnalytics(): Promise<AnalyticsPayload> {
   const [
     monPrice,
     priceTrend,
-    rpc,
     gmonads,
     tokenMarkets,
     coinGeckoMonStats,
@@ -929,7 +832,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
   ] = await Promise.all([
     fetchCurrentMonPrice().catch(() => undefined),
     fetchPriceTrend().catch(() => []),
-    fetchRpcSnapshot(),
     fetchGmonadsSnapshot().catch(() => ({
       validators: [],
       geolocations: [],
@@ -979,11 +881,17 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     .filter((opportunity) => opportunity.apr > 0)
     .sort((a, b) => b.apr - a.apr)
     .slice(0, 6)
-    .map((opportunity) => ({
-      label: opportunityAnalyticsLabel(opportunity.name, opportunity.protocol),
-      value: opportunity.apr,
-      detail: opportunity.opportunityType || opportunity.action,
-    }));
+    .map((opportunity) => {
+      const tvlLabel = compactUsdLabel(opportunity.tvl);
+      return {
+        label: opportunityAnalyticsLabel(opportunity.name, opportunity.protocol),
+        value: opportunity.apr,
+        detail: [
+          opportunity.opportunityType || opportunity.action,
+          tvlLabel ? `${tvlLabel} TVL` : undefined,
+        ].filter(Boolean).join(" · "),
+      };
+    });
 
   const dexLiquidityByProtocol = [...markets.reduce((map, market) => {
     map.set(market.dexLabel, (map.get(market.dexLabel) || 0) + (market.liquidityUsd || 0));
@@ -1007,23 +915,6 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     typeof dailyFeesUsd === "number" ? dailyFeesUsd * 365 : undefined;
   const marketCapUsd = resolvedMonMarket.marketCapUsd;
   const monPriceUsd = monPrice ?? resolvedMonMarket.priceUsd;
-  const blockTimeSeconds =
-    blockStats.blockTimeSeconds ?? ("blockTimeSeconds" in rpc ? rpc.blockTimeSeconds : undefined);
-  const estimatedBlocksPerDay =
-    blockTimeSeconds && blockTimeSeconds > 0 ? 86400 / blockTimeSeconds : undefined;
-  const grossEmission24hMon =
-    estimatedBlocksPerDay ? estimatedBlocksPerDay * MONAD_BLOCK_REWARD_MON : undefined;
-  const burnRate24hMon = "burnRate24hMon" in rpc ? rpc.burnRate24hMon : undefined;
-  const netEmission24hMon =
-    typeof grossEmission24hMon === "number"
-      ? grossEmission24hMon - (burnRate24hMon || 0)
-      : undefined;
-  const netEmissionYearMon =
-    typeof netEmission24hMon === "number" ? netEmission24hMon * 365 : undefined;
-  const inflationRatePct =
-    typeof netEmissionYearMon === "number"
-      ? (netEmissionYearMon / MONAD_INITIAL_SUPPLY_MON) * 100
-      : undefined;
 
   const dailyVolume = toPoints(dexOverview.totalDataChart).slice(-30);
 
@@ -1035,11 +926,10 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     sources: [
       "gmonads",
       "CoinGecko",
-      "DefiLlama",
-      "GeckoTerminal",
-      "Merkl",
-      "Monad RPC",
-    ],
+	      "DefiLlama",
+	      "GeckoTerminal",
+	      "Merkl",
+	    ],
     market: {
       priceUsd: monPriceUsd,
       change24hPct:
@@ -1077,24 +967,14 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       medianCommissionPct: validatorAnalytics.medianCommissionPct,
       atCommissionCap: validatorAnalytics.atCommissionCap,
     },
-    network: {
-      ...rpc,
-      blockTimeSeconds,
-      tps: blockStats.tps,
-      transactions1h: blockStats.transactions1h,
-      blocks1h: blockStats.blocks1h,
-      finalitySeconds: MONAD_FINALITY_SECONDS,
-      epoch: ("epoch" in rpc ? rpc.epoch : undefined) ?? validatorAnalytics.epoch,
-      inEpochDelayPeriod: "inEpochDelayPeriod" in rpc ? rpc.inEpochDelayPeriod : undefined,
-    },
-    economy: {
-      inflationRatePct,
-      burnRate24hMon,
-      blockRewardMon: MONAD_BLOCK_REWARD_MON,
-      netEmission24hMon,
-      netEmissionYearMon,
-      dailyFeesUsd,
-      annualizedFeesUsd,
+	    network: {
+	      transactions1h: blockStats.transactions1h,
+	      blocks1h: blockStats.blocks1h,
+	      epoch: validatorAnalytics.epoch,
+	    },
+	    economy: {
+	      dailyFeesUsd,
+	      annualizedFeesUsd,
       psRatio:
         marketCapUsd && annualizedFeesUsd && annualizedFeesUsd > 0
           ? marketCapUsd / annualizedFeesUsd
