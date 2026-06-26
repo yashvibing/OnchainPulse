@@ -16,10 +16,21 @@ type ChartMetricId =
   | "marketCap"
   | "fdv"
   | "marketVolume"
+  | "chainFees"
+  | "chainRevenue"
+  | "chainRev"
+  | "tokenIncentives"
+  | "appRevenue"
+  | "appFees"
+  | "feesPaid"
   | "dexVolume"
   | "dexVolumeAverage"
-  | "dexFees"
-  | "dexFeesAverage"
+  | "perpsVolume"
+  | "activeAddresses"
+  | "netInflows"
+  | "totalRaised"
+  | "bridgedTvl"
+  | "rwaActiveMcap"
   | "annualizedFees"
   | "chainTvl"
   | "dexTvl"
@@ -42,6 +53,7 @@ interface ChartMetric {
   color: string;
   points: AnalyticsPoint[];
   formatter: (value: number) => string;
+  mark: "area" | "line" | "bar";
   tone?: Tone;
 }
 
@@ -216,8 +228,13 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
   const pricePoints = pointsForRange(analytics.market.priceTrend, range);
   const dexPoints = pointsForRange(analytics.dex.volumeTrend, range);
   const feePoints = pointsForRange(analytics.economy.feeTrend, range);
+  const tvlPoints = pointsForRange(analytics.defi.tvlTrend, range);
+  const stablePoints = pointsForRange(analytics.stablecoins.trend, range);
+  const revenuePoints = pointsForRange(analytics.economy.chainRevenueTrend, range);
+  const appRevenuePoints = pointsForRange(analytics.economy.appRevenueTrend, range);
+  const appFeesPoints = pointsForRange(analytics.economy.appFeesTrend, range);
+  const userFeesPoints = pointsForRange(analytics.economy.userFeesTrend, range);
   const dexAveragePoints = movingAverageTrend(dexPoints);
-  const feeAveragePoints = movingAverageTrend(feePoints);
   const marketCapPoints = valueTrendFromPrice(
     pricePoints,
     analytics.market.marketCapUsd,
@@ -232,6 +249,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
   );
   const annualizedFeePoints = scaleTrend(feePoints, 365);
   const topStable = analytics.stablecoins.assets[0];
+  const tvl = analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd;
 
   return [
     {
@@ -242,6 +260,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#2f81ff",
       points: pricePoints,
       formatter: (value) => formatCurrency(value, 6),
+      mark: "line",
       tone: toneForPercent(changeForPoints(pricePoints)),
     },
     {
@@ -252,6 +271,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#ff2f7d",
       points: marketCapPoints,
       formatter: formatCurrency,
+      mark: "area",
     },
     {
       id: "fdv",
@@ -261,6 +281,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#d22cff",
       points: fdvPoints,
       formatter: formatCurrency,
+      mark: "line",
     },
     {
       id: "marketVolume",
@@ -270,6 +291,107 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#8b5cf6",
       points: [],
       formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainTvl",
+      label: "TVL",
+      value: formatCurrency(tvl),
+      helper: `${analytics.defi.protocolTvl.length} tracked protocols`,
+      color: "#2f81ff",
+      points: tvlPoints,
+      formatter: formatCurrency,
+      mark: "area",
+    },
+    {
+      id: "stableLiquidity",
+      label: "Stablecoins mcap",
+      value: formatCurrency(analytics.stablecoins.totalUsd),
+      helper: topStable ? `${topStable.symbol} ${formatPercent(topStable.sharePct)}` : "tracked stables",
+      color: "#ff2f7d",
+      points: stablePoints,
+      formatter: formatCurrency,
+      mark: "area",
+    },
+    {
+      id: "rwaActiveMcap",
+      label: "RWA active mcap",
+      value: formatCurrency(analytics.defi.rwaActiveMcapUsd),
+      helper: "DefiLlama snapshot",
+      color: "#f59e0b",
+      points: [],
+      formatter: formatCurrency,
+      mark: "area",
+    },
+    {
+      id: "chainFees",
+      label: "Chain fees",
+      value: formatCurrency(analytics.economy.chainFeesUsd),
+      helper: "24h chain-native fees",
+      color: "#50c861",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainRevenue",
+      label: "Chain revenue",
+      value: formatCurrency(analytics.economy.chainRevenueUsd),
+      helper: "24h chain revenue",
+      color: "#14b8a6",
+      points: revenuePoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainRev",
+      label: "Chain REV",
+      value: formatCurrency(analytics.economy.chainRevUsd),
+      helper: "24h REV",
+      color: "#22c55e",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "tokenIncentives",
+      label: "Token incentives",
+      value: formatCurrency(analytics.economy.tokenIncentivesUsd),
+      helper: "24h emissions",
+      color: "#facc15",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "appRevenue",
+      label: "App revenue",
+      value: formatCurrency(analytics.economy.appRevenueUsd),
+      helper: "24h app revenue",
+      color: "#06b6d4",
+      points: appRevenuePoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "appFees",
+      label: "App fees",
+      value: formatCurrency(analytics.economy.appFeesUsd),
+      helper: "24h app fees",
+      color: "#c75323",
+      points: appFeesPoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "feesPaid",
+      label: "Fees paid",
+      value: formatCurrency(analytics.economy.dailyFeesUsd),
+      helper: "24h protocol fees",
+      color: "#fb923c",
+      points: userFeesPoints.length > 0 ? userFeesPoints : feePoints,
+      formatter: formatCurrency,
+      mark: "bar",
     },
     {
       id: "dexVolume",
@@ -279,6 +401,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#50c861",
       points: dexPoints,
       formatter: formatCurrency,
+      mark: "bar",
     },
     {
       id: "dexVolumeAverage",
@@ -288,24 +411,64 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#9bd66b",
       points: dexAveragePoints,
       formatter: formatCurrency,
+      mark: "line",
     },
     {
-      id: "dexFees",
-      label: "Chain fees",
-      value: formatCurrency(analytics.economy.dailyFeesUsd),
-      helper: "daily fees",
-      color: "#c75323",
-      points: feePoints,
+      id: "perpsVolume",
+      label: "Perps volume",
+      value: formatCurrency(analytics.derivatives.perpsVolume24hUsd),
+      helper: analytics.derivatives.perpsVolume7dUsd ? `${formatCurrency(analytics.derivatives.perpsVolume7dUsd)} 7d` : "DefiLlama snapshot",
+      color: "#a855f7",
+      points: analytics.derivatives.perpsVolumeTrend,
       formatter: formatCurrency,
+      mark: "bar",
+      tone: toneForPercent(analytics.derivatives.perpsChange7dPct),
     },
     {
-      id: "dexFeesAverage",
-      label: "Fees 7d avg",
-      value: formatCurrency(latestValue(feeAveragePoints)),
-      helper: "smoothed fees",
-      color: "#fb923c",
-      points: feeAveragePoints,
+      id: "activeAddresses",
+      label: "Active addresses",
+      value: formatNumber(analytics.network.activeAddresses),
+      helper: "not available from DefiLlama",
+      color: "#d22cff",
+      points: [],
+      formatter: formatNumber,
+      mark: "bar",
+    },
+    {
+      id: "netInflows",
+      label: "Net inflows",
+      value: formatCurrency(analytics.flows.netInflows24hUsd),
+      helper: "24h bridge flow",
+      color: "#7c3aed",
+      points: analytics.flows.netInflowsTrend,
       formatter: formatCurrency,
+      mark: "bar",
+      tone:
+        typeof analytics.flows.netInflows24hUsd === "number"
+          ? analytics.flows.netInflows24hUsd >= 0
+            ? "positive"
+            : "negative"
+          : "neutral",
+    },
+    {
+      id: "totalRaised",
+      label: "Total raised",
+      value: formatCurrency(analytics.defi.totalRaisedUsd),
+      helper: "funding rounds",
+      color: "#f97316",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "bridgedTvl",
+      label: "Bridged TVL",
+      value: formatCurrency(analytics.defi.bridgedTvlUsd),
+      helper: "DefiLlama chain assets",
+      color: "#38bdf8",
+      points: [],
+      formatter: formatCurrency,
+      mark: "area",
     },
     {
       id: "annualizedFees",
@@ -315,15 +478,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#f59e0b",
       points: annualizedFeePoints,
       formatter: formatCurrency,
-    },
-    {
-      id: "chainTvl",
-      label: "Chain TVL",
-      value: formatCurrency(analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd),
-      helper: `${analytics.defi.protocolTvl.length} tracked protocols`,
-      color: "#14b8a6",
-      points: [],
-      formatter: formatCurrency,
+      mark: "line",
     },
     {
       id: "dexTvl",
@@ -333,15 +488,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#06b6d4",
       points: [],
       formatter: formatCurrency,
-    },
-    {
-      id: "stableLiquidity",
-      label: "Stablecoins mcap",
-      value: formatCurrency(analytics.stablecoins.totalUsd),
-      helper: topStable ? `${topStable.symbol} ${formatPercent(topStable.sharePct)}` : "tracked stables",
-      color: "#ec4899",
-      points: [],
-      formatter: formatCurrency,
+      mark: "area",
     },
     {
       id: "stakedValue",
@@ -351,6 +498,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#a78bfa",
       points: [],
       formatter: formatCurrency,
+      mark: "area",
     },
     {
       id: "stakingApy",
@@ -360,6 +508,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#84cc16",
       points: [],
       formatter: (value) => formatPercent(value),
+      mark: "line",
       tone: analytics.staking.estimatedApyPct && analytics.staking.estimatedApyPct > 8 ? "positive" : "neutral",
     },
     {
@@ -370,6 +519,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#22c55e",
       points: [],
       formatter: formatNumber,
+      mark: "bar",
     },
     {
       id: "nakamotoSafety",
@@ -379,6 +529,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#38bdf8",
       points: [],
       formatter: formatNumber,
+      mark: "bar",
     },
     {
       id: "top10Stake",
@@ -388,6 +539,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#fb7185",
       points: [],
       formatter: (value) => formatPercent(value),
+      mark: "bar",
       tone: analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral",
     },
     {
@@ -398,6 +550,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#f97316",
       points: [],
       formatter: (value) => formatPercent(value),
+      mark: "bar",
     },
     {
       id: "psRatio",
@@ -407,6 +560,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#facc15",
       points: [],
       formatter: (value) => formatNumber(value, 1),
+      mark: "line",
     },
     {
       id: "pfRatio",
@@ -416,6 +570,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       color: "#fb923c",
       points: [],
       formatter: (value) => formatNumber(value, 1),
+      mark: "line",
     },
   ];
 }
@@ -587,13 +742,12 @@ function MetricPill({
   return (
     <button
       type="button"
-      disabled={!canChart}
       aria-pressed={selected}
       onClick={onClick}
       className={`flex h-9 max-w-full items-center gap-2 rounded-full border px-3 text-[12px] font-black transition-colors ${
-        canChart
+        canChart || selected
           ? "bg-[rgba(255,255,255,0.025)] text-[var(--color-text-primary)] hover:bg-[rgba(255,255,255,0.05)]"
-          : "cursor-not-allowed border-[rgba(132,148,142,0.16)] bg-[rgba(255,255,255,0.012)] text-[var(--color-text-dim)]"
+          : "border-[rgba(132,148,142,0.16)] bg-[rgba(255,255,255,0.012)] text-[var(--color-text-dim)] hover:bg-[rgba(255,255,255,0.035)]"
       }`}
       style={{
         borderColor: selected ? metric.color : undefined,
@@ -625,16 +779,9 @@ function MetricShelfTile({
       </div>
       <div className="mt-2 truncate font-mono text-[17px] font-black leading-none text-[var(--color-text-primary)]">{metric.value}</div>
       <div className="mt-1 truncate text-[11px] font-semibold text-[var(--color-text-muted)]">{metric.helper}</div>
+      {!canChart && <div className="mt-2 label-caps text-[var(--color-text-dim)]">Snapshot</div>}
     </>
   );
-
-  if (!canChart) {
-    return (
-      <div className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 ${toneClasses(metric.tone || "neutral")}`}>
-        {content}
-      </div>
-    );
-  }
 
   return (
     <button
@@ -734,19 +881,38 @@ function MultiMetricChart({ metrics }: { metrics: ChartMetric[] }) {
           const path = coordinatesPath(coordinates);
           const activeIndex = Math.min(coordinates.length - 1, Math.max(0, Math.round(activeRatio * (coordinates.length - 1))));
           const activePoint = coordinates[activeIndex];
-          const areaPath = index === 0 && path ? `${path} L98,54 L2,54 Z` : "";
+          const areaPath = metric.mark === "area" && path ? `${path} L98,54 L2,54 Z` : "";
+          const barWidth = Math.max(0.18, Math.min(0.95, 58 / Math.max(coordinates.length, 1)));
           return (
             <g key={metric.id}>
-              {areaPath && <path d={areaPath} fill="url(#comparison-area)" />}
-              <path
-                d={path}
-                fill="none"
-                stroke={metric.color}
-                strokeWidth={index === 0 ? "2.3" : "2"}
-                opacity={index === 0 ? 1 : 0.86}
-                vectorEffect="non-scaling-stroke"
-              />
-              {activePoint && (
+              {metric.mark === "bar" ? (
+                coordinates.map((coordinate, coordinateIndex) => (
+                  <rect
+                    key={`${metric.id}-${coordinateIndex}`}
+                    x={coordinate.x - barWidth / 2}
+                    y={coordinate.y}
+                    width={barWidth}
+                    height={54 - coordinate.y}
+                    rx="0.08"
+                    fill={metric.color}
+                    opacity={coordinateIndex === activeIndex ? 0.82 : index === 0 ? 0.42 : 0.28}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))
+              ) : (
+                <>
+                  {areaPath && <path d={areaPath} fill={index === 0 ? "url(#comparison-area)" : metric.color} opacity={index === 0 ? 1 : 0.08} />}
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke={metric.color}
+                    strokeWidth={index === 0 ? "2.3" : "2"}
+                    opacity={index === 0 ? 1 : 0.86}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+              {activePoint && metric.mark !== "bar" && (
                 <circle
                   cx={activePoint.x}
                   cy={activePoint.y}
@@ -871,11 +1037,12 @@ export function AnalyticsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [chartRange, setChartRange] = useState<ChartRange>("30d");
   const [selectedMetricIds, setSelectedMetricIds] = useState<ChartMetricId[]>([
-    "price",
+    "chainTvl",
+    "stableLiquidity",
     "dexVolume",
-    "dexVolumeAverage",
-    "dexFees",
-    "dexFeesAverage",
+    "feesPaid",
+    "chainRevenue",
+    "appFees",
   ]);
   const [showMetricShelf, setShowMetricShelf] = useState(true);
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("defi");
@@ -905,11 +1072,10 @@ export function AnalyticsDashboard() {
     [analytics, chartRange]
   );
   const chartableMetrics = chartMetrics.filter((metric) => metric.points.length >= 2);
-  const selectedMetrics = chartMetrics.filter((metric) => selectedMetricIds.includes(metric.id) && metric.points.length >= 2);
+  const selectedMetrics = chartMetrics.filter((metric) => selectedMetricIds.includes(metric.id));
   const comparisonMetrics = selectedMetrics.length > 0 ? selectedMetrics : chartableMetrics.slice(0, 4);
 
   function toggleMetric(metric: ChartMetric) {
-    if (metric.points.length < 2) return;
     setSelectedMetricIds((current) => {
       if (current.includes(metric.id)) {
         const next = current.filter((id) => id !== metric.id);
@@ -971,13 +1137,14 @@ export function AnalyticsDashboard() {
           label="Chain TVL"
           value={formatCurrency(tvl)}
           helper={`${analytics.defi.protocolTvl.length} tracked protocols`}
-          points={analytics.defi.volume30dTrend}
+          points={analytics.defi.tvlTrend}
           color="var(--color-accent-violet)"
         />
         <PulseCard
           label="Stable liquidity"
           value={formatCurrency(analytics.stablecoins.totalUsd)}
           helper={stableLeader ? `${stableLeader.symbol} ${formatPercent(stableLeader.sharePct)}` : "tracked stables"}
+          points={analytics.stablecoins.trend}
           color="var(--color-warning)"
         />
       </div>
@@ -1012,7 +1179,7 @@ export function AnalyticsDashboard() {
               <MetricPill
                 key={metric.id}
                 metric={metric}
-                selected={selectedMetricIds.includes(metric.id) && metric.points.length >= 2}
+                selected={selectedMetricIds.includes(metric.id)}
                 onClick={() => toggleMetric(metric)}
               />
             ))}
@@ -1026,7 +1193,7 @@ export function AnalyticsDashboard() {
                 <MetricShelfTile
                   key={metric.id}
                   metric={metric}
-                  selected={selectedMetricIds.includes(metric.id) && metric.points.length >= 2}
+                  selected={selectedMetricIds.includes(metric.id)}
                   onClick={() => toggleMetric(metric)}
                 />
               ))}
@@ -1078,6 +1245,23 @@ export function AnalyticsDashboard() {
                 <Metric label="Largest" value={stableLeader?.symbol || "-"} helper={stableLeader ? formatCurrency(stableLeader.valueUsd) : undefined} />
               </div>
               <StablecoinRows stablecoins={analytics.stablecoins.assets} />
+            </div>
+            <div className="xl:col-span-3">
+              <div className="mb-2 text-[12px] font-black text-[var(--color-text-secondary)]">DefiLlama metrics</div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
+                <Metric label="RWA active" value={formatCurrency(analytics.defi.rwaActiveMcapUsd)} />
+                <Metric label="Bridged TVL" value={formatCurrency(analytics.defi.bridgedTvlUsd)} />
+                <Metric label="Total raised" value={formatCurrency(analytics.defi.totalRaisedUsd)} />
+                <Metric label="Perps 24h" value={formatCurrency(analytics.derivatives.perpsVolume24hUsd)} />
+                <Metric label="Net inflows" value={formatCurrency(analytics.flows.netInflows24hUsd)} tone={analytics.flows.netInflows24hUsd && analytics.flows.netInflows24hUsd < 0 ? "negative" : "positive"} />
+                <Metric label="App fees" value={formatCurrency(analytics.economy.appFeesUsd)} />
+                <Metric label="Chain fees" value={formatCurrency(analytics.economy.chainFeesUsd)} />
+                <Metric label="Chain revenue" value={formatCurrency(analytics.economy.chainRevenueUsd)} />
+                <Metric label="Chain REV" value={formatCurrency(analytics.economy.chainRevUsd)} />
+                <Metric label="App revenue" value={formatCurrency(analytics.economy.appRevenueUsd)} />
+                <Metric label="Fees paid" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
+                <Metric label="Token incentives" value={formatCurrency(analytics.economy.tokenIncentivesUsd)} />
+              </div>
             </div>
           </div>
         )}

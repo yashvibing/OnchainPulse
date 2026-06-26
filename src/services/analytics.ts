@@ -17,13 +17,17 @@ const COINGECKO_MON_URL =
 const GECKO_WMON_TOKEN_URL =
   `https://api.geckoterminal.com/api/v2/networks/monad/tokens/${CONTRACTS.wmon}`;
 const DEFILLAMA_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?chain=Monad";
+const DEFILLAMA_STABLECOIN_CHART_URL = "https://stablecoins.llama.fi/stablecoincharts/Monad";
 const DEFILLAMA_DEX_OVERVIEW_URL =
   "https://api.llama.fi/overview/dexs/Monad?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true&dataType=dailyVolume";
 const DEFILLAMA_FEES_OVERVIEW_URL =
-  "https://api.llama.fi/overview/fees/Monad?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true&dataType=dailyFees";
+  "https://api.llama.fi/overview/fees/Monad?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true";
 const DEFILLAMA_CHAINS_URL = "https://api.llama.fi/v2/chains";
+const DEFILLAMA_CHAIN_TVL_HISTORY_URL = "https://api.llama.fi/v2/historicalChainTvl/Monad";
 const DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols";
 const DEFILLAMA_YIELDS_URL = "https://yields.llama.fi/pools";
+const DEFILLAMA_MONAD_PAGE_URL =
+  "https://defillama.com/chain/monad?chainFees=true&perpsVolume=true&netInflows=true&activeAddresses=true&stablecoinsMcap=true";
 
 export interface AnalyticsPoint {
   timestamp: number;
@@ -96,14 +100,29 @@ export interface AnalyticsPayload {
 	  network: {
 	    transactions1h?: number;
 	    blocks1h?: number;
+    activeAddresses?: number;
+    newAddresses?: number;
 	    epoch?: number;
 	  };
 	  economy: {
 	    dailyFeesUsd?: number;
+    chainFeesUsd?: number;
+    chainRevenueUsd?: number;
+    chainRevUsd?: number;
+    tokenIncentivesUsd?: number;
+    appRevenueUsd?: number;
+    appFeesUsd?: number;
+    userFeesUsd?: number;
+    holdersRevenueUsd?: number;
+    supplySideRevenueUsd?: number;
 	    annualizedFeesUsd?: number;
 	    psRatio?: number;
     pfRatio?: number;
     feeTrend: AnalyticsPoint[];
+    chainRevenueTrend: AnalyticsPoint[];
+    appRevenueTrend: AnalyticsPoint[];
+    appFeesTrend: AnalyticsPoint[];
+    userFeesTrend: AnalyticsPoint[];
   };
   decentralization: {
     nakamotoLiveness?: number;
@@ -122,11 +141,26 @@ export interface AnalyticsPayload {
     categoryTvl: AnalyticsBar[];
     topRates: AnalyticsBar[];
     topDexLiquidity: AnalyticsBar[];
+    totalRaisedUsd?: number;
+    bridgedTvlUsd?: number;
+    rwaActiveMcapUsd?: number;
+    tvlTrend: AnalyticsPoint[];
     volume30dTrend: AnalyticsPoint[];
   };
   stablecoins: {
     totalUsd: number;
+    trend: AnalyticsPoint[];
     assets: AnalyticsStablecoin[];
+  };
+  derivatives: {
+    perpsVolume24hUsd?: number;
+    perpsVolume7dUsd?: number;
+    perpsChange7dPct?: number;
+    perpsVolumeTrend: AnalyticsPoint[];
+  };
+  flows: {
+    netInflows24hUsd?: number;
+    netInflowsTrend: AnalyticsPoint[];
   };
   dex: {
     volume24hUsd?: number;
@@ -201,6 +235,12 @@ interface DefiLlamaStablecoinsResponse {
   }>;
 }
 
+interface DefiLlamaStablecoinChartPoint {
+  date?: string | number;
+  totalCirculating?: { peggedUSD?: number };
+  totalCirculatingUSD?: { peggedUSD?: number };
+}
+
 interface DefiLlamaOverviewResponse {
   total24h?: number;
   total7d?: number;
@@ -211,6 +251,11 @@ interface DefiLlamaOverviewResponse {
     name?: string;
     total24h?: number;
   }>;
+}
+
+interface DefiLlamaHistoricalChainTvlPoint {
+  date?: number;
+  tvl?: number;
 }
 
 interface DefiLlamaChain {
@@ -294,6 +339,40 @@ interface GmonadsSnapshot {
   blocks: GmonadsBlockPoint[];
 }
 
+interface DefiLlamaPageSnapshot {
+  rwaActiveMcap?: number;
+  chainFees?: {
+    total24h?: number;
+    feesGenerated24h?: number;
+    totalREV24h?: number;
+  };
+  chainRevenue?: { total24h?: number };
+  appRevenue?: { total24h?: number };
+  appFees?: { total24h?: number };
+  perps?: {
+    total24h?: number;
+    total7d?: number;
+    change_7dover7d?: number;
+  };
+  users?: {
+    activeUsers?: number | null;
+    newUsers?: number | null;
+    transactions?: number | null;
+  };
+  inflows?: {
+    netInflows?: number;
+  };
+  chainRaises?: Array<{ amount?: number }>;
+  chainAssets?: {
+    total?: { total?: number };
+  };
+  chainIncentives?: {
+    emissions24h?: number;
+    emissions7d?: number;
+    emissions30d?: number;
+  };
+}
+
 interface ValidatorAnalyticsSummary {
   epoch?: number;
   activeValidators?: number;
@@ -319,6 +398,7 @@ interface BlockStatsSummary {
 }
 
 function toNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return undefined;
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
 }
@@ -330,6 +410,10 @@ function sum(values: Array<number | undefined>) {
 function percentChange(current?: number, previous?: number) {
   if (!current || !previous) return undefined;
   return ((current - previous) / previous) * 100;
+}
+
+function latestStablecoinValue(points: AnalyticsPoint[]) {
+  return points.at(-1)?.value || 0;
 }
 
 function toPoints(chart?: Array<[number, number]>) {
@@ -468,6 +552,24 @@ async function fetchStablecoins() {
   };
 }
 
+async function fetchStablecoinTrend() {
+  const data = await fetchJsonWithRetry<DefiLlamaStablecoinChartPoint[]>(DEFILLAMA_STABLECOIN_CHART_URL, {
+    sourceName: "defillama-stablecoin-chart-monad",
+    timeoutMs: 10_000,
+    retries: 1,
+  });
+
+  return (data || [])
+    .map((point) => ({
+      timestamp: toNumber(point.date) || 0,
+      value:
+        toNumber(point.totalCirculatingUSD?.peggedUSD) ??
+        toNumber(point.totalCirculating?.peggedUSD) ??
+        0,
+    }))
+    .filter((point) => point.timestamp > 0 && point.value > 0);
+}
+
 async function fetchDexOverview() {
   return fetchJsonWithRetry<DefiLlamaOverviewResponse>(DEFILLAMA_DEX_OVERVIEW_URL, {
     sourceName: "defillama-dexs-monad",
@@ -476,9 +578,9 @@ async function fetchDexOverview() {
   });
 }
 
-async function fetchFeesOverview() {
-  return fetchJsonWithRetry<DefiLlamaOverviewResponse>(DEFILLAMA_FEES_OVERVIEW_URL, {
-    sourceName: "defillama-fees-monad",
+async function fetchFeesOverview(dataType = "dailyFees") {
+  return fetchJsonWithRetry<DefiLlamaOverviewResponse>(`${DEFILLAMA_FEES_OVERVIEW_URL}&dataType=${dataType}`, {
+    sourceName: `defillama-fees-monad-${dataType}`,
     timeoutMs: 10_000,
     retries: 1,
   });
@@ -491,6 +593,50 @@ async function fetchChainTvl() {
     retries: 1,
   });
   return chains.find((chain) => chain.name === "Monad")?.tvl;
+}
+
+async function fetchChainTvlTrend() {
+  const data = await fetchJsonWithRetry<DefiLlamaHistoricalChainTvlPoint[]>(DEFILLAMA_CHAIN_TVL_HISTORY_URL, {
+    sourceName: "defillama-chain-tvl-history-monad",
+    timeoutMs: 10_000,
+    retries: 1,
+  });
+
+  return (data || [])
+    .map((point) => ({
+      timestamp: toNumber(point.date) || 0,
+      value: toNumber(point.tvl) || 0,
+    }))
+    .filter((point) => point.timestamp > 0 && point.value > 0);
+}
+
+async function fetchTextWithRetry(url: string, sourceName: string, timeoutMs = 10_000) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= 1; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+      return response.text();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1) break;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${sourceName}`);
+}
+
+async function fetchDefiLlamaPageSnapshot(): Promise<DefiLlamaPageSnapshot> {
+  const html = await fetchTextWithRetry(DEFILLAMA_MONAD_PAGE_URL, "defillama-monad-page");
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!match?.[1]) return {};
+  const data = JSON.parse(match[1]) as {
+    props?: { pageProps?: DefiLlamaPageSnapshot };
+  };
+  return data.props?.pageProps || {};
 }
 
 async function fetchDexTvlSummary(): Promise<DexTvlSummary> {
@@ -824,9 +970,18 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     monMarketStats,
     yieldOpportunities,
     stablecoins,
+    stablecoinTrend,
     dexOverview,
     feesOverview,
+    revenueOverview,
+    appRevenueOverview,
+    appFeesOverview,
+    userFeesOverview,
+    holdersRevenueOverview,
+    supplySideRevenueOverview,
     chainTvl,
+    chainTvlTrend,
+    defillamaPageSnapshot,
     dexTvlSummary,
     stakingApySummary,
   ] = await Promise.all([
@@ -843,9 +998,18 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     fetchMonMarketStats().catch(() => ({} as AnalyticsMarketStats)),
     fetchCombinedYieldOpportunitiesWithMeta().catch(() => ({ data: [] })),
     fetchStablecoins().catch(() => ({ totalUsd: 0, assets: [] })),
+    fetchStablecoinTrend().catch(() => []),
     fetchDexOverview().catch(() => ({} as DefiLlamaOverviewResponse)),
     fetchFeesOverview().catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailyRevenue").catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailyAppRevenue").catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailyAppFees").catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailyUserFees").catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailyHoldersRevenue").catch(() => ({} as DefiLlamaOverviewResponse)),
+    fetchFeesOverview("dailySupplySideRevenue").catch(() => ({} as DefiLlamaOverviewResponse)),
     fetchChainTvl().catch(() => undefined),
+    fetchChainTvlTrend().catch(() => []),
+    fetchDefiLlamaPageSnapshot().catch(() => ({} as DefiLlamaPageSnapshot)),
     fetchDexTvlSummary().catch(() => ({ totalUsd: 0, protocols: [] })),
     fetchStakingApySummary().catch(() => ({})),
   ]);
@@ -910,13 +1074,30 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     sum(dexLiquidityByProtocol.map((item) => item.value));
   const dexVolume24hUsd = toNumber(dexOverview.total24h);
   const dexFees24hUsd = toNumber(feesOverview.total24h);
-  const dailyFeesUsd = dexFees24hUsd;
+  const chainFeesUsd = toNumber(defillamaPageSnapshot.chainFees?.total24h);
+  const chainRevenueUsd =
+    toNumber(defillamaPageSnapshot.chainRevenue?.total24h) ??
+    toNumber(revenueOverview.total24h);
+  const chainRevUsd =
+    toNumber(defillamaPageSnapshot.chainFees?.totalREV24h) ??
+    chainFeesUsd;
+  const appRevenueUsd =
+    toNumber(defillamaPageSnapshot.appRevenue?.total24h) ??
+    toNumber(appRevenueOverview.total24h);
+  const appFeesUsd =
+    toNumber(defillamaPageSnapshot.appFees?.total24h) ??
+    toNumber(appFeesOverview.total24h);
+  const tokenIncentivesUsd = toNumber(defillamaPageSnapshot.chainIncentives?.emissions24h);
+  const dailyFeesUsd =
+    toNumber(defillamaPageSnapshot.chainFees?.feesGenerated24h) ??
+    dexFees24hUsd;
   const annualizedFeesUsd =
     typeof dailyFeesUsd === "number" ? dailyFeesUsd * 365 : undefined;
   const marketCapUsd = resolvedMonMarket.marketCapUsd;
   const monPriceUsd = monPrice ?? resolvedMonMarket.priceUsd;
 
   const dailyVolume = toPoints(dexOverview.totalDataChart).slice(-30);
+  const totalRaisedUsd = sum((defillamaPageSnapshot.chainRaises || []).map((raise) => toNumber(raise.amount))) * 1_000_000;
 
   const activeStakeMon = validatorAnalytics.totalActiveStakeMon;
   const activeValidators = validatorAnalytics.activeValidators;
@@ -927,6 +1108,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       "gmonads",
       "CoinGecko",
 	      "DefiLlama",
+      "DefiLlama page snapshot",
 	      "GeckoTerminal",
 	      "Merkl",
 	    ],
@@ -970,10 +1152,21 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
 	    network: {
 	      transactions1h: blockStats.transactions1h,
 	      blocks1h: blockStats.blocks1h,
+      activeAddresses: toNumber(defillamaPageSnapshot.users?.activeUsers),
+      newAddresses: toNumber(defillamaPageSnapshot.users?.newUsers),
 	      epoch: validatorAnalytics.epoch,
 	    },
 	    economy: {
 	      dailyFeesUsd,
+      chainFeesUsd,
+      chainRevenueUsd,
+      chainRevUsd,
+      tokenIncentivesUsd,
+      appRevenueUsd,
+      appFeesUsd,
+      userFeesUsd: toNumber(userFeesOverview.total24h),
+      holdersRevenueUsd: toNumber(holdersRevenueOverview.total24h),
+      supplySideRevenueUsd: toNumber(supplySideRevenueOverview.total24h),
 	      annualizedFeesUsd,
       psRatio:
         marketCapUsd && annualizedFeesUsd && annualizedFeesUsd > 0
@@ -984,6 +1177,10 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
           ? marketCapUsd / (dexFees24hUsd * 365)
           : undefined,
       feeTrend: toPoints(feesOverview.totalDataChart).slice(-30),
+      chainRevenueTrend: toPoints(revenueOverview.totalDataChart).slice(-30),
+      appRevenueTrend: toPoints(appRevenueOverview.totalDataChart).slice(-30),
+      appFeesTrend: toPoints(appFeesOverview.totalDataChart).slice(-30),
+      userFeesTrend: toPoints(userFeesOverview.totalDataChart).slice(-30),
     },
     decentralization: {
       nakamotoLiveness: validatorAnalytics.nakamotoLiveness,
@@ -1002,9 +1199,27 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       categoryTvl,
       topRates,
       topDexLiquidity,
+      totalRaisedUsd: totalRaisedUsd || undefined,
+      bridgedTvlUsd: toNumber(defillamaPageSnapshot.chainAssets?.total?.total),
+      rwaActiveMcapUsd: toNumber(defillamaPageSnapshot.rwaActiveMcap),
+      tvlTrend: chainTvlTrend.slice(-120),
       volume30dTrend: dailyVolume,
     },
-    stablecoins,
+    stablecoins: {
+      ...stablecoins,
+      totalUsd: stablecoins.totalUsd || latestStablecoinValue(stablecoinTrend),
+      trend: stablecoinTrend.slice(-120),
+    },
+    derivatives: {
+      perpsVolume24hUsd: toNumber(defillamaPageSnapshot.perps?.total24h),
+      perpsVolume7dUsd: toNumber(defillamaPageSnapshot.perps?.total7d),
+      perpsChange7dPct: toNumber(defillamaPageSnapshot.perps?.change_7dover7d),
+      perpsVolumeTrend: [],
+    },
+    flows: {
+      netInflows24hUsd: toNumber(defillamaPageSnapshot.inflows?.netInflows),
+      netInflowsTrend: [],
+    },
     dex: {
       volume24hUsd: dexVolume24hUsd,
       volume7dUsd: toNumber(dexOverview.total7d),
