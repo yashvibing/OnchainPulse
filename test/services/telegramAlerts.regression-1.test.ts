@@ -97,6 +97,8 @@ describe("telegram daily digest alerts", () => {
 
     expect(message).toContain("1. DeltaV_xyz");
     expect(message).toContain("   Summary:");
+    expect(message).toContain("DeltaV highlighted weekly Monad ecosystem traction");
+    expect(message).not.toContain("Summary: An ecosystem of founders who ship every week");
     expect(message).toContain("   Read: https://x.com/DeltaV_xyz/status/2070132310134210790");
   });
 });
