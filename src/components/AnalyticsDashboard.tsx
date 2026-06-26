@@ -11,7 +11,27 @@ import type {
 
 type Tone = "positive" | "negative" | "warning" | "neutral";
 type ChartRange = "7d" | "30d" | "all";
-type ChartMetricId = "price" | "dexVolume" | "fees" | "defiFlow";
+type ChartMetricId =
+  | "price"
+  | "marketCap"
+  | "fdv"
+  | "marketVolume"
+  | "dexVolume"
+  | "dexVolumeAverage"
+  | "dexFees"
+  | "dexFeesAverage"
+  | "annualizedFees"
+  | "chainTvl"
+  | "dexTvl"
+  | "stableLiquidity"
+  | "stakedValue"
+  | "stakingApy"
+  | "activeValidators"
+  | "nakamotoSafety"
+  | "top10Stake"
+  | "volumeToTvl"
+  | "psRatio"
+  | "pfRatio";
 type DetailTab = "defi" | "yield" | "validators";
 
 interface ChartMetric {
@@ -22,6 +42,7 @@ interface ChartMetric {
   color: string;
   points: AnalyticsPoint[];
   formatter: (value: number) => string;
+  tone?: Tone;
 }
 
 interface AnalyticsMeta {
@@ -144,7 +165,11 @@ function chartCoordinates(points: AnalyticsPoint[], width = 100, height = 42, pa
 }
 
 function chartPath(points: AnalyticsPoint[]) {
-  return chartCoordinates(points)
+  return coordinatesPath(chartCoordinates(points));
+}
+
+function coordinatesPath(coordinates: Array<{ x: number; y: number }>) {
+  return coordinates
     .map(({ x, y }, index) => `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
     .join(" ");
 }
@@ -161,11 +186,52 @@ function latestValue(points: AnalyticsPoint[]) {
   return sortedPoints(points).at(-1)?.value;
 }
 
+function scaleTrend(points: AnalyticsPoint[], multiplier?: number) {
+  if (typeof multiplier !== "number" || !Number.isFinite(multiplier)) return [];
+  return points.map((point) => ({
+    timestamp: point.timestamp,
+    value: point.value * multiplier,
+  }));
+}
+
+function valueTrendFromPrice(points: AnalyticsPoint[], currentValue?: number, currentPrice?: number, supply?: number) {
+  if (typeof currentValue === "number" && Number.isFinite(currentValue) && currentValue > 0 && currentPrice && currentPrice > 0) {
+    return scaleTrend(points, currentValue / currentPrice);
+  }
+  return scaleTrend(points, supply);
+}
+
+function movingAverageTrend(points: AnalyticsPoint[], windowSize = 7) {
+  const sorted = sortedPoints(points);
+  return sorted.map((point, index) => {
+    const window = sorted.slice(Math.max(0, index - windowSize + 1), index + 1);
+    return {
+      timestamp: point.timestamp,
+      value: window.reduce((total, item) => total + item.value, 0) / window.length,
+    };
+  });
+}
+
 function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): ChartMetric[] {
   const pricePoints = pointsForRange(analytics.market.priceTrend, range);
   const dexPoints = pointsForRange(analytics.dex.volumeTrend, range);
   const feePoints = pointsForRange(analytics.economy.feeTrend, range);
-  const defiPoints = pointsForRange(analytics.defi.volume30dTrend, range);
+  const dexAveragePoints = movingAverageTrend(dexPoints);
+  const feeAveragePoints = movingAverageTrend(feePoints);
+  const marketCapPoints = valueTrendFromPrice(
+    pricePoints,
+    analytics.market.marketCapUsd,
+    analytics.market.priceUsd,
+    analytics.supply.circulatingSupplyMon
+  );
+  const fdvPoints = valueTrendFromPrice(
+    pricePoints,
+    analytics.market.fdvUsd,
+    analytics.market.priceUsd,
+    analytics.supply.totalSupplyMon
+  );
+  const annualizedFeePoints = scaleTrend(feePoints, 365);
+  const topStable = analytics.stablecoins.assets[0];
 
   return [
     {
@@ -173,103 +239,185 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       label: "MON price",
       value: formatCurrency(analytics.market.priceUsd, 6),
       helper: formatSignedPercent(changeForPoints(pricePoints)),
-      color: "var(--color-accent-primary)",
+      color: "#2f81ff",
       points: pricePoints,
       formatter: (value) => formatCurrency(value, 6),
+      tone: toneForPercent(changeForPoints(pricePoints)),
+    },
+    {
+      id: "marketCap",
+      label: "Market cap",
+      value: formatCurrency(analytics.market.marketCapUsd),
+      helper: "derived from MON price",
+      color: "#ff2f7d",
+      points: marketCapPoints,
+      formatter: formatCurrency,
+    },
+    {
+      id: "fdv",
+      label: "FDV",
+      value: formatCurrency(analytics.market.fdvUsd),
+      helper: "fully diluted value",
+      color: "#d22cff",
+      points: fdvPoints,
+      formatter: formatCurrency,
+    },
+    {
+      id: "marketVolume",
+      label: "Market volume",
+      value: formatCurrency(analytics.market.volume24hUsd),
+      helper: "24h token volume",
+      color: "#8b5cf6",
+      points: [],
+      formatter: formatCurrency,
     },
     {
       id: "dexVolume",
       label: "DEX volume",
       value: formatCurrency(analytics.dex.volume24hUsd),
       helper: "24h volume",
-      color: "var(--color-accent-secondary)",
+      color: "#50c861",
       points: dexPoints,
       formatter: formatCurrency,
     },
     {
-      id: "fees",
-      label: "Fees",
+      id: "dexVolumeAverage",
+      label: "DEX 7d avg",
+      value: formatCurrency(latestValue(dexAveragePoints)),
+      helper: "smoothed volume",
+      color: "#9bd66b",
+      points: dexAveragePoints,
+      formatter: formatCurrency,
+    },
+    {
+      id: "dexFees",
+      label: "Chain fees",
       value: formatCurrency(analytics.economy.dailyFeesUsd),
       helper: "daily fees",
-      color: "var(--color-warning)",
+      color: "#c75323",
       points: feePoints,
       formatter: formatCurrency,
     },
     {
-      id: "defiFlow",
-      label: "DeFi flow",
-      value: formatCurrency(latestValue(analytics.defi.volume30dTrend)),
-      helper: "latest daily flow",
-      color: "var(--color-accent-violet)",
-      points: defiPoints,
+      id: "dexFeesAverage",
+      label: "Fees 7d avg",
+      value: formatCurrency(latestValue(feeAveragePoints)),
+      helper: "smoothed fees",
+      color: "#fb923c",
+      points: feeAveragePoints,
       formatter: formatCurrency,
     },
+    {
+      id: "annualizedFees",
+      label: "Annualized fees",
+      value: formatCurrency(analytics.economy.annualizedFeesUsd),
+      helper: "daily fees x 365",
+      color: "#f59e0b",
+      points: annualizedFeePoints,
+      formatter: formatCurrency,
+    },
+    {
+      id: "chainTvl",
+      label: "Chain TVL",
+      value: formatCurrency(analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd),
+      helper: `${analytics.defi.protocolTvl.length} tracked protocols`,
+      color: "#14b8a6",
+      points: [],
+      formatter: formatCurrency,
+    },
+    {
+      id: "dexTvl",
+      label: "DEX TVL",
+      value: formatCurrency(analytics.dex.tvlUsd),
+      helper: "tracked DEX liquidity",
+      color: "#06b6d4",
+      points: [],
+      formatter: formatCurrency,
+    },
+    {
+      id: "stableLiquidity",
+      label: "Stablecoins mcap",
+      value: formatCurrency(analytics.stablecoins.totalUsd),
+      helper: topStable ? `${topStable.symbol} ${formatPercent(topStable.sharePct)}` : "tracked stables",
+      color: "#ec4899",
+      points: [],
+      formatter: formatCurrency,
+    },
+    {
+      id: "stakedValue",
+      label: "Staked value",
+      value: formatCurrency(analytics.staking.totalValueStakedUsd),
+      helper: formatMon(analytics.staking.totalActiveStakeMon),
+      color: "#a78bfa",
+      points: [],
+      formatter: formatCurrency,
+    },
+    {
+      id: "stakingApy",
+      label: "Staking APY",
+      value: formatPercent(analytics.staking.estimatedApyPct),
+      helper: `${formatPercent(analytics.staking.minApyPct)} - ${formatPercent(analytics.staking.maxApyPct)}`,
+      color: "#84cc16",
+      points: [],
+      formatter: (value) => formatPercent(value),
+      tone: analytics.staking.estimatedApyPct && analytics.staking.estimatedApyPct > 8 ? "positive" : "neutral",
+    },
+    {
+      id: "activeValidators",
+      label: "Validators",
+      value: formatNumber(analytics.staking.activeValidators),
+      helper: `${formatNumber(analytics.staking.activeSetCap)} active cap`,
+      color: "#22c55e",
+      points: [],
+      formatter: formatNumber,
+    },
+    {
+      id: "nakamotoSafety",
+      label: "Nakamoto safety",
+      value: formatNumber(analytics.decentralization.nakamotoSafety),
+      helper: "validators for 1/3 stake",
+      color: "#38bdf8",
+      points: [],
+      formatter: formatNumber,
+    },
+    {
+      id: "top10Stake",
+      label: "Top 10 stake",
+      value: formatPercent(analytics.decentralization.top10SharePct),
+      helper: "validator concentration",
+      color: "#fb7185",
+      points: [],
+      formatter: (value) => formatPercent(value),
+      tone: analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral",
+    },
+    {
+      id: "volumeToTvl",
+      label: "Volume / TVL",
+      value: formatPercent(analytics.dex.volumeToTvlPct),
+      helper: "DEX capital velocity",
+      color: "#f97316",
+      points: [],
+      formatter: (value) => formatPercent(value),
+    },
+    {
+      id: "psRatio",
+      label: "P/S",
+      value: formatNumber(analytics.economy.psRatio, 1),
+      helper: "market cap / annual fees",
+      color: "#facc15",
+      points: [],
+      formatter: (value) => formatNumber(value, 1),
+    },
+    {
+      id: "pfRatio",
+      label: "P/F",
+      value: formatNumber(analytics.economy.pfRatio, 1),
+      helper: "market cap / fee run-rate",
+      color: "#fb923c",
+      points: [],
+      formatter: (value) => formatNumber(value, 1),
+    },
   ];
-}
-
-function buildInsights(analytics: AnalyticsPayload) {
-  const insights: Array<{ title: string; body: string; tone: Tone }> = [];
-  const dexDailyAverage = analytics.dex.volume7dUsd ? analytics.dex.volume7dUsd / 7 : undefined;
-  const dexChange = analytics.dex.volume24hUsd && dexDailyAverage
-    ? ((analytics.dex.volume24hUsd - dexDailyAverage) / dexDailyAverage) * 100
-    : undefined;
-  const feeDailyAverage = analytics.dex.fees7dUsd ? analytics.dex.fees7dUsd / 7 : undefined;
-  const feeChange = analytics.economy.dailyFeesUsd && feeDailyAverage
-    ? ((analytics.economy.dailyFeesUsd - feeDailyAverage) / feeDailyAverage) * 100
-    : undefined;
-  const topProtocol = analytics.dex.topProtocols[0];
-  const topRate = analytics.defi.topRates[0];
-  const topStable = analytics.stablecoins.assets[0];
-
-  if (typeof dexChange === "number") {
-    insights.push({
-      title: dexChange >= 0 ? "DEX activity is above recent pace" : "DEX activity is below recent pace",
-      body: `${formatCurrency(analytics.dex.volume24hUsd)} over 24h vs ${formatCurrency(dexDailyAverage)} daily average across 7d.`,
-      tone: dexChange >= 15 ? "positive" : dexChange <= -15 ? "warning" : "neutral",
-    });
-  }
-
-  if (typeof feeChange === "number") {
-    insights.push({
-      title: feeChange >= 0 ? "Fee capture is firmer" : "Fee capture is lighter",
-      body: `${formatCurrency(analytics.economy.dailyFeesUsd)} daily fees vs ${formatCurrency(feeDailyAverage)} 7d daily average.`,
-      tone: feeChange >= 20 ? "positive" : feeChange <= -20 ? "warning" : "neutral",
-    });
-  }
-
-  if (topStable) {
-    insights.push({
-      title: `${topStable.symbol} anchors stablecoin liquidity`,
-      body: `${formatCurrency(topStable.valueUsd)} supply, ${formatPercent(topStable.sharePct)} of tracked Monad stables.`,
-      tone: topStable.sharePct > 70 ? "warning" : "neutral",
-    });
-  }
-
-  if (analytics.decentralization.top10SharePct) {
-    insights.push({
-      title: "Validator stake concentration",
-      body: `Top 10 validators hold ${formatPercent(analytics.decentralization.top10SharePct)} of active stake. Nakamoto safety is ${formatNumber(analytics.decentralization.nakamotoSafety)} validators.`,
-      tone: analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral",
-    });
-  }
-
-  if (topProtocol) {
-    insights.push({
-      title: `${topProtocol.label} leads DEX volume`,
-      body: `${formatCurrency(topProtocol.value)} tracked over the latest 24h window.`,
-      tone: "neutral",
-    });
-  }
-
-  if (topRate) {
-    insights.push({
-      title: "Displayed rates are actionable",
-      body: `${topRate.label} is showing ${topRate.value.toFixed(2)}% APR from current yield sources.`,
-      tone: topRate.value > 15 ? "positive" : "neutral",
-    });
-  }
-
-  return insights.slice(0, 5);
 }
 
 async function loadAnalytics() {
@@ -425,29 +573,115 @@ function DetailTabButton({
   );
 }
 
-function TrendChart({ metric }: { metric: ChartMetric }) {
-  const chartRef = useRef<HTMLDivElement | null>(null);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const coordinates = useMemo(() => chartCoordinates(metric.points), [metric.points]);
-  const activePoint = activeIndex !== null ? coordinates[activeIndex] : coordinates.at(-1);
-  const path = metric.points.length >= 2 ? chartPath(metric.points) : "";
-  const areaPath = path ? `${path} L98,42 L2,42 Z` : "";
-  const sortedMetricPoints = sortedPoints(metric.points);
-  const firstPoint = sortedMetricPoints[0];
-  const middlePoint = sortedMetricPoints[Math.floor(sortedMetricPoints.length / 2)];
-  const lastPoint = sortedMetricPoints.at(-1);
+function MetricPill({
+  metric,
+  selected,
+  onClick,
+}: {
+  metric: ChartMetric;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const canChart = metric.points.length >= 2;
 
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (coordinates.length === 0 || !chartRef.current) return;
-    const bounds = chartRef.current.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
-    setActiveIndex(Math.round(ratio * (coordinates.length - 1)));
+  return (
+    <button
+      type="button"
+      disabled={!canChart}
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex h-9 max-w-full items-center gap-2 rounded-full border px-3 text-[12px] font-black transition-colors ${
+        canChart
+          ? "bg-[rgba(255,255,255,0.025)] text-[var(--color-text-primary)] hover:bg-[rgba(255,255,255,0.05)]"
+          : "cursor-not-allowed border-[rgba(132,148,142,0.16)] bg-[rgba(255,255,255,0.012)] text-[var(--color-text-dim)]"
+      }`}
+      style={{
+        borderColor: selected ? metric.color : undefined,
+        boxShadow: selected ? `inset 0 0 0 1px ${metric.color}` : undefined,
+      }}
+    >
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
+      <span className="truncate">{metric.label}</span>
+      {selected && <span className="font-mono text-[14px] leading-none" aria-hidden="true">x</span>}
+    </button>
+  );
+}
+
+function MetricShelfTile({
+  metric,
+  selected,
+  onClick,
+}: {
+  metric: ChartMetric;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const canChart = metric.points.length >= 2;
+  const content = (
+    <>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="label-caps min-w-0 truncate text-current opacity-70">{metric.label}</div>
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
+      </div>
+      <div className="mt-2 truncate font-mono text-[17px] font-black leading-none text-[var(--color-text-primary)]">{metric.value}</div>
+      <div className="mt-1 truncate text-[11px] font-semibold text-[var(--color-text-muted)]">{metric.helper}</div>
+    </>
+  );
+
+  if (!canChart) {
+    return (
+      <div className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 ${toneClasses(metric.tone || "neutral")}`}>
+        {content}
+      </div>
+    );
   }
 
-  if (!path) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
+        selected
+          ? "bg-[rgba(255,255,255,0.045)]"
+          : "bg-[rgba(255,255,255,0.018)] hover:bg-[rgba(255,255,255,0.04)]"
+      }`}
+      style={{ borderColor: selected ? metric.color : "rgba(132,148,142,0.22)" }}
+    >
+      {content}
+    </button>
+  );
+}
+
+function MultiMetricChart({ metrics }: { metrics: ChartMetric[] }) {
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const [hoverRatio, setHoverRatio] = useState<number | null>(null);
+  const chartableMetrics = metrics.filter((metric) => metric.points.length >= 2);
+  const activeRatio = hoverRatio ?? 1;
+  const primaryPoints = sortedPoints(chartableMetrics[0]?.points || []);
+  const firstPoint = primaryPoints[0];
+  const middlePoint = primaryPoints[Math.floor(primaryPoints.length / 2)];
+  const lastPoint = primaryPoints.at(-1);
+  const activeRows = chartableMetrics.map((metric) => {
+    const points = sortedPoints(metric.points);
+    const index = Math.min(points.length - 1, Math.max(0, Math.round(activeRatio * (points.length - 1))));
+    return {
+      metric,
+      point: points[index],
+    };
+  });
+  const activeDate = activeRows[0]?.point?.timestamp;
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (chartableMetrics.length === 0 || !chartRef.current) return;
+    const bounds = chartRef.current.getBoundingClientRect();
+    setHoverRatio(Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)));
+  }
+
+  if (chartableMetrics.length === 0) {
     return (
       <div className="grid h-[310px] place-items-center rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] text-[13px] font-semibold text-[var(--color-text-muted)]">
-        Trend unavailable
+        Select a chartable metric
       </div>
     );
   }
@@ -456,48 +690,82 @@ function TrendChart({ metric }: { metric: ChartMetric }) {
     <div
       ref={chartRef}
       onPointerMove={handlePointerMove}
-      onPointerLeave={() => setActiveIndex(null)}
-      className="rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] bg-[rgba(255,255,255,0.018)] p-3"
+      onPointerLeave={() => setHoverRatio(null)}
+      className="relative rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] bg-[rgba(255,255,255,0.018)] p-3"
     >
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="label-caps text-[var(--color-text-dim)]">{activePoint ? formatShortDate(activePoint.timestamp) : "Latest"}</div>
-          <div className="mt-1 font-mono text-[26px] font-black leading-none text-[var(--color-text-primary)]">
-            {activePoint ? metric.formatter(activePoint.value) : metric.value}
-          </div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] px-3 py-2">
+          <div className="label-caps text-[var(--color-text-dim)]">Relative trend</div>
+          <div className="mt-1 font-mono text-[13px] font-black text-[var(--color-text-primary)]">{activeDate ? formatShortDate(activeDate) : "Latest"}</div>
         </div>
-        <div className="rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] px-3 py-2 text-right">
-          <div className="label-caps text-[var(--color-text-dim)]">{metric.label}</div>
-          <div className="mt-1 text-[12px] font-bold text-[var(--color-text-secondary)]">{metric.helper}</div>
+        <div className="grid max-w-full grid-cols-2 gap-x-4 gap-y-1 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.24)] px-3 py-2 md:grid-cols-3 xl:grid-cols-5">
+          {activeRows.slice(0, 6).map(({ metric, point }) => (
+            <div key={metric.id} className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
+                <span className="truncate text-[10px] font-bold text-[var(--color-text-muted)]">{metric.label}</span>
+              </div>
+              <div className="truncate font-mono text-[12px] font-black text-[var(--color-text-primary)]">
+                {point ? metric.formatter(point.value) : metric.value}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       <svg
-        viewBox="0 0 100 42"
+        viewBox="0 0 100 56"
         preserveAspectRatio="none"
-        className="h-[240px] w-full overflow-visible"
+        className="h-[320px] w-full overflow-visible md:h-[360px]"
         role="img"
-        aria-label={`${metric.label} trend`}
+        aria-label="Selected analytics metric comparison"
       >
         <defs>
-          <linearGradient id={`area-${metric.id}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={metric.color} stopOpacity="0.26" />
-            <stop offset="100%" stopColor={metric.color} stopOpacity="0" />
+          <linearGradient id="comparison-area" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={chartableMetrics[0]?.color || "var(--color-accent-primary)"} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={chartableMetrics[0]?.color || "var(--color-accent-primary)"} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <path d="M2 40 H98" stroke="rgba(132,148,142,0.18)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-        <path d="M2 22 H98" stroke="rgba(132,148,142,0.1)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-        <path d="M2 4 H98" stroke="rgba(132,148,142,0.1)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-        <path d={areaPath} fill={`url(#area-${metric.id})`} />
-        <path d={path} fill="none" stroke={metric.color} strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
-        {activePoint && (
-          <circle
-            cx={activePoint.x}
-            cy={activePoint.y}
-            r="1.8"
-            fill="var(--color-bg-primary)"
-            stroke={metric.color}
-            strokeWidth="1.6"
+        {[52, 40, 28, 16, 4].map((y) => (
+          <path key={y} d={`M2 ${y} H98`} stroke="rgba(132,148,142,0.12)" strokeWidth="0.7" vectorEffect="non-scaling-stroke" />
+        ))}
+        {chartableMetrics.map((metric, index) => {
+          const coordinates = chartCoordinates(sortedPoints(metric.points), 100, 56, 3);
+          const path = coordinatesPath(coordinates);
+          const activeIndex = Math.min(coordinates.length - 1, Math.max(0, Math.round(activeRatio * (coordinates.length - 1))));
+          const activePoint = coordinates[activeIndex];
+          const areaPath = index === 0 && path ? `${path} L98,54 L2,54 Z` : "";
+          return (
+            <g key={metric.id}>
+              {areaPath && <path d={areaPath} fill="url(#comparison-area)" />}
+              <path
+                d={path}
+                fill="none"
+                stroke={metric.color}
+                strokeWidth={index === 0 ? "2.3" : "2"}
+                opacity={index === 0 ? 1 : 0.86}
+                vectorEffect="non-scaling-stroke"
+              />
+              {activePoint && (
+                <circle
+                  cx={activePoint.x}
+                  cy={activePoint.y}
+                  r="1.5"
+                  fill="var(--color-bg-primary)"
+                  stroke={metric.color}
+                  strokeWidth="1.3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+            </g>
+          );
+        })}
+        {hoverRatio !== null && (
+          <path
+            d={`M${(activeRatio * 100).toFixed(2)} 3 V53`}
+            stroke="rgba(219,229,224,0.32)"
+            strokeDasharray="2 2"
+            strokeWidth="0.8"
             vectorEffect="non-scaling-stroke"
           />
         )}
@@ -583,21 +851,6 @@ function ValidatorRows({ validators }: { validators: AnalyticsValidator[] }) {
   );
 }
 
-function InsightList({ analytics }: { analytics: AnalyticsPayload }) {
-  const insights = buildInsights(analytics);
-
-  return (
-    <div className="space-y-2">
-      {insights.map((insight) => (
-        <div key={insight.title} className={`rounded-[var(--radius-md)] border px-3 py-3 ${toneClasses(insight.tone)}`}>
-          <div className="text-[13px] font-black text-[var(--color-text-primary)]">{insight.title}</div>
-          <div className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">{insight.body}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function LoadingState() {
   return (
     <div className="grid gap-4">
@@ -617,7 +870,14 @@ export function AnalyticsDashboard() {
   const [meta, setMeta] = useState<AnalyticsMeta | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [chartRange, setChartRange] = useState<ChartRange>("30d");
-  const [activeMetricId, setActiveMetricId] = useState<ChartMetricId>("dexVolume");
+  const [selectedMetricIds, setSelectedMetricIds] = useState<ChartMetricId[]>([
+    "price",
+    "dexVolume",
+    "dexVolumeAverage",
+    "dexFees",
+    "dexFeesAverage",
+  ]);
+  const [showMetricShelf, setShowMetricShelf] = useState(true);
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("defi");
 
   useEffect(() => {
@@ -644,11 +904,24 @@ export function AnalyticsDashboard() {
     () => (analytics ? buildChartMetrics(analytics, chartRange) : []),
     [analytics, chartRange]
   );
-  const activeMetric = chartMetrics.find((metric) => metric.id === activeMetricId) || chartMetrics[0];
+  const chartableMetrics = chartMetrics.filter((metric) => metric.points.length >= 2);
+  const selectedMetrics = chartMetrics.filter((metric) => selectedMetricIds.includes(metric.id) && metric.points.length >= 2);
+  const comparisonMetrics = selectedMetrics.length > 0 ? selectedMetrics : chartableMetrics.slice(0, 4);
+
+  function toggleMetric(metric: ChartMetric) {
+    if (metric.points.length < 2) return;
+    setSelectedMetricIds((current) => {
+      if (current.includes(metric.id)) {
+        const next = current.filter((id) => id !== metric.id);
+        return next.length > 0 ? next : current;
+      }
+      return [...current, metric.id];
+    });
+  }
 
   if (!analytics && !error) return <LoadingState />;
 
-  if (error || !analytics || !activeMetric) {
+  if (error || !analytics) {
     return (
       <ShellPanel className="px-5 py-8 text-center">
         <div className="text-[15px] font-black text-[var(--color-text-primary)]">{error || "Could not load analytics."}</div>
@@ -709,11 +982,11 @@ export function AnalyticsDashboard() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_420px]">
+      <div className="grid gap-4">
         <ShellPanel className="p-4">
           <SectionHeader
             eyebrow="Market pulse"
-            title="Trend board"
+            title="Metric comparison"
             aside={
               <div className="flex flex-wrap gap-2">
                 {CHART_RANGES.map((range) => (
@@ -725,32 +998,40 @@ export function AnalyticsDashboard() {
             }
           />
 
-          <div className="mb-3 grid gap-2 sm:grid-cols-4">
-            {chartMetrics.map((metric) => (
-              <button
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMetricShelf((current) => !current)}
+              aria-expanded={showMetricShelf}
+              className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] bg-[rgba(255,255,255,0.025)] px-3 text-[12px] font-black text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-border-hover)]"
+            >
+              Add metrics
+              <span className="font-mono text-[16px] leading-none">+</span>
+            </button>
+            {comparisonMetrics.map((metric) => (
+              <MetricPill
                 key={metric.id}
-                type="button"
-                aria-pressed={activeMetric.id === metric.id}
-                onClick={() => setActiveMetricId(metric.id)}
-                className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
-                  activeMetric.id === metric.id
-                    ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)]"
-                    : "border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] hover:border-[var(--color-border-hover)]"
-                }`}
-              >
-                <div className="label-caps truncate text-[var(--color-text-dim)]">{metric.label}</div>
-                <div className="mt-2 truncate font-mono text-[16px] font-black text-[var(--color-text-primary)]">{metric.value}</div>
-                <div className="mt-1 truncate text-[11px] font-semibold text-[var(--color-text-muted)]">{metric.helper}</div>
-              </button>
+                metric={metric}
+                selected={selectedMetricIds.includes(metric.id) && metric.points.length >= 2}
+                onClick={() => toggleMetric(metric)}
+              />
             ))}
           </div>
 
-          <TrendChart metric={activeMetric} />
-        </ShellPanel>
+          <MultiMetricChart metrics={comparisonMetrics} />
 
-        <ShellPanel className="p-4">
-          <SectionHeader eyebrow="Signals" title="What changed" />
-          <InsightList analytics={analytics} />
+          {showMetricShelf && (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+              {chartMetrics.map((metric) => (
+                <MetricShelfTile
+                  key={metric.id}
+                  metric={metric}
+                  selected={selectedMetricIds.includes(metric.id) && metric.points.length >= 2}
+                  onClick={() => toggleMetric(metric)}
+                />
+              ))}
+            </div>
+          )}
         </ShellPanel>
       </div>
 
