@@ -5,9 +5,12 @@ import { fetchJsonWithRetry } from "@/lib/sourceFetch";
 import { fetchTokenMarkets, type TokenMarket } from "@/services/tokenMarkets";
 import { fetchCombinedYieldOpportunitiesWithMeta } from "@/services/yields-aggregator";
 
-const ANALYTICS_CACHE_KEY = "analytics:monad:v7";
+const ANALYTICS_CACHE_KEY = "analytics:monad:v8";
 const ANALYTICS_TTL_MS = 5 * 60 * 1000;
 const ANALYTICS_STALE_TTL_MS = 30 * 60 * 1000;
+const DEFILLAMA_PAGE_SNAPSHOT_CACHE_KEY = "defillama:monad-page-snapshot:v1";
+const DEFILLAMA_PAGE_SNAPSHOT_TTL_MS = 15 * 60 * 1000;
+const DEFILLAMA_PAGE_SNAPSHOT_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const MONAD_EPOCH_HOURS = 5.5;
 
 const GMONADS_BASE_URL = "https://www.gmonads.com/api/v1/public";
@@ -616,7 +619,15 @@ async function fetchTextWithRetry(url: string, sourceName: string, timeoutMs = 1
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "en-US,en;q=0.9",
+          "user-agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        },
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
       return response.text();
     } catch (error) {
@@ -629,14 +640,45 @@ async function fetchTextWithRetry(url: string, sourceName: string, timeoutMs = 1
   throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${sourceName}`);
 }
 
-async function fetchDefiLlamaPageSnapshot(): Promise<DefiLlamaPageSnapshot> {
+function hasDefiLlamaPageSnapshotMetrics(snapshot: DefiLlamaPageSnapshot) {
+  return Boolean(
+    toNumber(snapshot.chainFees?.total24h) !== undefined ||
+      toNumber(snapshot.chainRevenue?.total24h) !== undefined ||
+      toNumber(snapshot.perps?.total24h) !== undefined ||
+      toNumber(snapshot.users?.activeUsers) !== undefined ||
+      toNumber(snapshot.inflows?.netInflows) !== undefined ||
+      toNumber(snapshot.chainAssets?.total?.total) !== undefined ||
+      toNumber(snapshot.rwaActiveMcap) !== undefined ||
+      (snapshot.chainRaises?.length || 0) > 0
+  );
+}
+
+async function fetchDefiLlamaPageSnapshotDirect(): Promise<DefiLlamaPageSnapshot> {
   const html = await fetchTextWithRetry(DEFILLAMA_MONAD_PAGE_URL, "defillama-monad-page");
   const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-  if (!match?.[1]) return {};
+  if (!match?.[1]) throw new Error("DefiLlama page snapshot script was not found");
   const data = JSON.parse(match[1]) as {
     props?: { pageProps?: DefiLlamaPageSnapshot };
   };
-  return data.props?.pageProps || {};
+  const snapshot = data.props?.pageProps || {};
+  if (!hasDefiLlamaPageSnapshotMetrics(snapshot)) {
+    throw new Error("DefiLlama page snapshot did not include Monad metric fields");
+  }
+  return snapshot;
+}
+
+async function fetchDefiLlamaPageSnapshot(): Promise<DefiLlamaPageSnapshot> {
+  try {
+    const result = await withServerCache(
+      DEFILLAMA_PAGE_SNAPSHOT_CACHE_KEY,
+      DEFILLAMA_PAGE_SNAPSHOT_TTL_MS,
+      fetchDefiLlamaPageSnapshotDirect,
+      DEFILLAMA_PAGE_SNAPSHOT_STALE_TTL_MS
+    );
+    return result.data;
+  } catch {
+    return {};
+  }
 }
 
 async function fetchDexTvlSummary(): Promise<DexTvlSummary> {
@@ -1090,7 +1132,9 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     sum(dexLiquidityByProtocol.map((item) => item.value));
   const dexVolume24hUsd = toNumber(dexOverview.total24h);
   const dexFees24hUsd = toNumber(feesOverview.total24h);
-  const chainFeesUsd = toNumber(defillamaPageSnapshot.chainFees?.total24h);
+  const chainFeesUsd =
+    toNumber(defillamaPageSnapshot.chainFees?.total24h) ??
+    toNumber(feesOverview.total24h);
   const chainRevenueUsd =
     toNumber(defillamaPageSnapshot.chainRevenue?.total24h) ??
     toNumber(revenueOverview.total24h);
@@ -1106,6 +1150,7 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
   const tokenIncentivesUsd = toNumber(defillamaPageSnapshot.chainIncentives?.emissions24h);
   const dailyFeesUsd =
     toNumber(defillamaPageSnapshot.chainFees?.feesGenerated24h) ??
+    toNumber(feesOverview.total24h) ??
     dexFees24hUsd;
   const annualizedFeesUsd =
     typeof dailyFeesUsd === "number" ? dailyFeesUsd * 365 : undefined;
