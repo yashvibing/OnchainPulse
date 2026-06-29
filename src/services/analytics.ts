@@ -993,10 +993,26 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
       metadata: [],
       blocks: [],
     })),
-    fetchTokenMarkets().catch(() => ({ data: [] })),
+    fetchTokenMarkets().catch(() => ({
+      data: {
+        markets: [],
+        pagesLoaded: 0,
+        pagesExpected: 0,
+        partial: true,
+        warnings: ["Token market source unavailable."],
+      },
+    })),
     fetchCoinGeckoMonStats().catch(() => ({} as AnalyticsMarketStats)),
     fetchMonMarketStats().catch(() => ({} as AnalyticsMarketStats)),
-    fetchCombinedYieldOpportunitiesWithMeta().catch(() => ({ data: [] })),
+    fetchCombinedYieldOpportunitiesWithMeta().catch(() => ({
+      data: {
+        opportunities: [],
+        sources: [
+          { name: "Merkl", ok: false, count: 0, error: "Unavailable" },
+          { name: "DefiLlama", ok: false, count: 0, error: "Unavailable" },
+        ],
+      },
+    })),
     fetchStablecoins().catch(() => ({ totalUsd: 0, assets: [] })),
     fetchStablecoinTrend().catch(() => []),
     fetchDexOverview().catch(() => ({} as DefiLlamaOverviewResponse)),
@@ -1014,8 +1030,8 @@ async function loadAnalytics(): Promise<AnalyticsPayload> {
     fetchStakingApySummary().catch(() => ({})),
   ]);
 
-  const markets = tokenMarkets.data || [];
-  const opportunities = yieldOpportunities.data || [];
+  const markets = tokenMarkets.data.markets || [];
+  const opportunities = yieldOpportunities.data.opportunities || [];
   const validatorAnalytics = buildValidatorAnalytics(gmonads);
   const blockStats = buildBlockStats(gmonads.blocks);
   const monMarket =

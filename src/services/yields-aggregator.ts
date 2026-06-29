@@ -47,6 +47,19 @@ export interface YieldOpportunityFetchResult {
   cacheStatus?: string;
   cacheAgeMs?: number;
   fetchedAt?: number;
+  sources?: YieldSourceStatus[];
+}
+
+export interface YieldSourceStatus {
+  name: "Merkl" | "DefiLlama";
+  ok: boolean;
+  count: number;
+  error?: string;
+}
+
+interface YieldOpportunitiesPayload {
+  opportunities: YieldOpportunity[];
+  sources: YieldSourceStatus[];
 }
 
 const MERKL_API = "https://api.merkl.xyz/v4";
@@ -241,7 +254,7 @@ async function fetchMerklPage(action: string, page: number): Promise<YieldOpport
   const items = await fetchJsonWithRetry<Array<Record<string, unknown>>>(
     `${MERKL_API}/opportunities?${params}`,
     { retries: 2, timeoutMs: 8_000 }
-  ).catch((): Array<Record<string, unknown>> => []);
+  );
   if (!Array.isArray(items) || items.length === 0) return [];
 
   return items.map((item: Record<string, unknown>) => {
@@ -298,7 +311,7 @@ async function fetchDefiLlamaYieldOpportunities(): Promise<YieldOpportunity[]> {
   const body = await fetchJsonWithRetry<{ data?: DefiLlamaYieldPool[] }>(
     DEFILLAMA_YIELDS_API,
     { retries: 2, timeoutMs: 8_000 }
-  ).catch(() => ({ data: [] }));
+  );
   const pools = Array.isArray(body.data) ? body.data : [];
 
   return pools
@@ -390,9 +403,18 @@ export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]
 
   const results = await Promise.allSettled(fetches);
   const all: YieldOpportunity[] = [];
+  let failedPages = 0;
 
   for (const r of results) {
-    if (r.status === "fulfilled") all.push(...r.value);
+    if (r.status === "fulfilled") {
+      all.push(...r.value);
+    } else {
+      failedPages += 1;
+    }
+  }
+
+  if (all.length === 0 && failedPages > 0) {
+    throw new Error("Merkl opportunities unavailable");
   }
 
   // Dedupe by id + action
@@ -407,7 +429,7 @@ export async function fetchMerklYieldOpportunities(): Promise<YieldOpportunity[]
   return deduped;
 }
 
-async function loadCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
+async function loadCombinedYieldOpportunities(): Promise<YieldOpportunitiesPayload> {
   const [merklResult, defiLlamaResult] = await Promise.allSettled([
     fetchMerklYieldOpportunities(),
     fetchDefiLlamaYieldOpportunities(),
@@ -417,7 +439,23 @@ async function loadCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
   const defiLlama = defiLlamaResult.status === "fulfilled" ? defiLlamaResult.value : [];
   const data = mergeYieldOpportunities([...merkl, ...defiLlama]);
 
-  return data;
+  return {
+    opportunities: data,
+    sources: [
+      {
+        name: "Merkl",
+        ok: merklResult.status === "fulfilled",
+        count: merkl.length,
+        error: merklResult.status === "rejected" ? String(merklResult.reason?.message || merklResult.reason) : undefined,
+      },
+      {
+        name: "DefiLlama",
+        ok: defiLlamaResult.status === "fulfilled",
+        count: defiLlama.length,
+        error: defiLlamaResult.status === "rejected" ? String(defiLlamaResult.reason?.message || defiLlamaResult.reason) : undefined,
+      },
+    ],
+  };
 }
 
 export async function fetchCombinedYieldOpportunitiesWithMeta() {
@@ -431,17 +469,18 @@ export async function fetchCombinedYieldOpportunitiesWithMeta() {
 
 export async function fetchCombinedYieldOpportunities(): Promise<YieldOpportunity[]> {
   const result = await fetchCombinedYieldOpportunitiesWithMeta();
-  return result.data;
+  return result.data.opportunities;
 }
 
 export async function fetchYieldOpportunitiesWithClientMeta(): Promise<YieldOpportunityFetchResult> {
   if (typeof window === "undefined") {
     const result = await fetchCombinedYieldOpportunitiesWithMeta();
     return {
-      data: result.data,
+      data: result.data.opportunities,
       cacheStatus: result.status,
       cacheAgeMs: result.ageMs,
       fetchedAt: result.fetchedAt,
+      sources: result.data.sources,
     };
   }
 
@@ -449,11 +488,13 @@ export async function fetchYieldOpportunitiesWithClientMeta(): Promise<YieldOppo
   if (!res.ok) throw new Error("Failed to fetch yield opportunities");
 
   const data = await res.json();
+  const payload = Array.isArray(data) ? { data, sources: [] } : data;
   return {
-    data: Array.isArray(data) ? data : [],
+    data: Array.isArray(payload.data) ? payload.data : [],
     cacheStatus: res.headers.get("X-Cache-Status") || undefined,
     cacheAgeMs: Number(res.headers.get("X-Cache-Age-Ms") || 0),
     fetchedAt: Number(res.headers.get("X-Data-Fetched-At") || 0) || undefined,
+    sources: Array.isArray(payload.meta?.sources) ? payload.meta.sources : [],
   };
 }
 
@@ -638,8 +679,8 @@ export function calculateLoopStrategies(
     }
   }
 
-  // Sort by net APR at 2x descending
-  strategies.sort((a, b) => b.netAprAt2x - a.netAprAt2x);
+  // Borrow base cost is not always available, so rank by visible supply APR first.
+  strategies.sort((a, b) => b.netAprAt1x - a.netAprAt1x);
 
   return strategies.slice(0, 20); // Top 20 strategies
 }

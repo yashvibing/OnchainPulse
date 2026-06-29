@@ -23,13 +23,20 @@ export async function GET(request: Request) {
     logSlowApi("/api/token-markets", Date.now() - startedAt);
     return NextResponse.json(
       {
-        data: result.data,
+        data: result.data.markets,
         meta: {
           cache: result.status,
           ageMs: result.ageMs,
           fetchedAt: result.fetchedAt,
           durationMs: result.durationMs,
           source: "GeckoTerminal",
+          pagesLoaded: result.data.pagesLoaded,
+          pagesExpected: result.data.pagesExpected,
+          partial: result.status === "stale" || result.data.partial,
+          warnings: [
+            ...(result.status === "stale" ? ["Showing a stale cached market snapshot."] : []),
+            ...result.data.warnings,
+          ],
         },
       },
       { headers: withRateLimitHeaders(undefined, rateLimit) }
@@ -41,7 +48,11 @@ export async function GET(request: Request) {
       error: getErrorMessage(error),
     });
     return NextResponse.json(
-      { error: "Failed to load token markets" },
+      {
+        error: getErrorMessage(error).includes("429")
+          ? "Market data is temporarily rate limited"
+          : "Failed to load token markets",
+      },
       { status: 500, headers: withRateLimitHeaders(undefined, rateLimit) }
     );
   }

@@ -20,7 +20,7 @@ const DEMO_WALLETS: { address: string; label: string }[] = [
 ];
 
 interface AddressInputProps {
-  onSubmit: (address: string) => void;
+  onSubmit: (address: string, source?: "manual" | "demo") => void;
   initialAddress?: string | null;
 }
 
@@ -36,7 +36,7 @@ export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
       return;
     }
     setError("");
-    onSubmit(addr);
+    onSubmit(addr, "manual");
   }
 
   function handleDemo() {
@@ -44,36 +44,36 @@ export function AddressInput({ onSubmit, initialAddress }: AddressInputProps) {
     demoIndex.current += 1;
     setInput(demo.address);
     setError("");
-    onSubmit(demo.address);
+    onSubmit(demo.address, "demo");
   }
 
   return (
     <div className="mb-6">
-      <div className="flex flex-wrap gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2">
+      <div className="flex flex-col gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2 sm:flex-row">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="Enter wallet address (0x...)"
-          className="min-w-[220px] flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
+          className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-4 py-3 font-mono text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent-primary)]"
         />
         <button
           onClick={handleSubmit}
-          className="btn-primary whitespace-nowrap px-7 py-3 text-sm"
+          className="btn-primary min-h-11 whitespace-nowrap px-7 py-3 text-sm"
         >
           Track
+        </button>
+        <button
+          onClick={handleDemo}
+          className="min-h-11 rounded-[var(--radius-md)] border border-[var(--color-border)] px-5 py-3 text-sm font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+        >
+          Try demo wallet
         </button>
       </div>
       <div className="mt-2 flex items-center gap-3">
         {error && (
           <span className="text-xs text-[var(--color-negative)]">{error}</span>
         )}
-        <button
-          onClick={handleDemo}
-          className="border-none bg-transparent p-0 text-[12px] text-[var(--color-text-muted)] underline hover:text-[var(--color-text-secondary)]"
-        >
-          Load demo wallet
-        </button>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-dim)]">
         Read-only. No wallet connection or signing.

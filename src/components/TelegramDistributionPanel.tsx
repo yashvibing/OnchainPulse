@@ -40,7 +40,7 @@ export function TelegramDistributionPanel({ compact = false }: TelegramDistribut
           </a>
         ) : (
           <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3 text-center text-[13px] font-bold text-[var(--color-text-muted)]">
-            Channel link not configured
+            Telegram channel coming soon
           </div>
         )}
 

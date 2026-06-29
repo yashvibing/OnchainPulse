@@ -794,7 +794,32 @@ export function AlertCreator() {
           )}
         </div>
 
-        <div className={`rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4 ${connection ? "" : "opacity-70"}`}>
+        {!connection ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4">
+            <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
+              2. Create alerts
+            </div>
+            <div className="mt-2 text-[15px] font-bold text-[var(--color-text-primary)]">
+              Alert types unlock after Telegram is connected
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--color-text-muted)]">
+              Keep setup focused first. After the bot is connected, you can create watches for rate changes, new markets, token liquidity, volume, and daily briefs.
+            </p>
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {[
+                ["Rate thresholds", "APR above/below a target for a token or protocol."],
+                ["Market changes", "New DeFi markets, token markets, volume, liquidity, and price moves."],
+                ["Daily briefs", "One private recap for DeFi rates or latest news."],
+              ].map(([title, copy]) => (
+                <div key={title} className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                  <div className="text-[13px] font-bold text-[var(--color-text-primary)]">{title}</div>
+                  <div className="mt-1 text-[11px] leading-relaxed text-[var(--color-text-muted)]">{copy}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-4 py-4">
           <div className="mb-4">
             <div className="text-[10px] font-bold uppercase text-[var(--color-accent-primary)]">
               2. Create alert
@@ -944,6 +969,7 @@ export function AlertCreator() {
             </button>
           </div>
         </div>
+        )}
       </div>
 
       {status && (

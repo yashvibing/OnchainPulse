@@ -79,6 +79,14 @@ export interface TokenMarket {
   source: "GeckoTerminal";
 }
 
+export interface TokenMarketsPayload {
+  markets: TokenMarket[];
+  pagesLoaded: number;
+  pagesExpected: number;
+  partial: boolean;
+  warnings: string[];
+}
+
 function toNumber(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") return undefined;
   const numeric = Number(value);
@@ -181,17 +189,24 @@ async function fetchGeckoPoolsPage(page: number) {
   });
 }
 
-async function loadTokenMarkets() {
+async function loadTokenMarkets(): Promise<TokenMarketsPayload> {
   const pages: GeckoPoolsResponse[] = [];
+  const warnings: string[] = [];
 
   for (let page = 1; page <= PAGES_TO_SCAN; page += 1) {
     try {
       pages.push(await fetchGeckoPoolsPage(page));
     } catch (error) {
+      const message = getErrorMessage(error);
+      warnings.push(
+        message.includes("429")
+          ? "GeckoTerminal is rate limiting market scans."
+          : `GeckoTerminal page ${page} did not load.`
+      );
       logServerEvent("warn", "token_markets.page_failed", {
         page,
         loadedPages: pages.length,
-        error: getErrorMessage(error),
+        error: message,
       });
 
       if (pages.length === 0) throw error;
@@ -219,13 +234,21 @@ async function loadTokenMarkets() {
     deduped.set(dedupeKey, existing ? betterMarket(existing, market) : market);
   });
 
-  return [...deduped.values()]
+  const markets = [...deduped.values()]
     .filter((market) => (market.volume24hUsd || 0) > MIN_24H_VOLUME_USD)
     .sort((a, b) => (b.volume24hUsd || 0) - (a.volume24hUsd || 0))
     .slice(0, 80);
+
+  return {
+    markets,
+    pagesLoaded: pages.length,
+    pagesExpected: PAGES_TO_SCAN,
+    partial: pages.length < PAGES_TO_SCAN,
+    warnings,
+  };
 }
 
-export async function fetchTokenMarkets(): Promise<CacheResult<TokenMarket[]>> {
+export async function fetchTokenMarkets(): Promise<CacheResult<TokenMarketsPayload>> {
   return withServerCache(
     TOKEN_MARKETS_CACHE_KEY,
     TOKEN_MARKETS_TTL_MS,

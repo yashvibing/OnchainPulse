@@ -6,12 +6,19 @@ export const dynamic = "force-dynamic";
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) return process.env.NODE_ENV === "development";
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
+  if (!process.env.CRON_SECRET && process.env.NODE_ENV !== "development") {
+    return NextResponse.json(
+      { error: "CRON_SECRET is not configured" },
+      { status: 503 }
+    );
+  }
+
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

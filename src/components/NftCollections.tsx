@@ -120,7 +120,12 @@ export function NftCollections() {
       setCollections(Array.isArray(data.data) ? data.data : []);
       setUpdatedAt(Number(data.meta?.fetchedAt || Date.now()));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load NFT collections.");
+      const message = loadError instanceof Error ? loadError.message : "Could not load NFT collections.";
+      setError(
+        message.includes("OpenSea API key")
+          ? "NFT market data is not enabled in this environment."
+          : message
+      );
     } finally {
       setLoading(false);
     }
@@ -273,7 +278,7 @@ export function NftCollections() {
           type="button"
           onClick={loadCollections}
           disabled={loading}
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="min-h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-45"
         >
           {loading ? "Refreshing..." : "Refresh"}
         </button>
@@ -296,7 +301,7 @@ export function NftCollections() {
         </div>
       ) : filteredCollections.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8 text-[14px] text-[var(--color-text-muted)]">
-          No matching NFT collections found.
+          {error ? "NFT market data is intentionally unavailable here." : "No matching NFT collections found."}
         </div>
       ) : (
         <div className="grid gap-3">

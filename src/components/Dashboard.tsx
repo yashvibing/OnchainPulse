@@ -50,6 +50,7 @@ function DashboardInner() {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [loadingDemoWallet, setLoadingDemoWallet] = useState(false);
 
   useEffect(() => {
     setSavedAddresses(loadSavedAddresses());
@@ -65,9 +66,14 @@ function DashboardInner() {
   }, [searchParams, address]);
 
   const portfolio = usePortfolio(address);
-  function handleSearch(addr: string) {
+  useEffect(() => {
+    if (!portfolio.isLoading) setLoadingDemoWallet(false);
+  }, [portfolio.isLoading]);
+
+  function handleSearch(addr: string, source?: "manual" | "demo") {
     setAddress(addr);
     setShowPortfolio(true);
+    setLoadingDemoWallet(source === "demo");
     setActiveTab("overview");
     setSavedAddresses(saveAddress(addr));
     router.replace(`?address=${addr}`, { scroll: false });
@@ -142,7 +148,7 @@ function DashboardInner() {
                 Paste a public wallet to view holdings, positions, and rate matches.
               </p>
 
-              <div id="track-wallet" className="mx-auto mt-8 max-w-[620px] scroll-mt-24">
+              <div id="track-wallet" className="mx-auto mt-8 max-w-[760px] scroll-mt-24">
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
               </div>
               <SavedAddressBar
@@ -158,8 +164,9 @@ function DashboardInner() {
         {address && showPortfolio && (
           <section className="mt-6 border-t border-[var(--color-border)] pt-6">
             {/* Wallet badge */}
-            <div className="mb-4 flex items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-1.5">
+            <div className="mb-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-start">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-1.5">
                 <div className="h-2 w-2 rounded-full bg-[var(--color-positive)] animate-pulse" />
                 <span className="font-mono text-[12px] text-[var(--color-text-secondary)]">
                   {shortenAddress(address)}
@@ -172,14 +179,14 @@ function DashboardInner() {
                     setTimeout(() => setCopyFeedback(null), 2000);
                   });
                 }}
-                className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
+                className="min-h-10 rounded-[var(--radius-md)] px-3 text-[11px] text-[var(--color-text-dim)] transition-colors hover:text-[var(--color-text-muted)]"
               >
                 Copy
               </button>
               <button
                 onClick={handleExportCsv}
                 disabled={portfolio.isLoading || portfolio.isError}
-                className="text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-10 rounded-[var(--radius-md)] px-3 text-[11px] text-[var(--color-text-dim)] transition-colors hover:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Export CSV
               </button>
@@ -188,7 +195,8 @@ function DashboardInner() {
                   {copyFeedback}
                 </span>
               )}
-              <div className="ml-auto">
+              </div>
+              <div className="min-w-0">
                 <AddressInput onSubmit={handleSearch} initialAddress={address} />
               </div>
             </div>
@@ -202,6 +210,11 @@ function DashboardInner() {
             {/* Skeleton loading */}
             {portfolio.isLoading && (
               <div className="animate-fade-up">
+                <div className="mb-4 rounded-[var(--radius-md)] border border-[rgba(0,245,204,0.28)] bg-[rgba(0,245,204,0.06)] px-4 py-3 text-[13px] text-[var(--color-text-secondary)]">
+                  {loadingDemoWallet
+                    ? "Loading demo wallet with tokens, staking, lending, liquidity, and vault sections..."
+                    : "Loading wallet positions across portfolio sections..."}
+                </div>
                 <SkeletonStatCards />
                 <SkeletonCards count={3} />
               </div>
@@ -509,7 +522,7 @@ function SavedAddressBar({
           return (
             <div
               key={item.address}
-              className={`flex items-center gap-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-[11px] ${
+              className={`flex min-h-10 items-center gap-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-[11px] ${
                 active
                   ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] text-[var(--color-positive)]"
                   : "border-[var(--color-border)] text-[var(--color-text-secondary)]"
@@ -518,7 +531,7 @@ function SavedAddressBar({
               <button
                 type="button"
                 onClick={() => onSelect(item.address)}
-                className="font-mono hover:text-[var(--color-text-primary)]"
+                className="min-h-8 px-1 font-mono hover:text-[var(--color-text-primary)]"
               >
                 {item.label}
               </button>
@@ -526,7 +539,7 @@ function SavedAddressBar({
                 type="button"
                 aria-label={`Remove ${item.label}`}
                 onClick={() => onRemove(item.address)}
-                className="ml-1 text-[var(--color-text-dim)] hover:text-[var(--color-negative)]"
+                className="ml-1 min-h-8 min-w-8 rounded-[var(--radius-sm)] text-[var(--color-text-dim)] hover:text-[var(--color-negative)]"
               >
                 x
               </button>

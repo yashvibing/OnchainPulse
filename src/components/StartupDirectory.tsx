@@ -38,12 +38,12 @@ function StartupInitial({ startup }: { startup: DeltavStartup }) {
 
 function StartupCard({ startup }: { startup: DeltavStartup }) {
   return (
-    <article className="card card-hover flex min-h-[300px] flex-col border-t-4 border-t-[var(--color-accent-primary)] p-4">
-      <div className="flex items-start gap-4">
+    <article className="card card-hover flex min-h-[300px] min-w-0 max-w-full flex-col border-t-4 border-t-[var(--color-accent-primary)] p-4">
+      <div className="flex min-w-0 items-start gap-3">
         <StartupInitial startup={startup} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h2 className="truncate text-[20px] font-bold text-[var(--color-text-primary)]">
                 {startup.name}
               </h2>
@@ -51,7 +51,7 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
                 {startup.founder || "Founder/team"}
               </p>
             </div>
-            <span className="label-caps rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-2 py-1 text-[var(--color-text-secondary)]">
+            <span className="label-caps max-w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg-surface-solid)] px-2 py-1 text-[var(--color-text-secondary)]">
               {startup.category}
             </span>
           </div>
@@ -62,8 +62,8 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
         {startup.description || "Public startup listing from DeltaV."}
       </p>
 
-      <div className="mt-5 grid grid-cols-3 gap-2 border-y border-[var(--color-border)] bg-[rgba(8,16,13,0.42)] py-3">
-        <div className="text-center">
+      <div className="mt-5 grid min-w-0 grid-cols-3 gap-2 border-y border-[var(--color-border)] bg-[rgba(8,16,13,0.42)] py-3">
+        <div className="min-w-0 text-center">
           <div className="label-caps text-[var(--color-text-muted)]">
             Page
           </div>
@@ -71,7 +71,7 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
             {startup.sourcePage}
           </div>
         </div>
-        <div className="border-x border-[var(--color-border)] text-center">
+        <div className="min-w-0 border-x border-[var(--color-border)] text-center">
           <div className="label-caps text-[var(--color-text-muted)]">
             Believers
           </div>
@@ -79,7 +79,7 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
             {metricLabel(startup.believers)}
           </div>
         </div>
-        <div className="text-center">
+        <div className="min-w-0 text-center">
           <div className="label-caps text-[var(--color-text-muted)]">
             Followers
           </div>
@@ -92,7 +92,7 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
       <div className="mt-auto pt-4">
         <a
           href={getFeedbackUrl(startup)}
-          className="btn-primary block px-3 py-2 text-center text-[11px]"
+          className="btn-primary block min-h-10 px-3 py-2 text-center text-[11px]"
         >
           Give Feedback on DeltaV ↗
         </a>
@@ -127,7 +127,7 @@ export function StartupDirectory() {
           DeltaV public listings
         </div>
         <h1 className="mt-3 text-[40px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-          Ecosystem Feedback
+          Ecosystem
         </h1>
         <p className="mt-3 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
           Browse DeltaV listings and open DeltaV to leave feedback.

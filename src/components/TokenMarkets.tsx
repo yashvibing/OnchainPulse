@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +23,18 @@ interface ChartPoint {
   low?: number;
   close?: number;
   volumeUsd?: number;
+}
+
+interface TokenMarketsMeta {
+  cache?: "hit" | "miss" | "stale";
+  ageMs?: number;
+  fetchedAt?: number;
+  durationMs?: number;
+  source?: string;
+  pagesLoaded?: number;
+  pagesExpected?: number;
+  partial?: boolean;
+  warnings?: string[];
 }
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -380,7 +393,7 @@ function ExpandedTokenChart({
             key={nextRange}
             type="button"
             onClick={() => onRangeChange(nextRange)}
-            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
+            className={`min-h-10 rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
               range === nextRange
                 ? "border-[var(--color-accent-primary)] bg-[rgba(0,245,204,0.08)] text-[var(--color-accent-primary)]"
                 : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
@@ -499,8 +512,10 @@ function ExpandedTokenChart({
 
 export function TokenMarkets() {
   const [markets, setMarkets] = useState<TokenMarket[]>([]);
+  const lastGoodMarketsRef = useRef<TokenMarket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [meta, setMeta] = useState<TokenMarketsMeta | null>(null);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("volume");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -510,23 +525,36 @@ export function TokenMarkets() {
   const [copiedAddress, setCopiedAddress] = useState("");
   const [showFdv, setShowFdv] = useState(false);
 
-  async function loadMarkets() {
+  const loadMarkets = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const data = await fetchTokenMarketsWithRetry();
-      setMarkets(Array.isArray(data.data) ? data.data : []);
+      const nextMarkets = Array.isArray(data.data) ? data.data : [];
+      setMarkets(nextMarkets);
+      if (nextMarkets.length > 0) {
+        lastGoodMarketsRef.current = nextMarkets;
+      }
+      setMeta(data.meta || null);
       setUpdatedAt(Number(data.meta?.fetchedAt || Date.now()));
     } catch (loadError) {
+      if (lastGoodMarketsRef.current.length > 0) {
+        setMarkets(lastGoodMarketsRef.current);
+        setMeta((current) => ({
+          ...(current || {}),
+          partial: true,
+          warnings: ["Market source is temporarily unavailable. Showing the last loaded snapshot."],
+        }));
+      }
       setError(loadError instanceof Error ? loadError.message : "Could not load token markets.");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadMarkets();
-  }, []);
+  }, [loadMarkets]);
 
   const filteredMarkets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -642,7 +670,7 @@ export function TokenMarkets() {
                     : ", currently high to low"
                   : ""
               }`}
-              className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
+              className={`min-h-10 rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
                 sortKey === key
                   ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
                   : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
@@ -654,7 +682,7 @@ export function TokenMarkets() {
           <button
             type="button"
             onClick={toggleFdv}
-            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
+            className={`min-h-10 rounded-[var(--radius-md)] border px-3 py-2 text-[12px] font-bold ${
               showFdv
                 ? "border-[var(--color-accent-primary)] text-[var(--color-accent-primary)]"
                 : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
@@ -667,14 +695,26 @@ export function TokenMarkets() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-[12px] text-[var(--color-text-muted)]">
         <span>
-          Showing {filteredMarkets.length} token markets sorted by {activeSortLabel}.
+          {error && markets.length === 0
+            ? "Market data source unavailable."
+            : `Showing ${filteredMarkets.length} of ${markets.length} token markets sorted by ${activeSortLabel}.`}
         </span>
         <div className="flex flex-wrap items-center gap-2">
+          {meta?.partial && (
+            <span className="rounded-full border border-[rgba(255,184,0,0.42)] bg-[rgba(255,184,0,0.08)] px-2.5 py-1 text-[11px] font-bold text-[var(--color-warning)]">
+              Partial scan
+            </span>
+          )}
+          {meta?.cache === "stale" && (
+            <span className="rounded-full border border-[rgba(255,184,0,0.42)] bg-[rgba(255,184,0,0.08)] px-2.5 py-1 text-[11px] font-bold text-[var(--color-warning)]">
+              Stale cache
+            </span>
+          )}
           <button
             type="button"
             onClick={loadMarkets}
             disabled={loading}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+            className="min-h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-bold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] disabled:cursor-not-allowed disabled:opacity-45"
           >
             {loading ? "Refreshing..." : "Refresh"}
           </button>
@@ -684,12 +724,26 @@ export function TokenMarkets() {
       {updatedAt && (
         <div className="text-[11px] text-[var(--color-text-dim)]">
           Market data updated {new Date(updatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}.
+          {typeof meta?.pagesLoaded === "number" && typeof meta.pagesExpected === "number" && (
+            <> GeckoTerminal pages loaded: {meta.pagesLoaded}/{meta.pagesExpected}.</>
+          )}
         </div>
       )}
 
-      {error && (
+      {(error || meta?.warnings?.length) && (
         <div className="rounded-[var(--radius-md)] border border-[rgba(255,184,0,0.45)] bg-[rgba(255,184,0,0.08)] px-4 py-3 text-[13px] text-[var(--color-warning)]">
-          {error}
+          <div className="font-bold">
+            {error || "Market data is partially degraded."}
+          </div>
+          {meta?.warnings?.length ? (
+            <div className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
+              {meta.warnings.join(" ")}
+            </div>
+          ) : (
+            <div className="mt-1 text-[12px] text-[var(--color-text-secondary)]">
+              Try again in a moment, or keep using the last cached snapshot when available.
+            </div>
+          )}
         </div>
       )}
 
@@ -701,7 +755,9 @@ export function TokenMarkets() {
         </div>
       ) : filteredMarkets.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-5 py-8 text-[14px] text-[var(--color-text-muted)]">
-          No matching token markets found.
+          {error && markets.length === 0
+            ? "Token market data is temporarily unavailable from GeckoTerminal."
+            : "No matching token markets found."}
         </div>
       ) : (
         <div className="grid gap-3">
@@ -758,7 +814,7 @@ export function TokenMarkets() {
                       <button
                         type="button"
                         onClick={() => copyContract(market.tokenAddress)}
-                        className="mt-2 inline-flex max-w-full items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
+                        className="mt-2 inline-flex min-h-9 max-w-full items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-accent-primary)]"
                         aria-label={`Copy ${market.tokenSymbol} contract address`}
                       >
                         <span className="truncate">{shortAddress(market.tokenAddress)}</span>
@@ -819,7 +875,7 @@ export function TokenMarkets() {
                     href={market.poolUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-center text-[12px] font-bold text-[var(--color-accent-primary)] hover:border-[var(--color-border-hover)]"
+                    className="min-h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-center text-[12px] font-bold text-[var(--color-accent-primary)] hover:border-[var(--color-border-hover)]"
                   >
                     Open
                   </a>

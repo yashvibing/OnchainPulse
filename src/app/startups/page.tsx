@@ -3,7 +3,7 @@ import { Header } from "@/components/Header";
 import { StartupDirectory } from "@/components/StartupDirectory";
 
 export const metadata: Metadata = {
-  title: "Ecosystem Feedback - Onchain Pulse",
+  title: "Ecosystem - Onchain Pulse",
   description:
     "Browse public DeltaV ecosystem listings and continue to DeltaV to give feedback.",
 };

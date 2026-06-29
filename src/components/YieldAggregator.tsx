@@ -12,6 +12,7 @@ import {
   sortOpportunities,
   type LoopStrategy,
   type SortField,
+  type YieldSourceStatus,
   type YieldOpportunity,
 } from "@/services/yields-aggregator";
 import {
@@ -520,7 +521,7 @@ function OpportunityRow({
                   href={externalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1 inline-flex items-center justify-end text-[12px] font-bold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-text-primary)]"
+                  className="mt-1 inline-flex min-h-9 items-center justify-end rounded-[var(--radius-sm)] px-2 text-[12px] font-bold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-text-primary)]"
                 >
                   {isPendleOpportunity(opp) ? "Trade" : "Open"}
                 </a>
@@ -616,17 +617,20 @@ function LoopStrategyRow({ strategy }: { strategy: LoopStrategy }) {
           <div className="font-semibold text-[var(--color-text-primary)]">{formatRateLabel(strategy.netAprAt1x)}</div>
         </div>
         <div>
-          <div className="text-[10px] text-[var(--color-text-dim)]">Est. 2x</div>
-          <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt2x)}</div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">2x net</div>
+          <div className="font-semibold text-[var(--color-warning)]">Cost unknown</div>
         </div>
         <div>
-          <div className="text-[10px] text-[var(--color-text-dim)]">Est. 3x</div>
-          <div className="font-semibold text-[var(--color-positive)]">{formatRateLabel(strategy.netAprAt3x)}</div>
+          <div className="text-[10px] text-[var(--color-text-dim)]">3x net</div>
+          <div className="font-semibold text-[var(--color-warning)]">Cost unknown</div>
         </div>
         <div>
           <div className="text-[10px] text-[var(--color-text-dim)]">Max</div>
           <div className="font-semibold text-[var(--color-text-secondary)]">{strategy.maxLeverage}x</div>
         </div>
+      </div>
+      <div className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+        Leveraged net APR excludes base borrow cost when sources only report incentives.
       </div>
     </div>
   );
@@ -668,7 +672,7 @@ function EmptyOpportunities({
               key={symbol}
               type="button"
               onClick={() => onPickToken(symbol)}
-              className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+            className="min-h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-[12px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
             >
               Try {symbol}
             </button>
@@ -791,6 +795,7 @@ export function YieldAggregator() {
   const [dataStatus, setDataStatus] = useState<{
     cacheStatus?: string;
     fetchedAt?: number;
+    sources?: YieldSourceStatus[];
   }>({});
   const [lendTokens, setLendTokens] = useState<string[]>([]);
   const [borrowTokens, setBorrowTokens] = useState<string[]>([]);
@@ -812,6 +817,7 @@ export function YieldAggregator() {
         setDataStatus({
           cacheStatus: result.cacheStatus,
           fetchedAt: result.fetchedAt || Date.now(),
+          sources: result.sources,
         });
         setError(null);
         setLoading(false);
@@ -905,6 +911,19 @@ export function YieldAggregator() {
               <span>Using cached rates</span>
             </>
           )}
+          {dataStatus.sources?.map((source) => (
+            <span
+              key={source.name}
+              className={`rounded-full border px-2.5 py-1 font-bold ${
+                source.ok
+                  ? "border-[rgba(0,245,204,0.28)] bg-[rgba(0,245,204,0.07)] text-[var(--color-positive)]"
+                  : "border-[rgba(255,184,0,0.42)] bg-[rgba(255,184,0,0.08)] text-[var(--color-warning)]"
+              }`}
+              title={source.error}
+            >
+              {source.name}: {source.ok ? `${source.count} rows` : "unavailable"}
+            </span>
+          ))}
         </div>
       )}
 

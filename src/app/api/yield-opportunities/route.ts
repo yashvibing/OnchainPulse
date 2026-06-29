@@ -20,7 +20,12 @@ export async function GET(request: Request) {
 
   try {
     const result = await fetchCombinedYieldOpportunitiesWithMeta();
-    const response = NextResponse.json(result.data, {
+    const response = NextResponse.json({
+      data: result.data.opportunities,
+      meta: {
+        sources: result.data.sources,
+      },
+    }, {
       headers: withRateLimitHeaders(
         {
           "Cache-Control": "s-maxage=300, stale-while-revalidate=1800",

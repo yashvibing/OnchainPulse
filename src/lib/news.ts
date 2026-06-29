@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { lookup } from "dns/promises";
+import { isIP } from "net";
 import { getServerRedisClient } from "@/lib/serverCache";
 import { getErrorMessage, logServerEvent, logSlowSource, sourceNameFromUrl } from "@/lib/serverLog";
 
@@ -36,6 +38,7 @@ const CURATED_NEWS_KEY = "onchain-pulse:curated-news";
 const NEWS_LIMIT = 20;
 const NEWS_STORAGE_LIMIT = 50;
 const NEWS_FETCH_TIMEOUT_MS = 5_000;
+const NEWS_METADATA_MAX_BYTES = 512_000;
 const MAX_FIELD_LENGTH = 2_000;
 const MAX_BODY_LENGTH = 10_000;
 const memoryNews: NewsArticle[] = [];
@@ -62,6 +65,49 @@ function isValidHttpUrl(value: string) {
     return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
+  }
+}
+
+function isPrivateHostname(hostname: string) {
+  const normalized = hostname.toLowerCase().replace(/\.$/u, "");
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "0.0.0.0"
+  );
+}
+
+function isPrivateIpAddress(address: string) {
+  if (address === "::1") return true;
+  if (address.startsWith("fe80:")) return true;
+  if (address.startsWith("fc") || address.startsWith("fd")) return true;
+
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return false;
+  const [a, b] = parts;
+
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+async function assertSafeMetadataUrl(value: string) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") throw new Error("Only HTTPS metadata URLs are allowed");
+  if (isPrivateHostname(url.hostname)) throw new Error("Private metadata host is not allowed");
+
+  if (isIP(url.hostname)) {
+    if (isPrivateIpAddress(url.hostname)) throw new Error("Private metadata IP is not allowed");
+    return;
+  }
+
+  const results = await lookup(url.hostname, { all: true });
+  if (results.some((result) => isPrivateIpAddress(result.address))) {
+    throw new Error("Private metadata DNS target is not allowed");
   }
 }
 
@@ -197,6 +243,7 @@ async function fetchUrlMetadata(url: string) {
   const source = sourceNameFromUrl(url);
 
   try {
+    await assertSafeMetadataUrl(url);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -208,7 +255,7 @@ async function fetchUrlMetadata(url: string) {
     logSlowSource(source, durationMs);
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
+    const html = (await response.text()).slice(0, NEWS_METADATA_MAX_BYTES);
 
     const metadataImage = resolveMetadataUrl(
       url,

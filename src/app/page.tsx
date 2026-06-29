@@ -50,10 +50,16 @@ const FEATURE_CARDS = [
     href: "/analytics",
   },
   {
-    title: "News & Startups",
+    title: "News",
     eyebrow: "Ecosystem",
-    body: "Read curated updates and browse DeltaV startup listings without leaving the interface.",
+    body: "Read curated Monad and DeFi updates, with sources one tap away.",
     href: "/news",
+  },
+  {
+    title: "Ecosystem",
+    eyebrow: "Directory",
+    body: "Browse DeltaV startup listings and open DeltaV to leave feedback.",
+    href: "/startups",
   },
   {
     title: "Telegram Alerts",
@@ -111,7 +117,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             </div>
             <Link
               href="/app"
-              className="text-[12px] font-bold text-[var(--color-accent-primary)] hover:opacity-80"
+              className="inline-flex min-h-10 items-center text-[12px] font-bold text-[var(--color-accent-primary)] hover:opacity-80"
             >
               Start with a wallet -&gt;
             </Link>

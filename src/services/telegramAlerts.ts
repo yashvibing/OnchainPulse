@@ -1039,7 +1039,7 @@ export async function createTelegramAlert(input: {
   const needsOpportunities =
     !tokenAlert && input.kind !== "daily_digest" && input.kind !== "daily_news_brief";
   const opportunities = needsOpportunities ? await fetchCombinedYieldOpportunities() : [];
-  const tokenMarkets = tokenAlert ? (await fetchTokenMarkets()).data : [];
+  const tokenMarkets = tokenAlert ? (await fetchTokenMarkets()).data.markets : [];
   const tokenSymbol = normalizeTokenSymbol(input.tokenSymbol || "ANY");
   const protocolKey = input.protocolKey && input.protocolKey !== "all" ? normalizeProtocolKey(input.protocolKey) : undefined;
   const alreadyMet = findAlreadyMetThresholdAlert(
@@ -1646,7 +1646,7 @@ export async function checkTelegramAlerts() {
 
   if (hasTokenAlerts) {
     try {
-      tokenMarkets = (await fetchTokenMarkets()).data;
+      tokenMarkets = (await fetchTokenMarkets()).data.markets;
     } catch (error) {
       alertsToCheck = alertsToCheck.filter((alert) => !isTokenMarketAlert(alert.kind));
       if (alertsToCheck.length === 0) throw error;
