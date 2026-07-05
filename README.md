@@ -1,18 +1,18 @@
 # Onchain Pulse
 
-Onchain Pulse is an independent, unofficial interface for exploring public wallet portfolios, displayed DeFi rates, curated ecosystem updates, and Telegram alerts relating to Monad.
+Onchain Pulse is an independent, unofficial interface for exploring public wallet portfolios, displayed DeFi rates, curated ecosystem updates, and Telegram alerts related to Monad.
 
 It is not associated with, endorsed by, sponsored by, maintained by, or affiliated with Monad Foundation.
 
 ## What It Does
 
-- **Portfolio Tracker** - paste a public wallet address and view token holdings, staking positions, lending, vaults, liquidity positions, MON price context, and CSV export.
-- **DeFi Rates** - compare displayed lending, staking APY, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
-- **Latest News** - curated updates with an admin review flow, X post ingestion, and optional Telegram distribution.
-- **Ecosystem / Startups** - browse curated DeltaV startup listings and continue to DeltaV to leave feedback.
-- **Telegram Alerts** - create APR threshold, displayed-rate-change, new-market, and brief alerts through Telegram.
+- **Portfolio Tracker** — paste a public wallet address to view token holdings, staking positions, lending, vaults, liquidity positions, MON price context, and CSV export.
+- **DeFi Rates** — compare displayed lending, staking APY, LP, borrow, and vault opportunities using data from Merkl, DefiLlama, and protocol/source metadata.
+- **Latest News** — curated updates with an admin review flow, X post ingestion, and optional Telegram distribution.
+- **Ecosystem / Startups** — browse curated DeltaV startup listings and continue to DeltaV to leave feedback.
+- **Telegram Alerts** — set up APR threshold, displayed-rate-change, new-market, and daily brief alerts through Telegram.
 
-The app does not require wallet connection for the core experience. Users can paste public wallet addresses and opt into Telegram alerts separately.
+The app doesn't require a wallet connection for the core experience — users can paste public wallet addresses and opt into Telegram alerts separately.
 
 ## Live App
 
@@ -20,14 +20,14 @@ Production: [https://onchainpulse.app](https://onchainpulse.app)
 
 Main routes:
 
-- `/` - product home
-- `/app` - portfolio tracker
-- `/defi-rates` - DeFi rates
-- `/news` - latest news
-- `/news/admin` - protected news admin
-- `/startups` - DeltaV startup directory
-- `/alerts` - Telegram alert setup and management
-- `/api/health` - source and cache health check
+- `/` — product home
+- `/app` — portfolio tracker
+- `/defi-rates` — DeFi rates
+- `/news` — latest news
+- `/news/admin` — protected news admin
+- `/startups` — DeltaV startup directory
+- `/alerts` — Telegram alert setup and management
+- `/api/health` — source and cache health check
 
 ## Data Sources
 
@@ -94,9 +94,9 @@ NEXT_PUBLIC_MONAD_RPC_URL=
 Private access:
 
 - Visitors must redeem a one-time access code before using app pages.
-- Codes are read from private `ACCESS_CODES` environment variable.
+- Codes are read from the private `ACCESS_CODES` environment variable.
 - Used codes are stored in Upstash Redis when Redis env vars are configured.
-- `ACCESS_GATE_SECRET` should be a long random string used to sign access sessions.
+- `ACCESS_GATE_SECRET` should be a long, random string used to sign access sessions.
 
 Redis cache:
 
@@ -141,9 +141,7 @@ Never commit real API keys or secrets.
 
 ## Scheduled Jobs
 
-GitHub Actions runs `.github/workflows/x-ingest.yml` every 30 minutes.
-
-The workflow:
+GitHub Actions runs `.github/workflows/x-ingest.yml` every 30 minutes. The workflow:
 
 1. Calls `/api/cron/x-ingest` to fetch and score posts from tracked X accounts.
 2. Adds high-signal posts to Latest News, capped by run and daily limits.
