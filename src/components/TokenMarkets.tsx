@@ -406,17 +406,19 @@ function ExpandedTokenChart({
       </div>
 
       {status === "ready" ? (
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="h-32 w-full cursor-crosshair"
-          preserveAspectRatio="none"
-          role="img"
-          aria-label={`${market.tokenSymbol} candlestick chart`}
-          onMouseMove={handleChartMouseMove}
-          onTouchStart={handleChartTouch}
-          onTouchMove={handleChartTouch}
-        >
-          {[0.25, 0.5, 0.75].map((ratio) => (
+        <>
+        <div className="relative">
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="h-56 w-full cursor-crosshair sm:h-72"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={`${market.tokenSymbol} candlestick chart`}
+            onMouseMove={handleChartMouseMove}
+            onTouchStart={handleChartTouch}
+            onTouchMove={handleChartTouch}
+          >
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <line
               key={ratio}
               x1="0"
@@ -482,7 +484,27 @@ function ExpandedTokenChart({
               strokeWidth="0.25"
             />
           )}
-        </svg>
+          </svg>
+          {[0, 0.5, 1].map((ratio) => (
+            <div
+              key={ratio}
+              className="pointer-events-none absolute right-1 -translate-y-1/2 rounded-[2px] bg-[rgba(8,16,13,0.72)] px-1 font-mono text-[10px] text-[var(--color-text-muted)]"
+              style={{
+                top: `${((chartPadding + ratio * (chartHeight - chartPadding * 2)) / chartHeight) * 100}%`,
+              }}
+            >
+              {formatCurrency(maxPrice - ratio * priceRange, 4)}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1.5 flex justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
+          {[0, Math.floor((points.length - 1) / 2), points.length - 1]
+            .filter((index, position, list) => list.indexOf(index) === position)
+            .map((index) => (
+              <span key={index}>{formatChartTime(points[index].timestamp, range)}</span>
+            ))}
+        </div>
+        </>
       ) : status === "loading" ? (
         <div className="h-28 animate-pulse rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.04)]" />
       ) : (
