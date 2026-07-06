@@ -7,6 +7,8 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: rootDir,
+  // Lets parallel dev servers use isolated build dirs (see CLAUDE.md gotcha).
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     remotePatterns: [
       {

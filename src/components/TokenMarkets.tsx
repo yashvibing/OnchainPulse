@@ -6,9 +6,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent as ReactMouseEvent,
-  type TouchEvent as ReactTouchEvent,
 } from "react";
+import { CandleChart } from "@/components/CandleChart";
 import type { TokenMarket } from "@/services/tokenMarkets";
 
 type SortKey = "volume" | "change" | "liquidity" | "marketCap" | "fdv";
@@ -146,12 +145,6 @@ function candleOpen(point: ChartPoint) {
 
 function candleClose(point: ChartPoint) {
   return typeof point.close === "number" ? point.close : point.value;
-}
-
-function closestChartIndex(clientX: number, rect: DOMRect, length: number) {
-  if (length <= 1) return 0;
-  const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  return Math.round(ratio * (length - 1));
 }
 
 async function fetchChart(
@@ -303,33 +296,18 @@ function ExpandedTokenChart({
   const isPositive = (change || 0) >= 0;
   const latestPoint = points[points.length - 1];
   const activePoint = activeIndex === null ? latestPoint : points[activeIndex] || latestPoint;
-  const candleValues = points.flatMap((point) => [candleHigh(point), candleLow(point)]);
-  const minPrice = candleValues.length ? Math.min(...candleValues) : 0;
-  const maxPrice = candleValues.length ? Math.max(...candleValues) : 1;
-  const priceRange = maxPrice - minPrice || 1;
-  const chartWidth = 100;
-  const chartHeight = 48;
-  const chartPadding = 3;
-  const candleWidth = points.length ? Math.max(0.45, Math.min(2.2, (chartWidth - chartPadding * 2) / points.length * 0.62)) : 1;
-
-  function yForPrice(value: number) {
-    return chartHeight - chartPadding - ((value - minPrice) / priceRange) * (chartHeight - chartPadding * 2);
-  }
-
-  function setActiveFromClientX(clientX: number, rect: DOMRect) {
-    if (points.length === 0) return;
-    setActiveIndex(closestChartIndex(clientX, rect, points.length));
-  }
-
-  function handleChartMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
-    setActiveFromClientX(event.clientX, event.currentTarget.getBoundingClientRect());
-  }
-
-  function handleChartTouch(event: ReactTouchEvent<SVGSVGElement>) {
-    const touch = event.touches[0] || event.changedTouches[0];
-    if (!touch) return;
-    setActiveFromClientX(touch.clientX, event.currentTarget.getBoundingClientRect());
-  }
+  const candlePoints = useMemo(
+    () =>
+      points.map((point) => ({
+        time: Math.floor(chartTimestampMs(point.timestamp) / 1000),
+        open: candleOpen(point),
+        high: candleHigh(point),
+        low: candleLow(point),
+        close: candleClose(point),
+        volume: point.volumeUsd,
+      })),
+    [points],
+  );
 
   return (
     <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] p-4">
@@ -406,107 +384,13 @@ function ExpandedTokenChart({
       </div>
 
       {status === "ready" ? (
-        <>
-        <div className="relative">
-          <svg
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="h-56 w-full cursor-crosshair sm:h-72"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label={`${market.tokenSymbol} candlestick chart`}
-            onMouseMove={handleChartMouseMove}
-            onTouchStart={handleChartTouch}
-            onTouchMove={handleChartTouch}
-          >
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1="0"
-              x2={chartWidth}
-              y1={chartPadding + ratio * (chartHeight - chartPadding * 2)}
-              y2={chartPadding + ratio * (chartHeight - chartPadding * 2)}
-              stroke="rgba(255,255,255,0.07)"
-              strokeWidth="0.25"
-            />
-          ))}
-          {points.map((point, index) => {
-            const open = candleOpen(point);
-            const close = candleClose(point);
-            const high = candleHigh(point);
-            const low = candleLow(point);
-            const x = chartPadding + (index / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2);
-            const wickTop = yForPrice(high);
-            const wickBottom = yForPrice(low);
-            const bodyTop = yForPrice(Math.max(open, close));
-            const bodyBottom = yForPrice(Math.min(open, close));
-            const bodyHeight = Math.max(0.6, bodyBottom - bodyTop);
-            const candleColor = close >= open ? "var(--color-positive)" : "var(--color-negative)";
-            const isActive = activeIndex === index || (activeIndex === null && index === points.length - 1);
-
-            return (
-              <g key={`${point.timestamp}-${index}`}>
-                <line
-                  x1={x}
-                  x2={x}
-                  y1={wickTop}
-                  y2={wickBottom}
-                  stroke={candleColor}
-                  strokeWidth={isActive ? 0.45 : 0.28}
-                  opacity={isActive ? 1 : 0.72}
-                />
-                <rect
-                  x={x - candleWidth / 2}
-                  y={bodyTop}
-                  width={candleWidth}
-                  height={bodyHeight}
-                  fill={candleColor}
-                  opacity={isActive ? 1 : 0.82}
-                  rx="0.12"
-                />
-                <rect
-                  x={x - Math.max(candleWidth, 1.2) / 2}
-                  y={0}
-                  width={Math.max(candleWidth, 1.2)}
-                  height={chartHeight}
-                  fill="transparent"
-                />
-              </g>
-            );
-          })}
-          {activePoint && (
-            <line
-              x1={chartPadding + ((activeIndex ?? points.length - 1) / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2)}
-              x2={chartPadding + ((activeIndex ?? points.length - 1) / Math.max(1, points.length - 1)) * (chartWidth - chartPadding * 2)}
-              y1="0"
-              y2={chartHeight}
-              stroke="rgba(255,255,255,0.32)"
-              strokeDasharray="1 1"
-              strokeWidth="0.25"
-            />
-          )}
-          </svg>
-          {[0, 0.5, 1].map((ratio) => (
-            <div
-              key={ratio}
-              className="pointer-events-none absolute right-1 -translate-y-1/2 rounded-[2px] bg-[rgba(8,16,13,0.72)] px-1 font-mono text-[10px] text-[var(--color-text-muted)]"
-              style={{
-                top: `${((chartPadding + ratio * (chartHeight - chartPadding * 2)) / chartHeight) * 100}%`,
-              }}
-            >
-              {formatCurrency(maxPrice - ratio * priceRange, 4)}
-            </div>
-          ))}
-        </div>
-        <div className="mt-1.5 flex justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
-          {[0, Math.floor((points.length - 1) / 2), points.length - 1]
-            .filter((index, position, list) => list.indexOf(index) === position)
-            .map((index) => (
-              <span key={index}>{formatChartTime(points[index].timestamp, range)}</span>
-            ))}
-        </div>
-        </>
+        <CandleChart
+          points={candlePoints}
+          onCrosshairIndex={setActiveIndex}
+          className="h-64 w-full sm:h-80"
+        />
       ) : status === "loading" ? (
-        <div className="h-28 animate-pulse rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.04)]" />
+        <div className="h-64 animate-pulse rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.04)] sm:h-80" />
       ) : (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-6 text-[13px] text-[var(--color-text-muted)]">
           Chart is unavailable from the market data source right now.
