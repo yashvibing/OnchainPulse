@@ -724,13 +724,15 @@ export function TokenMarkets() {
       {updatedAt && (
         <div className="text-[11px] text-[var(--color-text-dim)]">
           Market data updated {new Date(updatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}.
-          {typeof meta?.pagesLoaded === "number" && typeof meta.pagesExpected === "number" && (
-            <> GeckoTerminal pages loaded: {meta.pagesLoaded}/{meta.pagesExpected}.</>
-          )}
+          {typeof meta?.pagesLoaded === "number" &&
+            typeof meta.pagesExpected === "number" &&
+            meta.pagesLoaded < meta.pagesExpected && (
+              <> Some markets are still loading from the data source.</>
+            )}
         </div>
       )}
 
-      {(error || meta?.warnings?.length) && (
+      {(Boolean(error) || Boolean(meta?.warnings?.length)) && (
         <div className="rounded-[var(--radius-md)] border border-[rgba(255,184,0,0.45)] bg-[rgba(255,184,0,0.08)] px-4 py-3 text-[13px] text-[var(--color-warning)]">
           <div className="font-bold">
             {error || "Market data is partially degraded."}

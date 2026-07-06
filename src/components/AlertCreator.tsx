@@ -777,7 +777,7 @@ export function AlertCreator() {
                   disabled={busy || !telegramOpened}
                   className={setupButtonClass(telegramOpened)}
                 >
-                  I tapped Start
+                  I&apos;ve tapped Start
                 </button>
               )}
             </div>
@@ -788,7 +788,7 @@ export function AlertCreator() {
               <ol className="mt-2 grid gap-1 sm:grid-cols-3">
                 <li className={telegramOpened ? "text-[var(--color-positive)]" : ""}>1. Launch the bot link</li>
                 <li>2. Tap Start in Telegram</li>
-                <li>3. Click I tapped Start</li>
+                <li>3. Come back and confirm below</li>
               </ol>
             </div>
           )}

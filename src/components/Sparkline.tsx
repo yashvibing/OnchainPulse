@@ -87,23 +87,57 @@ export function PortfolioSparkline({ holdings }: SparklineProps) {
   }, [holdings]);
 
   const ranges = [
-    { label: "24H TREND", points: chartRanges?.day || [] },
-    { label: "7-DAY TREND", points: chartRanges?.week || [] },
-    { label: "30-DAY TREND", points: chartRanges?.month || [] },
+    { key: "24H", label: "PORTFOLIO TREND", points: chartRanges?.day || [] },
+    { key: "7D", label: "PORTFOLIO TREND", points: chartRanges?.week || [] },
+    { key: "30D", label: "PORTFOLIO TREND", points: chartRanges?.month || [] },
   ];
+
+  const [activeKey, setActiveKey] = useState("7D");
 
   if (ranges.every((range) => range.points.length < 2)) return null;
 
+  const available = ranges.filter((range) => range.points.length >= 2);
+  const active = available.find((range) => range.key === activeKey) || available[0];
+
   return (
-    <div className="mb-5 grid gap-3 lg:grid-cols-3">
-      {ranges.map((range) => (
-        <TrendChart key={range.label} label={range.label} points={range.points} />
-      ))}
+    <div className="mb-5">
+      <TrendChart
+        label={active.label}
+        points={active.points}
+        rangeToggle={
+          <div className="flex gap-1" role="tablist" aria-label="Trend range">
+            {available.map((range) => (
+              <button
+                key={range.key}
+                type="button"
+                role="tab"
+                aria-selected={range.key === active.key}
+                onClick={() => setActiveKey(range.key)}
+                className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                  range.key === active.key
+                    ? "bg-[rgba(0,245,204,0.12)] text-[var(--color-accent-primary)]"
+                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                {range.key}
+              </button>
+            ))}
+          </div>
+        }
+      />
     </div>
   );
 }
 
-function TrendChart({ label, points }: { label: string; points: ChartPoint[] }) {
+function TrendChart({
+  label,
+  points,
+  rangeToggle,
+}: {
+  label: string;
+  points: ChartPoint[];
+  rangeToggle?: React.ReactNode;
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const gradientId = `spark-fill-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
@@ -136,9 +170,12 @@ function TrendChart({ label, points }: { label: string; points: ChartPoint[] }) 
 
   return (
     <div className="card px-4 py-4">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-[11px] tracking-[0.6px] text-[var(--color-text-muted)]">
-          {label}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <div className="text-[11px] tracking-[0.6px] text-[var(--color-text-muted)]">
+            {label}
+          </div>
+          {rangeToggle}
         </div>
         <div className="flex items-center gap-2">
           {displayPoint && (
@@ -164,7 +201,7 @@ function TrendChart({ label, points }: { label: string; points: ChartPoint[] }) 
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="w-full"
-        style={{ height: 70 }}
+        style={{ height: 110 }}
         preserveAspectRatio="none"
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();

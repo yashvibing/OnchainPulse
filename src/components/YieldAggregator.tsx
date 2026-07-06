@@ -466,7 +466,7 @@ function OpportunityRow({
 
   return (
     <div className="group block rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-4 transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-card-hover)]">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:items-center">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="flex min-w-0 gap-3">
           <AssetStack symbols={assetSymbols} />
           <div className="min-w-0">
@@ -500,16 +500,16 @@ function OpportunityRow({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 sm:grid-cols-3 md:bg-transparent md:px-0 md:py-0">
+        <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.035)] px-3 py-3 sm:grid-cols-3 md:flex md:items-center md:gap-5 md:bg-transparent md:px-0 md:py-0">
           <div>
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">{getRateTitle(opp)}</div>
-            <div className="mt-1 text-[16px] font-bold text-[var(--color-positive)]">
+            <div className="whitespace-nowrap text-[10px] uppercase text-[var(--color-text-dim)]">{getRateTitle(opp)}</div>
+            <div className="mt-1 whitespace-nowrap text-[16px] font-bold text-[var(--color-positive)]">
               {getRateLabel(opp)}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase text-[var(--color-text-dim)]">TVL</div>
-            <div className="mt-1 font-mono text-[13px] font-semibold text-[var(--color-text-secondary)]">
+            <div className="whitespace-nowrap text-[10px] uppercase text-[var(--color-text-dim)]">TVL</div>
+            <div className="mt-1 whitespace-nowrap font-mono text-[13px] font-semibold text-[var(--color-text-secondary)]">
               {formatUsd(opp.tvl)}
             </div>
           </div>
@@ -557,7 +557,7 @@ function PendleSpotlight({ opportunities }: { opportunities: YieldOpportunity[] 
             </span>
           </div>
           <p className="mt-2 max-w-[720px] text-[12px] leading-relaxed text-[var(--color-text-muted)]">
-            Pendle rows are maturity-based yield markets, so they sit beside lending and vault APYs but should be compared separately.
+            Pendle offers fixed yields that lock until a maturity date, so compare them separately from the floating lending and vault APYs listed here.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-right">
@@ -755,7 +755,7 @@ function AggregatorSkeleton() {
         <div className="h-4 w-52 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
         <div className="mt-3 h-3 w-full max-w-[560px] animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
       </div>
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
+      <div className="mb-6 grid gap-4 xl:grid-cols-2">
         {Array.from({ length: 2 }).map((_, index) => (
           <div key={index} className="rounded-[var(--radius-lg)] border border-[var(--color-border)] px-4 py-4">
             <div className="h-4 w-28 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
@@ -767,7 +767,7 @@ function AggregatorSkeleton() {
           </div>
         ))}
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         {Array.from({ length: 2 }).map((_, sectionIndex) => (
           <div key={sectionIndex} className="space-y-2">
             {Array.from({ length: 5 }).map((__, rowIndex) => (
@@ -921,13 +921,13 @@ export function YieldAggregator() {
               }`}
               title={source.error}
             >
-              {source.name}: {source.ok ? `${source.count} rows` : "unavailable"}
+              {source.name}: {source.ok ? `${source.count} markets` : "unavailable"}
             </span>
           ))}
         </div>
       )}
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
+      <div className="mb-6 grid gap-4 xl:grid-cols-2">
         <TokenSelectorPanel
           title="Earn / Supply"
           subtitle="Lending, staking, LP, and vaults."
@@ -964,10 +964,10 @@ export function YieldAggregator() {
       </div>
 
       {!hasLendSelection && !hasBorrowSelection && (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
           <OpportunitySection
             title="Earn / Supply Opportunities"
-            subtitle="Lending, staking, LP, and vault rows."
+            subtitle="Lending, staking, LP, and vault markets."
             emptyLabel="No earn or supply opportunities found."
             opportunities={lendOpps}
             searchValue={lendSearch}
@@ -977,7 +977,7 @@ export function YieldAggregator() {
           />
           <OpportunitySection
             title="Borrow Markets"
-            subtitle="Borrow rows include collateral hints where available."
+            subtitle="Borrow markets include collateral hints where available."
             emptyLabel="No borrow markets found."
             opportunities={borrowOpps}
             searchValue={borrowSearch}
@@ -991,7 +991,7 @@ export function YieldAggregator() {
       {showSupplyOnly && (
         <OpportunitySection
           title={`Earn / supply opportunities for ${lendTokens.join(", ")}`}
-          subtitle="Matching earn and supply rows."
+          subtitle="Matching earn and supply markets."
           emptyLabel="No earn or supply opportunities found for this token."
           opportunities={lendOpps}
           searchValue={lendSearch}

@@ -119,7 +119,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               href="/app"
               className="inline-flex min-h-10 items-center text-[12px] font-bold text-[var(--color-accent-primary)] hover:opacity-80"
             >
-              Start with a wallet -&gt;
+              Start with a wallet &rarr;
             </Link>
           </div>
 
@@ -140,7 +140,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                   {feature.body}
                 </p>
                 <div className="mt-4 text-[12px] font-bold text-[var(--color-accent-primary)]">
-                  Open -&gt;
+                  Open &rarr;
                 </div>
               </Link>
             ))}

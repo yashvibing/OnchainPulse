@@ -22,7 +22,7 @@ export function StatCards({
     <div className="mb-5 flex flex-wrap gap-3">
       <StatCard label="TOTAL VALUE" value={totalValue} format="usd" />
       <StatCard
-        label={`EST. ${yieldEstimate.period.toUpperCase()} AMOUNT`}
+        label={`EST. ${yieldEstimate.period.toUpperCase()} EARNINGS`}
         value={yieldEstimate.amount}
         format="usd-estimate"
         sub="From staking APY, vault rates, and lending APR/APY"

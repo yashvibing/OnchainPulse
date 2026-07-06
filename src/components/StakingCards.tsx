@@ -39,23 +39,6 @@ export function StakingCards({ positions }: StakingCardsProps) {
             </span>
           </div>
 
-          {/* Source APY progress bar shows the reported staking rate as a visual reference. */}
-          <div className="mb-4">
-            <div className="mb-1 flex items-center justify-between text-[11px]">
-              <span className="text-[var(--color-text-dim)]">Source APY</span>
-              <span className="font-semibold text-[var(--color-positive)]">{pos.apy.toFixed(1)}%</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.04)]">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${Math.min(pos.apy / 25 * 100, 100)}%`,
-                  background: `linear-gradient(90deg, ${pos.color}, var(--color-positive))`,
-                }}
-              />
-            </div>
-          </div>
-
           {/* Stats */}
           <div className="flex flex-wrap gap-6">
             <div>

@@ -345,9 +345,9 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
     },
     {
       id: "chainRev",
-      label: "Chain REV",
+      label: "REV (fees + tips)",
       value: formatCurrency(analytics.economy.chainRevUsd),
-      helper: "24h REV",
+      helper: "24h real economic value",
       color: "#22c55e",
       points: [],
       formatter: formatCurrency,
@@ -1257,7 +1257,7 @@ export function AnalyticsDashboard() {
                 <Metric label="App fees" value={formatCurrency(analytics.economy.appFeesUsd)} />
                 <Metric label="Chain fees" value={formatCurrency(analytics.economy.chainFeesUsd)} />
                 <Metric label="Chain revenue" value={formatCurrency(analytics.economy.chainRevenueUsd)} />
-                <Metric label="Chain REV" value={formatCurrency(analytics.economy.chainRevUsd)} />
+                <Metric label="REV (fees + tips)" value={formatCurrency(analytics.economy.chainRevUsd)} />
                 <Metric label="App revenue" value={formatCurrency(analytics.economy.appRevenueUsd)} />
                 <Metric label="Fees paid" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
                 <Metric label="Token incentives" value={formatCurrency(analytics.economy.tokenIncentivesUsd)} />

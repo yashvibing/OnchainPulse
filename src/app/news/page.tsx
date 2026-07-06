@@ -18,10 +18,10 @@ export default function NewsPage() {
       <main className="mx-auto max-w-[1280px] px-5 pb-16 pt-8 md:px-6">
         <section className="mb-6 border-b border-[var(--color-border)] pb-6 pt-2">
           <div className="label-caps text-[var(--color-accent-primary)]">
-            Latest News
+            Market context
           </div>
           <h1 className="mt-3 text-[34px] font-bold text-[var(--color-text-primary)] md:text-[40px]">
-            Market context
+            Latest news
           </h1>
           <p className="mt-2 max-w-[720px] text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
             Curated Monad and DeFi updates rewritten into quick reads before you open the source.

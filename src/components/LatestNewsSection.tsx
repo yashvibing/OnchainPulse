@@ -186,7 +186,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
           className="mt-4 inline-flex items-center gap-2 text-[11px] font-semibold text-[var(--color-accent-primary)] transition-colors hover:text-[var(--color-positive)]"
         >
           <span>Verify source</span>
-          <span aria-hidden="true">-&gt;</span>
+          <span aria-hidden="true">&rarr;</span>
         </a>
       ) : (
         <div className="mt-4 text-[11px] font-semibold text-[var(--color-text-dim)]">

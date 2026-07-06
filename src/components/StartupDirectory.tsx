@@ -62,16 +62,8 @@ function StartupCard({ startup }: { startup: DeltavStartup }) {
         {startup.description || "Public startup listing from DeltaV."}
       </p>
 
-      <div className="mt-5 grid min-w-0 grid-cols-3 gap-2 border-y border-[var(--color-border)] bg-[rgba(8,16,13,0.42)] py-3">
-        <div className="min-w-0 text-center">
-          <div className="label-caps text-[var(--color-text-muted)]">
-            Page
-          </div>
-          <div className="mt-2 font-mono text-[18px] font-semibold text-[var(--color-accent-primary)]">
-            {startup.sourcePage}
-          </div>
-        </div>
-        <div className="min-w-0 border-x border-[var(--color-border)] text-center">
+      <div className="mt-5 grid min-w-0 grid-cols-2 gap-2 border-y border-[var(--color-border)] bg-[rgba(8,16,13,0.42)] py-3">
+        <div className="min-w-0 border-r border-[var(--color-border)] text-center">
           <div className="label-caps text-[var(--color-text-muted)]">
             Believers
           </div>
