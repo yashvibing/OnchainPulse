@@ -11,6 +11,7 @@ import type {
 
 type Tone = "positive" | "negative" | "warning" | "neutral";
 type ChartRange = "7d" | "30d" | "all";
+type MetricCategory = "core" | "volume" | "fees" | "flows" | "network" | "valuation";
 type ChartMetricId =
   | "price"
   | "marketCap"
@@ -51,6 +52,7 @@ interface ChartMetric {
   value: string;
   helper: string;
   color: string;
+  category: MetricCategory;
   points: AnalyticsPoint[];
   formatter: (value: number) => string;
   mark: "area" | "line" | "bar";
@@ -75,6 +77,17 @@ const CHART_RANGES: Array<{ value: ChartRange; label: string; days?: number }> =
   { value: "30d", label: "30D", days: 30 },
   { value: "all", label: "All" },
 ];
+
+const CATEGORY_ORDER: MetricCategory[] = ["core", "volume", "fees", "flows", "network", "valuation"];
+
+const CATEGORY_LABELS: Record<MetricCategory, string> = {
+  core: "Core",
+  volume: "Volume",
+  fees: "Fees & revenue",
+  flows: "Flows & liquidity",
+  network: "Network & staking",
+  valuation: "Valuation",
+};
 
 function formatCurrency(value?: number, maximumFractionDigits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
@@ -224,6 +237,10 @@ function movingAverageTrend(points: AnalyticsPoint[], windowSize = 7) {
   });
 }
 
+function isChartable(metric: ChartMetric) {
+  return metric.points.length >= 2;
+}
+
 function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): ChartMetric[] {
   const pricePoints = pointsForRange(analytics.market.priceTrend, range);
   const dexPoints = pointsForRange(analytics.dex.volumeTrend, range);
@@ -234,6 +251,8 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
   const appRevenuePoints = pointsForRange(analytics.economy.appRevenueTrend, range);
   const appFeesPoints = pointsForRange(analytics.economy.appFeesTrend, range);
   const userFeesPoints = pointsForRange(analytics.economy.userFeesTrend, range);
+  const perpsPoints = pointsForRange(analytics.derivatives.perpsVolumeTrend, range);
+  const inflowPoints = pointsForRange(analytics.flows.netInflowsTrend, range);
   const dexAveragePoints = movingAverageTrend(dexPoints);
   const marketCapPoints = valueTrendFromPrice(
     pricePoints,
@@ -258,6 +277,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.market.priceUsd, 6),
       helper: formatSignedPercent(changeForPoints(pricePoints)),
       color: "#2f81ff",
+      category: "core",
       points: pricePoints,
       formatter: (value) => formatCurrency(value, 6),
       mark: "line",
@@ -269,6 +289,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.market.marketCapUsd),
       helper: "derived from MON price",
       color: "#ff2f7d",
+      category: "core",
       points: marketCapPoints,
       formatter: formatCurrency,
       mark: "area",
@@ -279,19 +300,10 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.market.fdvUsd),
       helper: "fully diluted value",
       color: "#d22cff",
+      category: "core",
       points: fdvPoints,
       formatter: formatCurrency,
       mark: "line",
-    },
-    {
-      id: "marketVolume",
-      label: "Market volume",
-      value: formatCurrency(analytics.market.volume24hUsd),
-      helper: "24h token volume",
-      color: "#8b5cf6",
-      points: [],
-      formatter: formatCurrency,
-      mark: "bar",
     },
     {
       id: "chainTvl",
@@ -299,6 +311,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(tvl),
       helper: `${analytics.defi.protocolTvl.length} tracked protocols`,
       color: "#2f81ff",
+      category: "core",
       points: tvlPoints,
       formatter: formatCurrency,
       mark: "area",
@@ -309,87 +322,19 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.stablecoins.totalUsd),
       helper: topStable ? `${topStable.symbol} ${formatPercent(topStable.sharePct)}` : "tracked stables",
       color: "#ff2f7d",
+      category: "core",
       points: stablePoints,
       formatter: formatCurrency,
       mark: "area",
     },
     {
-      id: "rwaActiveMcap",
-      label: "RWA active mcap",
-      value: formatCurrency(analytics.defi.rwaActiveMcapUsd),
-      helper: "DefiLlama snapshot",
-      color: "#f59e0b",
+      id: "marketVolume",
+      label: "Market volume",
+      value: formatCurrency(analytics.market.volume24hUsd),
+      helper: "24h token volume",
+      color: "#8b5cf6",
+      category: "volume",
       points: [],
-      formatter: formatCurrency,
-      mark: "area",
-    },
-    {
-      id: "chainFees",
-      label: "Chain fees",
-      value: formatCurrency(analytics.economy.chainFeesUsd),
-      helper: "24h chain-native fees",
-      color: "#50c861",
-      points: [],
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "chainRevenue",
-      label: "Chain revenue",
-      value: formatCurrency(analytics.economy.chainRevenueUsd),
-      helper: "24h chain revenue",
-      color: "#14b8a6",
-      points: revenuePoints,
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "chainRev",
-      label: "REV (fees + tips)",
-      value: formatCurrency(analytics.economy.chainRevUsd),
-      helper: "24h real economic value",
-      color: "#22c55e",
-      points: [],
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "tokenIncentives",
-      label: "Token incentives",
-      value: formatCurrency(analytics.economy.tokenIncentivesUsd),
-      helper: "24h emissions",
-      color: "#facc15",
-      points: [],
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "appRevenue",
-      label: "App revenue",
-      value: formatCurrency(analytics.economy.appRevenueUsd),
-      helper: "24h app revenue",
-      color: "#06b6d4",
-      points: appRevenuePoints,
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "appFees",
-      label: "App fees",
-      value: formatCurrency(analytics.economy.appFeesUsd),
-      helper: "24h app fees",
-      color: "#c75323",
-      points: appFeesPoints,
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
-      id: "feesPaid",
-      label: "Fees paid",
-      value: formatCurrency(analytics.economy.dailyFeesUsd),
-      helper: "24h protocol fees",
-      color: "#fb923c",
-      points: userFeesPoints.length > 0 ? userFeesPoints : feePoints,
       formatter: formatCurrency,
       mark: "bar",
     },
@@ -399,6 +344,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.dex.volume24hUsd),
       helper: "24h volume",
       color: "#50c861",
+      category: "volume",
       points: dexPoints,
       formatter: formatCurrency,
       mark: "bar",
@@ -409,6 +355,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(latestValue(dexAveragePoints)),
       helper: "smoothed volume",
       color: "#9bd66b",
+      category: "volume",
       points: dexAveragePoints,
       formatter: formatCurrency,
       mark: "line",
@@ -419,20 +366,110 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.derivatives.perpsVolume24hUsd),
       helper: analytics.derivatives.perpsVolume7dUsd ? `${formatCurrency(analytics.derivatives.perpsVolume7dUsd)} 7d` : "DefiLlama snapshot",
       color: "#a855f7",
-      points: analytics.derivatives.perpsVolumeTrend,
+      category: "volume",
+      points: perpsPoints,
       formatter: formatCurrency,
       mark: "bar",
       tone: toneForPercent(analytics.derivatives.perpsChange7dPct),
     },
     {
-      id: "activeAddresses",
-      label: "Active addresses",
-      value: formatNumber(analytics.network.activeAddresses),
-      helper: "not available from DefiLlama",
-      color: "#d22cff",
+      id: "volumeToTvl",
+      label: "Volume / TVL",
+      value: formatPercent(analytics.dex.volumeToTvlPct),
+      helper: "DEX capital velocity",
+      color: "#f97316",
+      category: "volume",
       points: [],
-      formatter: formatNumber,
+      formatter: (value) => formatPercent(value),
       mark: "bar",
+    },
+    {
+      id: "feesPaid",
+      label: "Fees paid",
+      value: formatCurrency(analytics.economy.dailyFeesUsd),
+      helper: "24h protocol fees",
+      color: "#fb923c",
+      category: "fees",
+      points: userFeesPoints.length > 0 ? userFeesPoints : feePoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainFees",
+      label: "Chain fees",
+      value: formatCurrency(analytics.economy.chainFeesUsd),
+      helper: "24h chain-native fees",
+      color: "#50c861",
+      category: "fees",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainRevenue",
+      label: "Chain revenue",
+      value: formatCurrency(analytics.economy.chainRevenueUsd),
+      helper: "24h chain revenue",
+      color: "#14b8a6",
+      category: "fees",
+      points: revenuePoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "chainRev",
+      label: "REV (fees + tips)",
+      value: formatCurrency(analytics.economy.chainRevUsd),
+      helper: "24h real economic value",
+      color: "#22c55e",
+      category: "fees",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "tokenIncentives",
+      label: "Token incentives",
+      value: formatCurrency(analytics.economy.tokenIncentivesUsd),
+      helper: "24h emissions",
+      color: "#facc15",
+      category: "fees",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "appRevenue",
+      label: "App revenue",
+      value: formatCurrency(analytics.economy.appRevenueUsd),
+      helper: "24h app revenue",
+      color: "#06b6d4",
+      category: "fees",
+      points: appRevenuePoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "appFees",
+      label: "App fees",
+      value: formatCurrency(analytics.economy.appFeesUsd),
+      helper: "24h app fees",
+      color: "#c75323",
+      category: "fees",
+      points: appFeesPoints,
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "annualizedFees",
+      label: "Annualized fees",
+      value: formatCurrency(analytics.economy.annualizedFeesUsd),
+      helper: "daily fees x 365",
+      color: "#f59e0b",
+      category: "fees",
+      points: annualizedFeePoints,
+      formatter: formatCurrency,
+      mark: "line",
     },
     {
       id: "netInflows",
@@ -440,7 +477,8 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.flows.netInflows24hUsd),
       helper: "24h bridge flow",
       color: "#7c3aed",
-      points: analytics.flows.netInflowsTrend,
+      category: "flows",
+      points: inflowPoints,
       formatter: formatCurrency,
       mark: "bar",
       tone:
@@ -451,34 +489,15 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
           : "neutral",
     },
     {
-      id: "totalRaised",
-      label: "Total raised",
-      value: formatCurrency(analytics.defi.totalRaisedUsd),
-      helper: "funding rounds",
-      color: "#f97316",
-      points: [],
-      formatter: formatCurrency,
-      mark: "bar",
-    },
-    {
       id: "bridgedTvl",
       label: "Bridged TVL",
       value: formatCurrency(analytics.defi.bridgedTvlUsd),
       helper: "DefiLlama chain assets",
       color: "#38bdf8",
+      category: "flows",
       points: [],
       formatter: formatCurrency,
       mark: "area",
-    },
-    {
-      id: "annualizedFees",
-      label: "Annualized fees",
-      value: formatCurrency(analytics.economy.annualizedFeesUsd),
-      helper: "daily fees x 365",
-      color: "#f59e0b",
-      points: annualizedFeePoints,
-      formatter: formatCurrency,
-      mark: "line",
     },
     {
       id: "dexTvl",
@@ -486,9 +505,43 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.dex.tvlUsd),
       helper: "tracked DEX liquidity",
       color: "#06b6d4",
+      category: "flows",
       points: [],
       formatter: formatCurrency,
       mark: "area",
+    },
+    {
+      id: "rwaActiveMcap",
+      label: "RWA active mcap",
+      value: formatCurrency(analytics.defi.rwaActiveMcapUsd),
+      helper: "DefiLlama snapshot",
+      color: "#f59e0b",
+      category: "flows",
+      points: [],
+      formatter: formatCurrency,
+      mark: "area",
+    },
+    {
+      id: "totalRaised",
+      label: "Total raised",
+      value: formatCurrency(analytics.defi.totalRaisedUsd),
+      helper: "funding rounds",
+      color: "#f97316",
+      category: "flows",
+      points: [],
+      formatter: formatCurrency,
+      mark: "bar",
+    },
+    {
+      id: "activeAddresses",
+      label: "Active addresses",
+      value: formatNumber(analytics.network.activeAddresses),
+      helper: "24h active wallets",
+      color: "#d22cff",
+      category: "network",
+      points: [],
+      formatter: formatNumber,
+      mark: "bar",
     },
     {
       id: "stakedValue",
@@ -496,6 +549,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatCurrency(analytics.staking.totalValueStakedUsd),
       helper: formatMon(analytics.staking.totalActiveStakeMon),
       color: "#a78bfa",
+      category: "network",
       points: [],
       formatter: formatCurrency,
       mark: "area",
@@ -506,6 +560,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatPercent(analytics.staking.estimatedApyPct),
       helper: `${formatPercent(analytics.staking.minApyPct)} - ${formatPercent(analytics.staking.maxApyPct)}`,
       color: "#84cc16",
+      category: "network",
       points: [],
       formatter: (value) => formatPercent(value),
       mark: "line",
@@ -517,6 +572,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatNumber(analytics.staking.activeValidators),
       helper: `${formatNumber(analytics.staking.activeSetCap)} active cap`,
       color: "#22c55e",
+      category: "network",
       points: [],
       formatter: formatNumber,
       mark: "bar",
@@ -527,6 +583,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatNumber(analytics.decentralization.nakamotoSafety),
       helper: "validators for 1/3 stake",
       color: "#38bdf8",
+      category: "network",
       points: [],
       formatter: formatNumber,
       mark: "bar",
@@ -537,20 +594,11 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatPercent(analytics.decentralization.top10SharePct),
       helper: "validator concentration",
       color: "#fb7185",
+      category: "network",
       points: [],
       formatter: (value) => formatPercent(value),
       mark: "bar",
       tone: analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral",
-    },
-    {
-      id: "volumeToTvl",
-      label: "Volume / TVL",
-      value: formatPercent(analytics.dex.volumeToTvlPct),
-      helper: "DEX capital velocity",
-      color: "#f97316",
-      points: [],
-      formatter: (value) => formatPercent(value),
-      mark: "bar",
     },
     {
       id: "psRatio",
@@ -558,6 +606,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatNumber(analytics.economy.psRatio, 1),
       helper: "market cap / annual fees",
       color: "#facc15",
+      category: "valuation",
       points: [],
       formatter: (value) => formatNumber(value, 1),
       mark: "line",
@@ -568,6 +617,7 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       value: formatNumber(analytics.economy.pfRatio, 1),
       helper: "market cap / fee run-rate",
       color: "#fb923c",
+      category: "valuation",
       points: [],
       formatter: (value) => formatNumber(value, 1),
       mark: "line",
@@ -631,33 +681,6 @@ function MiniSparkline({ points, color }: { points: AnalyticsPoint[]; color: str
   );
 }
 
-function PulseCard({
-  label,
-  value,
-  helper,
-  tone = "neutral",
-  points = [],
-  color = "var(--color-accent-primary)",
-}: {
-  label: string;
-  value: string;
-  helper?: string;
-  tone?: Tone;
-  points?: AnalyticsPoint[];
-  color?: string;
-}) {
-  return (
-    <div className={`grid min-h-[126px] grid-rows-[auto_1fr_auto] rounded-[var(--radius-lg)] border p-3 ${toneClasses(tone)}`}>
-      <div className="label-caps truncate text-current opacity-70">{label}</div>
-      <div className="mt-3 min-w-0">
-        <div className="truncate font-mono text-[24px] font-black leading-none text-[var(--color-text-primary)]">{value}</div>
-        {helper && <div className="mt-2 truncate text-[12px] font-semibold text-[var(--color-text-muted)]">{helper}</div>}
-      </div>
-      <MiniSparkline points={points} color={color} />
-    </div>
-  );
-}
-
 function Metric({
   label,
   value,
@@ -674,6 +697,35 @@ function Metric({
       <div className="label-caps truncate text-current opacity-70">{label}</div>
       <div className="mt-2 truncate font-mono text-[17px] font-black leading-none text-[var(--color-text-primary)]">{value}</div>
       {helper && <div className="mt-1 truncate text-[11px] font-semibold text-[var(--color-text-muted)]">{helper}</div>}
+    </div>
+  );
+}
+
+function StatRow({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  tone?: Tone;
+}) {
+  const valueColor =
+    tone === "positive"
+      ? "text-[var(--color-positive)]"
+      : tone === "negative"
+        ? "text-[var(--color-negative)]"
+        : "text-[var(--color-text-primary)]";
+
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-t border-[rgba(132,148,142,0.14)] py-2.5 first:border-t-0">
+      <div className="min-w-0">
+        <div className="truncate text-[12px] font-bold text-[var(--color-text-muted)]">{label}</div>
+        {helper && <div className="mt-0.5 truncate text-[10px] font-semibold text-[var(--color-text-dim)]">{helper}</div>}
+      </div>
+      <div className={`shrink-0 font-mono text-[14px] font-black ${valueColor}`}>{value}</div>
     </div>
   );
 }
@@ -728,82 +780,155 @@ function DetailTabButton({
   );
 }
 
-function MetricPill({
+function SelectedMetricPill({
   metric,
-  selected,
-  onClick,
+  onRemove,
 }: {
   metric: ChartMetric;
-  selected: boolean;
-  onClick: () => void;
+  onRemove: () => void;
 }) {
-  const canChart = metric.points.length >= 2;
-
   return (
     <button
       type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`flex h-9 max-w-full items-center gap-2 rounded-full border px-3 text-[12px] font-black transition-colors ${
-        canChart || selected
-          ? "bg-[rgba(255,255,255,0.025)] text-[var(--color-text-primary)] hover:bg-[rgba(255,255,255,0.05)]"
-          : "border-[rgba(132,148,142,0.16)] bg-[rgba(255,255,255,0.012)] text-[var(--color-text-dim)] hover:bg-[rgba(255,255,255,0.035)]"
-      }`}
-      style={{
-        borderColor: selected ? metric.color : undefined,
-        boxShadow: selected ? `inset 0 0 0 1px ${metric.color}` : undefined,
-      }}
+      onClick={onRemove}
+      aria-label={`Remove ${metric.label} from chart`}
+      className="flex h-9 max-w-full items-center gap-2 rounded-full border bg-[rgba(255,255,255,0.025)] px-3 text-[12px] font-black text-[var(--color-text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.05)]"
+      style={{ borderColor: metric.color, boxShadow: `inset 0 0 0 1px ${metric.color}` }}
     >
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
       <span className="truncate">{metric.label}</span>
-      {selected && <span className="font-mono text-[14px] leading-none" aria-hidden="true">x</span>}
+      <span className="font-mono text-[14px] leading-none opacity-70" aria-hidden="true">
+        ×
+      </span>
     </button>
   );
 }
 
-function MetricShelfTile({
-  metric,
-  selected,
-  onClick,
+function MetricPickerModal({
+  metrics,
+  selectedIds,
+  onToggle,
+  onClose,
 }: {
-  metric: ChartMetric;
-  selected: boolean;
-  onClick: () => void;
+  metrics: ChartMetric[];
+  selectedIds: ChartMetricId[];
+  onToggle: (metric: ChartMetric) => void;
+  onClose: () => void;
 }) {
-  const canChart = metric.points.length >= 2;
-  const content = (
-    <>
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <div className="label-caps min-w-0 truncate text-current opacity-70">{metric.label}</div>
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
-      </div>
-      <div className="mt-2 truncate font-mono text-[17px] font-black leading-none text-[var(--color-text-primary)]">{metric.value}</div>
-      <div className="mt-1 truncate text-[11px] font-semibold text-[var(--color-text-muted)]">{metric.helper}</div>
-      {!canChart && <div className="mt-2 label-caps text-[var(--color-text-dim)]">Snapshot</div>}
-    </>
-  );
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = normalizedQuery
+    ? metrics.filter((metric) => metric.label.toLowerCase().includes(normalizedQuery))
+    : metrics;
+  const groups = CATEGORY_ORDER.map((category) => ({
+    category,
+    all: metrics.filter((metric) => metric.category === category),
+    visible: filtered.filter((metric) => metric.category === category),
+  })).filter((group) => group.all.length > 0);
+  const selectedCount = metrics.filter((metric) => selectedIds.includes(metric.id)).length;
 
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`min-w-0 rounded-[var(--radius-md)] border px-3 py-3 text-left transition-colors ${
-        selected
-          ? "bg-[rgba(255,255,255,0.045)]"
-          : "bg-[rgba(255,255,255,0.018)] hover:bg-[rgba(255,255,255,0.04)]"
-      }`}
-      style={{ borderColor: selected ? metric.color : "rgba(132,148,142,0.22)" }}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chart metrics"
+      className="absolute left-0 top-[calc(100%+8px)] z-40 w-[min(560px,calc(100vw-48px))] rounded-[var(--radius-lg)] border border-[rgba(132,148,142,0.35)] bg-[var(--color-bg-surface-solid)] shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
     >
-      {content}
-    </button>
+      <div className="flex items-center justify-between gap-3 border-b border-[rgba(132,148,142,0.18)] px-4 py-3">
+        <div className="flex items-baseline gap-2">
+          <div className="text-[15px] font-black text-[var(--color-text-primary)]">Chart metrics</div>
+          <div className="font-mono text-[11px] font-bold text-[var(--color-text-dim)]">
+            {selectedCount}/{metrics.length}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close metric picker"
+          className="grid h-8 w-8 place-items-center rounded-[var(--radius-md)] border border-transparent text-[16px] font-black text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-border)] hover:text-[var(--color-text-primary)]"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="max-h-[min(420px,60vh)] overflow-y-auto px-4 pb-4">
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={`Search ${metrics.length} metrics...`}
+          className="mt-3 h-10 w-full rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.28)] bg-[rgba(255,255,255,0.03)] px-3 text-[13px] font-semibold text-[var(--color-text-primary)] placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-border-hover)] focus:outline-none"
+        />
+
+        {groups.map((group) => {
+          if (normalizedQuery && group.visible.length === 0) return null;
+          const groupSelected = group.all.filter((metric) => selectedIds.includes(metric.id)).length;
+          return (
+            <div key={group.category} className="mt-4">
+              <div className="label-caps flex items-baseline gap-2 text-[var(--color-text-dim)]">
+                <span>{CATEGORY_LABELS[group.category]}</span>
+                <span className="font-mono">
+                  {groupSelected}/{group.all.length}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {group.visible.map((metric) => {
+                  const selected = selectedIds.includes(metric.id);
+                  return (
+                    <button
+                      key={metric.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => onToggle(metric)}
+                      className={`flex h-9 max-w-full items-center gap-2 rounded-full border px-3 text-[12px] font-black transition-colors ${
+                        selected
+                          ? "bg-[rgba(255,255,255,0.04)] text-[var(--color-text-primary)]"
+                          : "border-[rgba(132,148,142,0.24)] bg-[rgba(255,255,255,0.018)] text-[var(--color-text-secondary)] hover:bg-[rgba(255,255,255,0.045)]"
+                      }`}
+                      style={selected ? { borderColor: metric.color } : undefined}
+                    >
+                      {selected ? (
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: metric.color }} />
+                      ) : (
+                        <span className="font-mono text-[14px] leading-none text-[var(--color-text-dim)]" aria-hidden="true">
+                          +
+                        </span>
+                      )}
+                      <span className="truncate">{metric.label}</span>
+                      {selected && (
+                        <span className="font-mono text-[14px] leading-none opacity-70" aria-hidden="true">
+                          ×
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {normalizedQuery && filtered.length === 0 && (
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.2)] px-3 py-4 text-center text-[12px] font-semibold text-[var(--color-text-muted)]">
+            No chartable metric matches &ldquo;{query}&rdquo;.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
 function MultiMetricChart({ metrics }: { metrics: ChartMetric[] }) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [hoverRatio, setHoverRatio] = useState<number | null>(null);
-  const chartableMetrics = metrics.filter((metric) => metric.points.length >= 2);
+  const chartableMetrics = metrics.filter(isChartable);
   const activeRatio = hoverRatio ?? 1;
   const primaryPoints = sortedPoints(chartableMetrics[0]?.points || []);
   const firstPoint = primaryPoints[0];
@@ -1021,12 +1146,11 @@ function LoadingState() {
   return (
     <div className="grid gap-4">
       <div className="h-24 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)]" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-32 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
-        ))}
+      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="h-[420px] animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
+        <div className="h-[420px] animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
       </div>
-      <div className="h-[360px] animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
+      <div className="h-48 animate-pulse rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]" />
     </div>
   );
 }
@@ -1041,11 +1165,10 @@ export function AnalyticsDashboard() {
     "stableLiquidity",
     "dexVolume",
     "feesPaid",
-    "chainRevenue",
-    "appFees",
   ]);
-  const [showMetricShelf, setShowMetricShelf] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("defi");
+  const pickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1067,12 +1190,33 @@ export function AnalyticsDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPickerOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pickerOpen]);
+
   const chartMetrics = useMemo(
     () => (analytics ? buildChartMetrics(analytics, chartRange) : []),
     [analytics, chartRange]
   );
-  const chartableMetrics = chartMetrics.filter((metric) => metric.points.length >= 2);
-  const selectedMetrics = chartMetrics.filter((metric) => selectedMetricIds.includes(metric.id));
+  const chartableMetrics = chartMetrics.filter(isChartable);
+  const snapshotMetrics = chartMetrics.filter((metric) => !isChartable(metric));
+  const selectedMetrics = chartableMetrics.filter((metric) => selectedMetricIds.includes(metric.id));
   const comparisonMetrics = selectedMetrics.length > 0 ? selectedMetrics : chartableMetrics.slice(0, 4);
 
   function toggleMetric(metric: ChartMetric) {
@@ -1101,6 +1245,10 @@ export function AnalyticsDashboard() {
   const topRate = analytics.defi.topRates[0];
   const sourceLine = (meta?.sources || analytics.sources).join(" + ");
   const freshnessAnchor = meta?.fetchedAt || analytics.generatedAt;
+  const snapshotGroups = CATEGORY_ORDER.map((category) => ({
+    category,
+    metrics: snapshotMetrics.filter((metric) => metric.category === category),
+  })).filter((group) => group.metrics.length > 0);
 
   return (
     <div className="space-y-4">
@@ -1117,39 +1265,46 @@ export function AnalyticsDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <PulseCard
-          label="MON price"
-          value={formatCurrency(analytics.market.priceUsd, 6)}
-          helper={`${formatSignedPercent(analytics.market.change24hPct)} 24h`}
-          tone={toneForPercent(analytics.market.change24hPct)}
-          points={analytics.market.priceTrend}
-          color="var(--color-accent-primary)"
-        />
-        <PulseCard
-          label="DEX volume"
-          value={formatCurrency(analytics.dex.volume24hUsd)}
-          helper={`${formatCurrency(analytics.dex.volume7dUsd)} 7d`}
-          points={analytics.dex.volumeTrend}
-          color="var(--color-accent-secondary)"
-        />
-        <PulseCard
-          label="Chain TVL"
-          value={formatCurrency(tvl)}
-          helper={`${analytics.defi.protocolTvl.length} tracked protocols`}
-          points={analytics.defi.tvlTrend}
-          color="var(--color-accent-violet)"
-        />
-        <PulseCard
-          label="Stable liquidity"
-          value={formatCurrency(analytics.stablecoins.totalUsd)}
-          helper={stableLeader ? `${stableLeader.symbol} ${formatPercent(stableLeader.sharePct)}` : "tracked stables"}
-          points={analytics.stablecoins.trend}
-          color="var(--color-warning)"
-        />
-      </div>
+      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <ShellPanel className="self-start p-4">
+          <div className="label-caps text-[var(--color-text-dim)]">MON price</div>
+          <div className="mt-2 flex items-baseline gap-3">
+            <div className="min-w-0 truncate font-mono text-[28px] font-black leading-none text-[var(--color-text-primary)]">
+              {formatCurrency(analytics.market.priceUsd, 6)}
+            </div>
+            <div className={`shrink-0 font-mono text-[13px] font-black ${toneForPercent(analytics.market.change24hPct) === "negative" ? "text-[var(--color-negative)]" : "text-[var(--color-positive)]"}`}>
+              {formatSignedPercent(analytics.market.change24hPct)} 24h
+            </div>
+          </div>
+          <div className="mt-3">
+            <MiniSparkline points={analytics.market.priceTrend} color="var(--color-accent-primary)" />
+          </div>
 
-      <div className="grid gap-4">
+          <div className="mt-4">
+            <StatRow label="Market cap" value={formatCurrency(analytics.market.marketCapUsd)} />
+            <StatRow label="FDV" value={formatCurrency(analytics.market.fdvUsd)} />
+            <StatRow label="Token volume" helper="24h" value={formatCurrency(analytics.market.volume24hUsd)} />
+            <StatRow label="TVL" helper={`${analytics.defi.protocolTvl.length} protocols`} value={formatCurrency(tvl)} />
+            <StatRow
+              label="Stablecoins mcap"
+              helper={stableLeader ? `${stableLeader.symbol} ${formatPercent(stableLeader.sharePct)}` : undefined}
+              value={formatCurrency(analytics.stablecoins.totalUsd)}
+            />
+            <StatRow label="DEX volume" helper="24h" value={formatCurrency(analytics.dex.volume24hUsd)} />
+            <StatRow label="Fees paid" helper="24h" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
+            <StatRow
+              label="Staked value"
+              helper={formatMon(analytics.staking.totalActiveStakeMon)}
+              value={formatCurrency(analytics.staking.totalValueStakedUsd)}
+            />
+            <StatRow
+              label="Staking APY"
+              value={formatPercent(analytics.staking.estimatedApyPct)}
+              tone={analytics.staking.estimatedApyPct && analytics.staking.estimatedApyPct > 8 ? "positive" : undefined}
+            />
+          </div>
+        </ShellPanel>
+
         <ShellPanel className="p-4">
           <SectionHeader
             eyebrow="Market pulse"
@@ -1166,41 +1321,56 @@ export function AnalyticsDashboard() {
           />
 
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowMetricShelf((current) => !current)}
-              aria-expanded={showMetricShelf}
-              className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] bg-[rgba(255,255,255,0.025)] px-3 text-[12px] font-black text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-border-hover)]"
-            >
-              Add metrics
-              <span className="font-mono text-[16px] leading-none">+</span>
-            </button>
+            <div className="relative" ref={pickerRef}>
+              <button
+                type="button"
+                onClick={() => setPickerOpen((current) => !current)}
+                aria-expanded={pickerOpen}
+                aria-haspopup="dialog"
+                className="flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[rgba(132,148,142,0.22)] bg-[rgba(255,255,255,0.025)] px-3 text-[12px] font-black text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-border-hover)]"
+              >
+                Add metrics
+                <span className="font-mono text-[16px] leading-none">+</span>
+              </button>
+              {pickerOpen && (
+                <MetricPickerModal
+                  metrics={chartableMetrics}
+                  selectedIds={selectedMetricIds}
+                  onToggle={toggleMetric}
+                  onClose={() => setPickerOpen(false)}
+                />
+              )}
+            </div>
             {comparisonMetrics.map((metric) => (
-              <MetricPill
-                key={metric.id}
-                metric={metric}
-                selected={selectedMetricIds.includes(metric.id)}
-                onClick={() => toggleMetric(metric)}
-              />
+              <SelectedMetricPill key={metric.id} metric={metric} onRemove={() => toggleMetric(metric)} />
             ))}
           </div>
 
           <MultiMetricChart metrics={comparisonMetrics} />
-
-          {showMetricShelf && (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-              {chartMetrics.map((metric) => (
-                <MetricShelfTile
-                  key={metric.id}
-                  metric={metric}
-                  selected={selectedMetricIds.includes(metric.id)}
-                  onClick={() => toggleMetric(metric)}
-                />
-              ))}
-            </div>
-          )}
         </ShellPanel>
       </div>
+
+      <ShellPanel className="p-4">
+        <SectionHeader eyebrow="Snapshot" title="Latest network stats" />
+        <div className="grid gap-4">
+          {snapshotGroups.map((group) => (
+            <div key={group.category}>
+              <div className="label-caps mb-2 text-[var(--color-text-dim)]">{CATEGORY_LABELS[group.category]}</div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+                {group.metrics.map((metric) => (
+                  <Metric
+                    key={metric.id}
+                    label={metric.label}
+                    value={metric.value}
+                    helper={metric.helper}
+                    tone={metric.tone}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ShellPanel>
 
       <ShellPanel className="p-4">
         <div className="mb-4 flex flex-col gap-3 border-b border-[rgba(132,148,142,0.18)] pb-3 md:flex-row md:items-end md:justify-between">
@@ -1245,23 +1415,6 @@ export function AnalyticsDashboard() {
                 <Metric label="Largest" value={stableLeader?.symbol || "-"} helper={stableLeader ? formatCurrency(stableLeader.valueUsd) : undefined} />
               </div>
               <StablecoinRows stablecoins={analytics.stablecoins.assets} />
-            </div>
-            <div className="xl:col-span-3">
-              <div className="mb-2 text-[12px] font-black text-[var(--color-text-secondary)]">DefiLlama metrics</div>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
-                <Metric label="RWA active" value={formatCurrency(analytics.defi.rwaActiveMcapUsd)} />
-                <Metric label="Bridged TVL" value={formatCurrency(analytics.defi.bridgedTvlUsd)} />
-                <Metric label="Total raised" value={formatCurrency(analytics.defi.totalRaisedUsd)} />
-                <Metric label="Perps 24h" value={formatCurrency(analytics.derivatives.perpsVolume24hUsd)} />
-                <Metric label="Net inflows" value={formatCurrency(analytics.flows.netInflows24hUsd)} tone={analytics.flows.netInflows24hUsd && analytics.flows.netInflows24hUsd < 0 ? "negative" : "positive"} />
-                <Metric label="App fees" value={formatCurrency(analytics.economy.appFeesUsd)} />
-                <Metric label="Chain fees" value={formatCurrency(analytics.economy.chainFeesUsd)} />
-                <Metric label="Chain revenue" value={formatCurrency(analytics.economy.chainRevenueUsd)} />
-                <Metric label="REV (fees + tips)" value={formatCurrency(analytics.economy.chainRevUsd)} />
-                <Metric label="App revenue" value={formatCurrency(analytics.economy.appRevenueUsd)} />
-                <Metric label="Fees paid" value={formatCurrency(analytics.economy.dailyFeesUsd)} />
-                <Metric label="Token incentives" value={formatCurrency(analytics.economy.tokenIncentivesUsd)} />
-              </div>
             </div>
           </div>
         )}

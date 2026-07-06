@@ -575,9 +575,7 @@ export function filterByTokens(
   action: "LEND" | "BORROW"
 ): YieldOpportunity[] {
   if (tokenSymbols.length === 0) {
-    return opps.filter(
-      (o) => o.action === action && getKnownOpportunityAssetSymbols(o).length > 0
-    );
+    return opps.filter((o) => o.action === action);
   }
 
   const symbols = new Set(tokenSymbols.map(normalizeYieldSymbol));

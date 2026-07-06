@@ -735,8 +735,8 @@ function OpportunitySection({
         </div>
       </div>
       <div className="space-y-2 md:max-h-[620px] md:overflow-y-auto md:pr-1">
-        {opportunities.slice(0, 30).map((opp, index) => (
-          <div key={`${opp.id}-${index}`} style={{ animationDelay: `${index * 25}ms` }} className="animate-fade-up">
+        {opportunities.map((opp, index) => (
+          <div key={`${opp.id}-${index}`} style={{ animationDelay: `${Math.min(index, 20) * 25}ms` }} className="animate-fade-up">
             <OpportunityRow opp={opp} />
           </div>
         ))}

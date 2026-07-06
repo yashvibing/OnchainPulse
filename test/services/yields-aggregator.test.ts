@@ -52,13 +52,14 @@ describe("yield aggregator filtering", () => {
     expect(filterByTokens(opps, ["WETH"], "LEND")).toEqual([opps[1]]);
   });
 
-  it("excludes unsupported assets from the default all-token view", () => {
+  it("includes unrecognized wrapper assets in the default all-token view", () => {
     const opps = [
       opportunity("LEND", ["USDC"]),
       opportunity("LEND", ["randomVaultShare"]),
+      opportunity("BORROW", ["USDC"]),
     ];
 
-    expect(filterByTokens(opps, [], "LEND")).toEqual([opps[0]]);
+    expect(filterByTokens(opps, [], "LEND")).toEqual([opps[0], opps[1]]);
   });
 
   it("includes DefiLlama yield pools in the default all-token view", () => {
