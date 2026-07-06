@@ -11,11 +11,8 @@ import type {
 
 type Tone = "positive" | "negative" | "warning" | "neutral";
 type ChartRange = "7d" | "30d" | "all";
-type MetricCategory = "core" | "volume" | "fees" | "flows" | "network" | "valuation";
+type MetricCategory = "core" | "volume" | "fees" | "flows" | "network";
 type ChartMetricId =
-  | "price"
-  | "marketCap"
-  | "fdv"
   | "marketVolume"
   | "chainFees"
   | "chainRevenue"
@@ -41,9 +38,7 @@ type ChartMetricId =
   | "activeValidators"
   | "nakamotoSafety"
   | "top10Stake"
-  | "volumeToTvl"
-  | "psRatio"
-  | "pfRatio";
+  | "volumeToTvl";
 type DetailTab = "defi" | "yield" | "validators";
 
 interface ChartMetric {
@@ -78,7 +73,7 @@ const CHART_RANGES: Array<{ value: ChartRange; label: string; days?: number }> =
   { value: "all", label: "All" },
 ];
 
-const CATEGORY_ORDER: MetricCategory[] = ["core", "volume", "fees", "flows", "network", "valuation"];
+const CATEGORY_ORDER: MetricCategory[] = ["core", "volume", "fees", "flows", "network"];
 
 const CATEGORY_LABELS: Record<MetricCategory, string> = {
   core: "Core",
@@ -86,7 +81,6 @@ const CATEGORY_LABELS: Record<MetricCategory, string> = {
   fees: "Fees & revenue",
   flows: "Flows & liquidity",
   network: "Network & staking",
-  valuation: "Valuation",
 };
 
 function formatCurrency(value?: number, maximumFractionDigits = 2) {
@@ -199,14 +193,6 @@ function coordinatesPath(coordinates: Array<{ x: number; y: number }>) {
     .join(" ");
 }
 
-function changeForPoints(points: AnalyticsPoint[]) {
-  if (points.length < 2) return undefined;
-  const first = points[0]?.value;
-  const last = points.at(-1)?.value;
-  if (!first || typeof last !== "number") return undefined;
-  return ((last - first) / Math.abs(first)) * 100;
-}
-
 function latestValue(points: AnalyticsPoint[]) {
   return sortedPoints(points).at(-1)?.value;
 }
@@ -217,13 +203,6 @@ function scaleTrend(points: AnalyticsPoint[], multiplier?: number) {
     timestamp: point.timestamp,
     value: point.value * multiplier,
   }));
-}
-
-function valueTrendFromPrice(points: AnalyticsPoint[], currentValue?: number, currentPrice?: number, supply?: number) {
-  if (typeof currentValue === "number" && Number.isFinite(currentValue) && currentValue > 0 && currentPrice && currentPrice > 0) {
-    return scaleTrend(points, currentValue / currentPrice);
-  }
-  return scaleTrend(points, supply);
 }
 
 function movingAverageTrend(points: AnalyticsPoint[], windowSize = 7) {
@@ -242,7 +221,6 @@ function isChartable(metric: ChartMetric) {
 }
 
 function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): ChartMetric[] {
-  const pricePoints = pointsForRange(analytics.market.priceTrend, range);
   const dexPoints = pointsForRange(analytics.dex.volumeTrend, range);
   const feePoints = pointsForRange(analytics.economy.feeTrend, range);
   const tvlPoints = pointsForRange(analytics.defi.tvlTrend, range);
@@ -254,57 +232,11 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
   const perpsPoints = pointsForRange(analytics.derivatives.perpsVolumeTrend, range);
   const inflowPoints = pointsForRange(analytics.flows.netInflowsTrend, range);
   const dexAveragePoints = movingAverageTrend(dexPoints);
-  const marketCapPoints = valueTrendFromPrice(
-    pricePoints,
-    analytics.market.marketCapUsd,
-    analytics.market.priceUsd,
-    analytics.supply.circulatingSupplyMon
-  );
-  const fdvPoints = valueTrendFromPrice(
-    pricePoints,
-    analytics.market.fdvUsd,
-    analytics.market.priceUsd,
-    analytics.supply.totalSupplyMon
-  );
   const annualizedFeePoints = scaleTrend(feePoints, 365);
   const topStable = analytics.stablecoins.assets[0];
   const tvl = analytics.defi.totalChainTvlUsd ?? analytics.defi.totalTvlUsd;
 
   return [
-    {
-      id: "price",
-      label: "MON price",
-      value: formatCurrency(analytics.market.priceUsd, 6),
-      helper: formatSignedPercent(changeForPoints(pricePoints)),
-      color: "#2f81ff",
-      category: "core",
-      points: pricePoints,
-      formatter: (value) => formatCurrency(value, 6),
-      mark: "line",
-      tone: toneForPercent(changeForPoints(pricePoints)),
-    },
-    {
-      id: "marketCap",
-      label: "Market cap",
-      value: formatCurrency(analytics.market.marketCapUsd),
-      helper: "derived from MON price",
-      color: "#ff2f7d",
-      category: "core",
-      points: marketCapPoints,
-      formatter: formatCurrency,
-      mark: "area",
-    },
-    {
-      id: "fdv",
-      label: "FDV",
-      value: formatCurrency(analytics.market.fdvUsd),
-      helper: "fully diluted value",
-      color: "#d22cff",
-      category: "core",
-      points: fdvPoints,
-      formatter: formatCurrency,
-      mark: "line",
-    },
     {
       id: "chainTvl",
       label: "TVL",
@@ -599,28 +531,6 @@ function buildChartMetrics(analytics: AnalyticsPayload, range: ChartRange): Char
       formatter: (value) => formatPercent(value),
       mark: "bar",
       tone: analytics.decentralization.top10SharePct && analytics.decentralization.top10SharePct > 45 ? "warning" : "neutral",
-    },
-    {
-      id: "psRatio",
-      label: "P/S",
-      value: formatNumber(analytics.economy.psRatio, 1),
-      helper: "market cap / annual fees",
-      color: "#facc15",
-      category: "valuation",
-      points: [],
-      formatter: (value) => formatNumber(value, 1),
-      mark: "line",
-    },
-    {
-      id: "pfRatio",
-      label: "P/F",
-      value: formatNumber(analytics.economy.pfRatio, 1),
-      helper: "market cap / fee run-rate",
-      color: "#fb923c",
-      category: "valuation",
-      points: [],
-      formatter: (value) => formatNumber(value, 1),
-      mark: "line",
     },
   ];
 }

@@ -111,15 +111,18 @@ describe("AnalyticsDashboard metric picker", () => {
     const dialog = await openPicker();
 
     // Chartable metrics (trend data in the payload) are offered.
-    expect(within(dialog).getByRole("button", { name: "MON price" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /DEX volume/u })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "App fees" })).toBeInTheDocument();
 
     // Snapshot-only metrics (no trend points) must not be offered.
     expect(within(dialog).queryByRole("button", { name: "Validators" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "P/S" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Bridged TVL" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Perps volume" })).not.toBeInTheDocument();
+
+    // Removed metrics must not exist at all.
+    expect(within(dialog).queryByRole("button", { name: "MON price" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Market cap" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "FDV" })).not.toBeInTheDocument();
   });
 
   it("closes via the close button and via clicking outside", async () => {
@@ -138,9 +141,9 @@ describe("AnalyticsDashboard metric picker", () => {
     render(<AnalyticsDashboard />);
     const dialog = await openPicker();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "MON price" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "App fees" }));
     expect(screen.getByRole("dialog", { name: "Chart metrics" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove MON price from chart" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove App fees from chart" })).toBeInTheDocument();
   });
 
   it("shows snapshot-only metrics in the network stats section", async () => {
@@ -149,7 +152,11 @@ describe("AnalyticsDashboard metric picker", () => {
 
     const section = screen.getByText("Latest network stats").closest("section") as HTMLElement;
     expect(within(section).getByText("Validators")).toBeInTheDocument();
-    expect(within(section).getByText("P/S")).toBeInTheDocument();
     expect(within(section).getByText("Bridged TVL")).toBeInTheDocument();
+
+    // The valuation section (P/S, P/F) was removed entirely.
+    expect(screen.queryByText("Valuation")).not.toBeInTheDocument();
+    expect(screen.queryByText("P/S")).not.toBeInTheDocument();
+    expect(screen.queryByText("P/F")).not.toBeInTheDocument();
   });
 });
