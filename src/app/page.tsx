@@ -8,29 +8,23 @@ interface PageProps {
 }
 
 export const metadata: Metadata = {
-  title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
+  title: "Onchain Pulse - Monad Markets, DeFi Rates, News & Alerts",
   description:
-    "Explore public portfolios, token markets, displayed DeFi rates, latest news, Telegram alerts, and Monad ecosystem context.",
+    "Token markets, displayed DeFi rates, chain analytics, latest news, Telegram alerts, and public portfolio views for the Monad ecosystem.",
   openGraph: {
-    title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
+    title: "Onchain Pulse - Monad Markets, DeFi Rates, News & Alerts",
     description:
-      "Inspect public portfolios, scan token markets, compare displayed DeFi rates, follow latest news, set Telegram alerts, and browse Monad ecosystem context.",
+      "Scan token markets, compare displayed DeFi rates, review chain analytics, follow latest news, set Telegram alerts, and inspect public portfolios on Monad.",
     images: [{ url: "/api/og", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Onchain Pulse - Portfolio, Token Markets, DeFi Rates & Alerts",
+    title: "Onchain Pulse - Monad Markets, DeFi Rates, News & Alerts",
     images: ["/api/og"],
   },
 };
 
 const FEATURE_CARDS = [
-  {
-    title: "Portfolio Tracker",
-    eyebrow: "Core app",
-    body: "Paste any public EVM wallet or load a demo wallet to inspect Monad holdings, positions, charts, and exports.",
-    href: "/app",
-  },
   {
     title: "Token Markets",
     eyebrow: "Markets",
@@ -46,7 +40,7 @@ const FEATURE_CARDS = [
   {
     title: "Analytics",
     eyebrow: "Signals",
-    body: "Review source health, portfolio usage context, and ecosystem activity from the monitoring view.",
+    body: "Review chain metrics, source health, and ecosystem activity from the monitoring view.",
     href: "/analytics",
   },
   {
@@ -56,16 +50,22 @@ const FEATURE_CARDS = [
     href: "/news",
   },
   {
-    title: "Ecosystem",
-    eyebrow: "Directory",
-    body: "Browse DeltaV startup listings and open DeltaV to leave feedback.",
-    href: "/startups",
-  },
-  {
     title: "Telegram Alerts",
     eyebrow: "Alerts",
     body: "Set APR thresholds, new-market alerts, displayed-rate changes, and daily briefs for Telegram.",
     href: "/alerts",
+  },
+  {
+    title: "Portfolio Tracker",
+    eyebrow: "Portfolio",
+    body: "Paste any public EVM wallet or load a demo wallet to inspect Monad holdings, positions, charts, and exports.",
+    href: "/app",
+  },
+  {
+    title: "Ecosystem",
+    eyebrow: "Directory",
+    body: "Browse DeltaV startup listings and open DeltaV to leave feedback.",
+    href: "/startups",
   },
 ];
 
@@ -89,17 +89,23 @@ export default async function HomePage({ searchParams }: PageProps) {
               Read-only Monad intelligence
             </div>
             <h1 className="mt-4 max-w-[840px] text-[40px] font-bold text-[var(--color-text-primary)] md:text-[60px]">
-              Track any Monad wallet without connecting one.
+              The pulse of the Monad ecosystem.
             </h1>
             <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
-              Onchain Pulse turns a public wallet address into a live portfolio
-              view across token balances, staking, lending, liquidity, vaults,
-              token markets, rates, news, and Telegram alerts.
+              Token markets, DeFi rates, chain analytics, curated news, and
+              Telegram alerts in one place &mdash; plus a read-only portfolio
+              view for any public wallet, no connection required.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/app" className="btn-primary px-5 py-3 text-[13px]">
-                Open app
+              <Link href="/token-markets" className="btn-primary px-5 py-3 text-[13px]">
+                Explore markets
+              </Link>
+              <Link
+                href="/app"
+                className="inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-border)] px-5 py-3 text-[13px] font-bold text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]"
+              >
+                Track a wallet
               </Link>
             </div>
           </div>
@@ -112,14 +118,14 @@ export default async function HomePage({ searchParams }: PageProps) {
                 Current app areas
               </div>
               <h2 className="mt-2 text-[24px] font-bold text-[var(--color-text-primary)]">
-                Built around the tracker, with market context around it
+                One toolkit for markets, yields, news, and alerts
               </h2>
             </div>
             <Link
-              href="/app"
+              href="/token-markets"
               className="inline-flex min-h-10 items-center text-[12px] font-bold text-[var(--color-accent-primary)] hover:opacity-80"
             >
-              Start with a wallet &rarr;
+              Start with markets &rarr;
             </Link>
           </div>
 

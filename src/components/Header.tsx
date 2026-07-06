@@ -6,13 +6,13 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/app", label: "Portfolio", group: "primary" },
   { href: "/token-markets", label: "Markets", group: "primary" },
   { href: "/defi-rates", label: "Rates", group: "primary" },
-  { href: "/alerts", label: "Alerts", group: "primary" },
-  { href: "/analytics", label: "Analytics", group: "secondary" },
+  { href: "/analytics", label: "Analytics", group: "primary" },
+  { href: "/app", label: "Portfolio", group: "primary" },
   { href: "/news", label: "News", group: "secondary" },
   { href: "/startups", label: "Ecosystem", group: "secondary" },
+  { href: "/alerts", label: "Alerts", group: "secondary" },
   ...(process.env.NODE_ENV === "development"
     ? [{ href: "/nfts", label: "NFTs (dev)", group: "secondary" }]
     : []),
