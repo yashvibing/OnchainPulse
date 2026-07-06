@@ -42,6 +42,10 @@ describe("LatestNewsSection", () => {
       "src",
       "https://cdn.example.com/monad-card.jpg"
     );
+    expect(screen.getByRole("link", { name: /View news/u })).toHaveAttribute(
+      "href",
+      "https://example.com/article"
+    );
     expect(screen.queryByText(/cdn\.example\.com/u)).not.toBeInTheDocument();
     expect(screen.queryByText("Add news")).not.toBeInTheDocument();
   });
