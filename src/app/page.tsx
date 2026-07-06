@@ -89,12 +89,12 @@ export default async function HomePage({ searchParams }: PageProps) {
               Read-only Monad intelligence
             </div>
             <h1 className="mt-4 max-w-[840px] text-[40px] font-bold text-[var(--color-text-primary)] md:text-[60px]">
-              The pulse of the Monad ecosystem.
+              The pulse of the Monad&nbsp;ecosystem.
             </h1>
             <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-[var(--color-text-secondary)]">
               Token markets, DeFi rates, chain analytics, curated news, and
-              Telegram alerts in one place &mdash; plus a read-only portfolio
-              view for any public wallet, no connection required.
+              Telegram alerts in one place, plus a read-only portfolio view
+              for any public wallet. No connection required.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
